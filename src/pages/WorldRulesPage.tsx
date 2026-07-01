@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 
 interface WorldRule {
-  id?: number; category: string; ruleText: string; boundary: string
+  id?: number; category: string; ruleText: string; rule_text?: string; boundary: string
 }
 
 export default function WorldRulesPage() {
