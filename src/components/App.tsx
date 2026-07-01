@@ -61,11 +61,22 @@ function AppRoutes() {
   // 轮询快照和事件
   useEffect(() => {
     if (mode === 'running') {
+      // 推送更新触发即时刷新
+      const cleanupPush = window.electronAPI?.onRuntimeUpdate(() => {
+        refreshSnapshot()
+        refreshEvents()
+        refreshChapters()
+      })
+      // 降级轮询（推送失败时的保底）
       pollRef.current = setInterval(async () => {
         await refreshSnapshot()
         await refreshEvents()
         await refreshChapters()
-      }, 2000)
+      }, 10000) // 轮询间隔从 2s 延长到 10s，由推送驱动即时更新
+      return () => {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+        if (cleanupPush) cleanupPush()
+      }
     } else {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
     }

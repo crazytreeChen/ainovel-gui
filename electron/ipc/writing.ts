@@ -354,6 +354,19 @@ function startRuntimeSync() {
         }
       } catch (e) { log.error('runtime-sync:chapters', e) }
     }
+
+    // 推送最新快照到渲染进程（替代前端轮询）
+    try {
+      const { ipcMain } = require('electron')
+      // 复用 get-snapshot 处理逻辑：通过 ipcMain 已有的事件处理
+      // 直接向渲染进程推送数据
+      if (bookId && state.mainWindow && !state.mainWindow.isDestroyed()) {
+        state.mainWindow.webContents.send('runtime-update', {
+          type: 'sync',
+          timestamp: Date.now(),
+        })
+      }
+    } catch (e) { log.error('runtime-sync:push', e) }
   }, 10000)
 }
 

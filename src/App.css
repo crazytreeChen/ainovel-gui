@@ -328,6 +328,109 @@ html, body, #root {
   border-left: 2px solid var(--color-accent);
 }
 
+/* ── 工具类：减少内联 style={{}} ── */
+
+/* 布局 */
+.flex-row { display: flex; flex-direction: row; }
+.flex-col { display: flex; flex-direction: column; }
+.flex-1 { flex: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-24 { gap: 24px; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.overflow-auto { overflow: auto; }
+.overflow-hidden { overflow: hidden; }
+
+/* 间距 */
+.p-8 { padding: 8px; }
+.p-12 { padding: 12px; }
+.p-16 { padding: 16px; }
+.p-24 { padding: 24px; }
+.p-32 { padding: 32px; }
+.m-0 { margin: 0; }
+.mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.ml-auto { margin-left: auto; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+
+/* 文字 */
+.text-dim { color: var(--color-dim); }
+.text-muted { color: var(--color-muted); }
+.text-accent { color: var(--color-accent); }
+.text-error { color: var(--color-error); }
+.text-success { color: var(--color-success); }
+.mono { font-family: var(--font-mono); }
+.text-sm { font-size: 12px; }
+.text-base { font-size: 13px; }
+.text-lg { font-size: 16px; }
+
+/* 输入控件 */
+.input-field {
+  width: 100%; padding: 8px 12px;
+  background: var(--color-surface-2); color: var(--color-text);
+  border: 1px solid var(--color-border); border-radius: var(--radius);
+  outline: none; font-size: 13px;
+}
+.input-field:focus { border-color: var(--color-accent); }
+.textarea-field {
+  width: 100%; padding: 8px 12px;
+  background: var(--color-surface-2); color: var(--color-text);
+  border: 1px solid var(--color-border); border-radius: var(--radius);
+  outline: none; font-size: 13px; resize: vertical; font-family: var(--font-mono);
+}
+.textarea-field:focus { border-color: var(--color-accent); }
+
+/* 面板容器 */
+.panel-surface {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.panel-surface-2 {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+
+/* 按钮 */
+.btn {
+  font-size: 12px; padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer; transition: all 0.12s;
+  background: transparent; color: var(--color-text);
+}
+.btn:hover { background: var(--color-surface-2); }
+.btn.active {
+  background: var(--color-accent); color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+.btn-primary {
+  font-size: 13px; padding: 8px 24px;
+  background: var(--color-accent); color: var(--color-bg);
+  border: none; border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-danger {
+  background: transparent; color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+.btn-sm { font-size: 11px; padding: 4px 10px; }
+.btn-block { width: 100%; text-align: center; }
+
+/* 光标 */
+.cursor-clickable { cursor: pointer; }
+.cursor-clickable:hover { opacity: 0.8; }
+
 /* ── select 下拉框 ── */
 select {
   padding: 4px 8px; background: var(--color-bg); color: var(--color-text);

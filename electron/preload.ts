@@ -132,4 +132,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('stream-output', handler)
     return () => ipcRenderer.removeListener('stream-output', handler)
   },
+
+  // 运行时同步推送（减少前端轮询）
+  onRuntimeUpdate: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('runtime-update', handler)
+    return () => ipcRenderer.removeListener('runtime-update', handler)
+  },
 })

@@ -50,28 +50,26 @@ export default function Workspace() {
   const isComplete = snapshot.phase === 'complete'
 
   return (
-    <div style={{ padding: 24, height: '100vh', display: 'flex', gap: 24 }}>
+    <div className="flex-row p-24" style={{ height: '100vh', gap: 24 }}>
       <BookNavSidebar bookId={id || ''} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="flex-1 flex-col overflow-hidden" style={{ gap: 24 }}>
         {/* 顶栏 */}
-        <div className="top-bar" style={{ padding: 0, marginBottom: 8 }}><TopBar bookName={book?.name} /></div>
+        <div className="top-bar mb-8" style={{ padding: 0 }}><TopBar bookName={book?.name} /></div>
 
         {/* 主体内容 */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div className="flex-1 flex-row overflow-hidden">
           {/* 状态侧栏 */}
           {!isRunning && !isComplete && (
-            <div style={{ marginBottom: 8, flexShrink: 0, width: '23%', minWidth: 240, borderRight: '1px solid var(--color-border)', paddingRight: 8, overflow: 'auto' }}>
-              <button onClick={handleResume} className="welcome-mode-btn active"
-                style={{ width: '100%', fontSize: 12, padding: '6px 0', textAlign: 'center', marginBottom: 8 }}>
+            <div className="state-panel">
+              <button onClick={handleResume} className="btn btn-primary btn-block mb-8">
                 ▶️ {book?.completedCount ? '继续创作' : '开始创作'}
               </button>
               <StatusSidebar />
             </div>
           )}
           {isRunning && (
-            <div style={{ flexShrink: 0, width: '23%', minWidth: 240, borderRight: '1px solid var(--color-border)', paddingRight: 8, overflow: 'auto' }}>
-              <button onClick={() => pauseWriting()} className="welcome-mode-btn"
-                style={{ width: '100%', fontSize: 12, padding: '6px 0', textAlign: 'center', borderColor: 'var(--color-error)', color: 'var(--color-error)', marginBottom: 8 }}>
+            <div className="state-panel">
+              <button onClick={() => pauseWriting()} className="btn btn-danger btn-block mb-8">
                 ⏸ 暂停
               </button>
               <StatusSidebar />
@@ -79,23 +77,17 @@ export default function Workspace() {
           )}
 
           {/* 中央：事件流 + 实时输出 */}
-          <div className="center-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '0 8px' }}>
-            <div className="event-panel" style={{ flex: 4, overflow: 'auto', padding: 8, borderBottom: '1px solid var(--color-border)' }}>
-              <EventFlow />
-            </div>
-            <div className="stream-panel" style={{ flex: 6, overflow: 'auto', padding: 8 }}>
-              <StreamOutput />
-            </div>
+          <div className="center-panel">
+            <div className="event-panel"><EventFlow /></div>
+            <div className="stream-panel"><StreamOutput /></div>
           </div>
 
           {/* 右侧详情 */}
-          <div className="detail-panel" style={{ width: '27%', minWidth: 280, borderLeft: '1px solid var(--color-border)', paddingLeft: 8, overflow: 'auto' }}>
-            <DetailPanel />
-          </div>
+          <div className="detail-panel"><DetailPanel /></div>
         </div>
 
         {/* 底部输入 */}
-        <div className="bottom-bar" style={{ padding: 0, marginTop: 8 }}><InputBox /></div>
+        <div className="bottom-bar mt-8" style={{ padding: 0 }}><InputBox /></div>
       </div>
 
       {/* 模态框 */}

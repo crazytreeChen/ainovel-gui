@@ -175,4 +175,5 @@ export interface ElectronAPI {
   onProcessExited: (callback: () => void) => () => void
   onSnapshotUpdate: (callback: (data: UISnapshot) => void) => () => void
   onStreamOutput: (callback: (data: string) => void) => () => void
+  onRuntimeUpdate: (callback: () => void) => () => void
 }
