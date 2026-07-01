@@ -530,7 +530,8 @@ function setupIPC() {
             catch { }
         }
         try {
-            return execSync(`"${binary}" --headless /simulate 2>&1`, { cwd, encoding: 'utf8', timeout: 120000 });
+            // 以 /simulate 为 prompt 启动 headless，引擎会执行仿写分析
+            return execSync(`"${binary}" --headless --prompt "/simulate" 2>&1`, { cwd, encoding: 'utf8', timeout: 120000 });
         }
         catch (e) {
             return e.stdout || e.stderr || e.message || '仿写分析执行失败';
