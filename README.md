@@ -93,15 +93,33 @@ npm run dist:linux
 npm run dist:all
 ```
 
-构建产物位于 `release/` 目录：
+构建产物位于 `release/` 目录。
 
+### 一键发布到 GitHub Release
+
+```bash
+# 完整发布流程（编译 mac + win → 计算 SHA256 → 创建 Release → 上传产物）
+npm run release
+
+# 仅编译，不上传
+npm run release:build-only
+
+# 跳过 macOS / Windows 编译
+npm run release -- --skip-mac
+npm run release -- --skip-win
+
+# 草稿模式（Release 标记为 draft）
+npm run release -- --draft
+
+# 预览模式（不执行实际操作）
+npm run release:dry-run
 ```
-release/
-├── AINovel-0.1.0-mac-arm64.dmg   # macOS 安装包
-├── AINovel-0.1.0-mac-arm64.zip   # macOS 便携版
-├── AINovel-0.1.0-win-x64.exe     # Windows 安装包
-└── AINovel-0.1.0-win-x64.zip     # Windows 便携版
-```
+
+> **前置条件**：需要安装 [GitHub CLI](https://cli.github.com/) 并登录：
+> ```bash
+> brew install gh
+> gh auth login
+> ```
 
 ---
 
@@ -218,6 +236,9 @@ npm run dist:mac         # 构建 macOS DMG/ZIP
 npm run dist:win         # 构建 Windows NSIS/ZIP
 npm run dist:linux       # 构建 Linux AppImage/DEB
 npm run dist:all         # 构建全部平台
+npm run release          # 一键编译 + 发布 GitHub Release
+npm run release:build-only  # 仅编译，不发布
+npm run release:dry-run  # 预览模式
 npm run generate-icons   # 从 SVG 生成多尺寸图标
 ```
 

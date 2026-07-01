@@ -19,6 +19,9 @@
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:all": "npm run build && electron-builder --mac --win --linux",
+    "release": "node scripts/release.js",
+    "release:build-only": "node scripts/release.js --build-only",
+    "release:dry-run": "node scripts/release.js --dry-run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "generate-icons": "node scripts/generate-icons.js"
   },
