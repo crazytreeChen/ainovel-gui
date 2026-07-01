@@ -5,13 +5,18 @@
   "downloads": {
     "mac-arm64": {
       "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.2.0/AINovel-0.2.0-mac-arm64.dmg",
-      "size": 0,
-      "sha256": ""
+      "size": 97968775,
+      "sha256": "fc5390daeee02ce7491269be621a58483737a4d3952ad5f8ca77b18a1aedbe6e"
     },
     "win-x64": {
       "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.2.0/AINovel-0.2.0-win-x64.zip",
       "size": 0,
       "sha256": ""
+    },
+    "mac-arm64-zip": {
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.2.0/AINovel-0.2.0-mac-arm64.zip",
+      "size": 103460785,
+      "sha256": "1748e35e8dc766d1d32c30c23784d69fda87ab77eb6ad05b9b396b73eaeb4aa2"
     }
   }
 }
