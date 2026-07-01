@@ -1,8 +1,8 @@
 {
   "name": "ainovel-gui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AINovel - AI Novel Writing Desktop GUI (ainovel-cli 可视化界面)",
-  "author": "AINovel Team",
+  "author": "crazytree",
   "license": "MIT",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -11,12 +11,17 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "build:cli": "node scripts/build-cli.js",
     "build": "npm run build:renderer && npm run build:electron && npm run build:cli",
+    "build:optimized": "npm run build:renderer && npm run build:electron && npm run build:cli && npm run clean:modules",
+    "clean:modules": "node scripts/clean-node-modules.js",
+    "clean:modules:dry": "node scripts/clean-node-modules.js --dry-run",
     "postinstall": "node scripts/build-cli.js --check",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && npm run build:cli && tsc -p electron/tsconfig.json && cross-env NODE_ENV=development electron dist-electron/main.js\"",
     "electron:start": "npm run build && electron dist-electron/main.js",
     "pack": "npm run build && electron-builder --dir",
     "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac:opt": "npm run build:optimized && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
+    "dist:win:opt": "npm run build:optimized && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:all": "npm run build && electron-builder --mac --win --linux",
     "release": "node scripts/release.js",
@@ -51,7 +56,7 @@
   "build": {
     "appId": "com.ainovel.gui",
     "productName": "AINovel",
-    "copyright": "Copyright © 2025 AINovel Team",
+    "copyright": "Copyright © 2026 crazytree",
     "directories": {
       "buildResources": "build",
       "output": "release"

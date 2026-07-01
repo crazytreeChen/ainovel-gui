@@ -5,3 +5,7 @@ release/
 *.log
 *.db
 .DS_Store
+
+# ainovel-cli 子模块源码（按需 git submodule update）
+vendor/ainovel-cli/
+vendor/*/

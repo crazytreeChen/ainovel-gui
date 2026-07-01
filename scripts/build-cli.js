@@ -3,14 +3,17 @@
  * ainovel-cli 子模块编译脚本
  * 
  * 从 vendor/ainovel-cli/ 编译 Go 二进制到 build/ainovel-cli/bin/
+ * 编译完成后尝试 UPX 压缩（需安装 upx），可将 11MB → ~3MB
  * 
  * 用法:
  *   node scripts/build-cli.js          # 编译当前平台
  *   node scripts/build-cli.js --check  # 只检查是否需要编译
+ *   node scripts/build-cli.js --no-upx # 编译但不进行 UPX 压缩
+ *   node scripts/build-cli.js --only-upx # 只进行 UPX 压缩（已有二进制）
  */
 
 const { execSync } = require('child_process')
-const { existsSync, mkdirSync } = require('fs')
+const { existsSync, mkdirSync, statSync } = require('fs')
 const { join } = require('path')
 const os = require('os')
 
@@ -100,7 +103,56 @@ function build() {
   }
 }
 
+function upxCompress() {
+  if (process.argv.includes('--no-upx')) {
+    log('Skipping UPX compression (--no-upx flag)')
+    return true
+  }
+  if (!existsSync(OUTPUT_BIN)) {
+    warn('Binary not found, skipping UPX: ' + OUTPUT_BIN)
+    return false
+  }
+  // 检查 UPX 是否可用
+  let hasUPX = false
+  try {
+    execSync('upx --version 2>&1', { encoding: 'utf8' })
+    hasUPX = true
+  } catch { try {
+    execSync('/usr/local/bin/upx --version 2>&1', { encoding: 'utf8' })
+    hasUPX = true
+  } catch {} }
+
+  if (!hasUPX) {
+    warn('UPX not found (install with: brew install upx). Skipping compression.')
+    warn('  Binary size: ' + (statSync(OUTPUT_BIN).size / 1024 / 1024).toFixed(1) + ' MB (uncompressed)')
+    return true
+  }
+
+  const beforeSize = statSync(OUTPUT_BIN).size
+  log('Compressing with UPX...')
+  try {
+    execSync(`upx --best --no-color '${OUTPUT_BIN}'`, { stdio: 'inherit', timeout: 120000 })
+    const afterSize = statSync(OUTPUT_BIN).size
+    const saved = ((beforeSize - afterSize) / 1024 / 1024).toFixed(1)
+    log(`${GREEN}✅ UPX compressed: ${(beforeSize / 1024 / 1024).toFixed(1)} MB → ${(afterSize / 1024 / 1024).toFixed(1)} MB (saved ${saved} MB)${RESET}`)
+    return true
+  } catch (e) {
+    warn('UPX compression failed: ' + e.message)
+    warn('  Binary remains uncompressed at ' + OUTPUT_BIN)
+    return false
+  }
+}
+
 function main() {
+  // --only-upx 模式：只压缩已有二进制
+  if (process.argv.includes('--only-upx')) {
+    console.log(`${GREEN}═══════════════════════════════════════${RESET}`)
+    console.log(`${GREEN}   UPX Compression Only${RESET}`)
+    console.log(`${GREEN}═══════════════════════════════════════${RESET}`)
+    upxCompress()
+    return
+  }
+
   if (!needsBuild()) return
 
   console.log(`${GREEN}═══════════════════════════════════════${RESET}`)
@@ -109,7 +161,13 @@ function main() {
   console.log(`${GREEN}═══════════════════════════════════════${RESET}`)
 
   const ok = build()
-  process.exit(ok ? 0 : 1)
+  if (!ok) {
+    process.exit(1)
+    return
+  }
+
+  upxCompress()
+  process.exit(0)
 }
 
 main()
