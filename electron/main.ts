@@ -2,7 +2,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const { join, dirname } = require('path')
 const { ChildProcess, spawn, execSync } = require('child_process')
-const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } = require('fs')
+const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
 const os = require('os')
 const { AppDatabase } = require('./database')
 
@@ -685,11 +685,11 @@ function setupIPC() {
     catch { return [] }
   })
 
-  ipcMain.handle('create-book', async (_e, name, style) => {
+  ipcMain.handle('create-book', async (_e, name, style, phase, premise, tags) => {
     const crypto = require('crypto')
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
-    const book = { id, name, premise: '', style: style || 'default', planning_tier: 'short', phase: 'init', flow: 'writing', layered: false, total_word_count: 0, workspace_dir: null, created_at: now, updated_at: now, last_opened_at: now }
+    const book = { id, name, premise: premise || '', style: style || 'default', planning_tier: 'short', phase: phase || 'init', flow: 'writing', layered: false, total_word_count: 0, workspace_dir: null, tags: tags || '', created_at: now, updated_at: now, last_opened_at: now }
     getDB().createBook(book)
     const bookDir = join(home, '.ainovel-gui', 'books', id)
     if (!existsSync(bookDir)) mkdirSync(bookDir, { recursive: true })
@@ -1224,7 +1224,8 @@ function setupIPC() {
 
   ipcMain.handle('save-book-cover', async (_e, id, imagePath) => {
     const dir = getBookDirById(id)
-    if (!dir || !existsSync(imagePath)) return false
+    if (!dir) { console.error('[cover] dir not found for', id); return false }
+    if (!existsSync(imagePath)) { console.error('[cover] image not found:', imagePath); return false }
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     const ext = coverExts.find(e => imagePath.toLowerCase().endsWith(e)) || '.png'
     const dest = join(dir, 'cover' + ext)
@@ -1233,7 +1234,7 @@ function setupIPC() {
       const old = join(dir, 'cover' + e)
       if (old !== dest && existsSync(old)) try { unlinkSync(old) } catch {}
     }
-    try { copyFileSync(imagePath, dest); return true } catch { return false }
+    try { copyFileSync(imagePath, dest); return true } catch (e: any) { console.error('[cover] copy failed:', e.message); return e.message }
   })
 
   ipcMain.handle('get-book-cover', async (_e, id) => {

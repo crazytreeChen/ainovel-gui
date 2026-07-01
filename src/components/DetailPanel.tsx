@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/stores/useAppStore'
 import BookCover from './BookCover'
-import { AGENT_DISPLAY, AGENT_COLORS } from '@/types'
+import { AGENT_DISPLAY, AGENT_COLORS, PHASE_LABELS } from '@/types'
 
 export default function DetailPanel() {
   const snapshot = useAppStore((s) => s.snapshot)
@@ -38,7 +38,7 @@ export default function DetailPanel() {
           <div>
             <div style={{ fontWeight: 'bold', fontSize: 14, color: 'var(--color-text)' }}>{bookName || snapshot.novelName || '未定书名'}</div>
             <div className="text-dim mono" style={{ fontSize: 11, marginTop: 4 }}>
-              {snapshot.phase} · {snapshot.completedCount} 章
+              {PHASE_LABELS[snapshot.phase] || snapshot.phase} · {snapshot.completedCount} 章
             </div>
           </div>
         </div>

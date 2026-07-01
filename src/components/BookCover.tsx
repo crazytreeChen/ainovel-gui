@@ -28,12 +28,17 @@ export default function BookCover({ bookId, size = 'medium', editable, onCoverCh
 
   async function handleSelect() {
     if (!window.electronAPI || !editable) return
+    console.log('[cover] selecting image for book:', bookId)
     const path = await window.electronAPI.selectCoverImage()
+    console.log('[cover] selected path:', path)
     if (!path) return
     const ok = await window.electronAPI.saveBookCover(bookId, path)
-    if (ok) {
+    console.log('[cover] save result:', ok)
+    if (ok === true) {
       await loadCover()
       onCoverChange?.()
+    } else if (typeof ok === 'string') {
+      console.error('[cover] error:', ok)
     }
   }
 

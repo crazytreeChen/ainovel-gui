@@ -6,6 +6,9 @@ export default function NewBook() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [style, setStyle] = useState('default')
+  const [phase, setPhase] = useState('init')
+  const [tags, setTags] = useState('')
+  const [premise, setPremise] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [createdId, setCreatedId] = useState<string | null>(null)
@@ -17,7 +20,7 @@ export default function NewBook() {
     setError('')
     try {
       if (window.electronAPI) {
-        const book = await window.electronAPI.createBook(name.trim(), style)
+        const book = await window.electronAPI.createBook(name.trim(), style, phase, premise, tags)
         if (book?.id) {
           setCreatedId(book.id)
           // 如果有选择的图片，保存为封面
@@ -121,6 +124,45 @@ export default function NewBook() {
           >
             {selectedImage ? '更换封面图片' : '选择封面图片'}
           </button>
+
+          {/* 写作阶段 */}
+          <div style={{ marginBottom: 16 }}>
+            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>写作阶段</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { key: 'init', label: '初始化' },
+                { key: 'premise', label: '前提' },
+                { key: 'outline', label: '大纲' },
+                { key: 'writing', label: '写作' },
+                { key: 'complete', label: '完成' },
+              ].map(s => (
+                <button key={s.key}
+                  className={`welcome-mode-btn ${phase === s.key ? 'active' : ''}`}
+                  onClick={() => setPhase(s.key)}
+                  style={{ fontSize: 12, padding: '6px 14px' }}
+                >{s.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* 标签 */}
+          <div style={{ marginBottom: 16 }}>
+            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>标签</label>
+            <input value={tags} onChange={e => setTags(e.target.value)}
+              placeholder="用逗号分隔，如: 玄幻, 后宫, 末日"
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 13 }}
+            />
+          </div>
+
+          {/* 内容简介 */}
+          <div style={{ marginBottom: 16 }}>
+            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>内容简介</label>
+            <textarea value={premise} onChange={e => setPremise(e.target.value)}
+              placeholder="输入书籍内容简介..."
+              rows={3}
+              style={{ width: '100%', padding: '8px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 13, resize: 'vertical', fontFamily: 'var(--font-mono)' }}
+            />
+          </div>
         </div>
       </div>
 

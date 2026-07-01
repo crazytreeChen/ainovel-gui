@@ -5,7 +5,7 @@ const electron_1 = require("electron");
 electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     // 书籍管理
     listBooks: () => electron_1.ipcRenderer.invoke('list-books'),
-    createBook: (name, style) => electron_1.ipcRenderer.invoke('create-book', name, style),
+    createBook: (name, style, phase, premise, tags) => electron_1.ipcRenderer.invoke('create-book', name, style, phase, premise, tags),
     deleteBook: (id) => electron_1.ipcRenderer.invoke('delete-book', id),
     getBookDir: (id) => electron_1.ipcRenderer.invoke('get-book-dir', id),
     getGuiDataDir: () => electron_1.ipcRenderer.invoke('get-gui-data-dir'),

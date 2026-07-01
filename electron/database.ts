@@ -185,8 +185,8 @@ class AppDatabase {
   getBook(id) { return this.database.prepare('SELECT * FROM books WHERE id = ?').get(id) }
 
   createBook(book) {
-    this.database.prepare(`INSERT INTO books (id, name, premise, style, planning_tier, phase, flow, layered, total_word_count, workspace_dir, created_at, updated_at, last_opened_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(book.id, book.name, book.premise, book.style, book.planning_tier, book.phase, book.flow, book.layered ? 1 : 0, book.total_word_count || 0, book.workspace_dir || null, book.created_at, book.updated_at, book.last_opened_at)
+    this.database.prepare(`INSERT INTO books (id, name, premise, style, planning_tier, phase, flow, layered, total_word_count, workspace_dir, created_at, updated_at, last_opened_at, tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(book.id, book.name, book.premise, book.style, book.planning_tier, book.phase, book.flow, book.layered ? 1 : 0, book.total_word_count || 0, book.workspace_dir || null, book.created_at, book.updated_at, book.last_opened_at, book.tags || '')
     this.database.prepare(`INSERT INTO progress (book_id, novel_name, phase) VALUES (?,?,?)`).run(book.id, book.name, 'init')
     return book
   }

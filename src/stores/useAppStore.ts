@@ -15,7 +15,7 @@ declare global {
     electronAPI: {
       // 书籍管理
       listBooks: () => Promise<any[]>
-      createBook: (name: string, style: string) => Promise<any>
+      createBook: (name: string, style: string, phase?: string, premise?: string, tags?: string) => Promise<any>
       deleteBook: (id: string) => Promise<boolean>
       getBookDir: (id: string) => Promise<string | null>
       getGuiDataDir: () => Promise<string>
