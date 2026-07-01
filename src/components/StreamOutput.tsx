@@ -10,7 +10,7 @@ export default function StreamOutput() {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
-  }, [streamOutput.length])
+  }, [streamOutput.length, streamOutput[streamOutput.length - 1]?.text.length])
 
   return (
     <div ref={containerRef} style={{ height: '100%', overflow: 'auto' }}>
@@ -25,11 +25,23 @@ export default function StreamOutput() {
           正在初始化...
         </div>
       )}
-      {streamOutput.map((round, i) => (
-        <div key={i} className="stream-round">
-          <div className="stream-content">{round}</div>
-        </div>
-      ))}
+      {/* 合并所有流式输出为连续文本 */}
+      <div style={{ lineHeight: 1.7 }}>
+        {streamOutput.map((entry, i) => {
+          const isNewBlock = i > 0 && streamOutput[i-1].type !== entry.type
+          return (
+            <span key={i}>
+              {isNewBlock && <span style={{ display: 'block', height: 8 }} />}
+              <span style={{
+                color: entry.type === 'thinking' ? 'var(--color-dim)' : 'var(--color-text)',
+                fontSize: entry.type === 'thinking' ? 12 : 13,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}>{entry.text}</span>
+            </span>
+          )
+        })}
+      </div>
       {snapshot.isRunning && (
         <div className="text-accent" style={{ fontFamily: 'var(--font-mono)', fontSize: 14 }}>
           ●

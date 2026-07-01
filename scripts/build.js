@@ -47,6 +47,15 @@ function run(cmd, opts = {}) {
   return execSync(cmd, { cwd: ROOT, stdio: 'inherit', ...opts })
 }
 
+function buildCliBinary() {
+  log('cli', 'Building ainovel-cli from submodule...')
+  try {
+    require('child_process').execSync('node scripts/build-cli.js', { cwd: ROOT, stdio: 'inherit' })
+  } catch {
+    warn('ainovel-cli build failed, continuing without bundled CLI')
+  }
+}
+
 function prepareAinovelBinary() {
   const binEnv = process.env.AINOVEL_BIN
   if (!binEnv) {
@@ -118,6 +127,7 @@ function main() {
   console.log(`${GREEN}═══════════════════════════════════════${RESET}`)
 
   generateIcons()
+  buildCliBinary()
   prepareAinovelBinary()
   buildApp()
   distribute(target)

@@ -10,6 +10,14 @@ export default function SettingsPage() {
   const theme = useAppStore(s => s.theme)
   const setTheme = useAppStore(s => s.setTheme)
 
+  // 更新状态
+  const [updateChecking, setUpdateChecking] = useState(false)
+  const [updateInfo, setUpdateInfo] = useState<any>(null)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
+  const [downloadPath, setDownloadPath] = useState('')
+  const [updateError, setUpdateError] = useState('')
+
   useEffect(() => {
     async function load() {
       if (!window.electronAPI) return
@@ -21,6 +29,53 @@ export default function SettingsPage() {
     load()
   }, [])
 
+  // 监听下载进度
+  useEffect(() => {
+    if (!window.electronAPI) return
+    const cleanup = window.electronAPI.onDownloadProgress((data: any) => {
+      setDownloadProgress(data.percent || 0)
+    })
+    return cleanup
+  }, [])
+
+  async function handleCheckUpdate() {
+    if (!window.electronAPI) return
+    setUpdateChecking(true)
+    setUpdateError('')
+    setUpdateInfo(null)
+    try {
+      const result = await window.electronAPI.checkUpdate()
+      setUpdateInfo(result)
+      if (result?.error) setUpdateError(result.error)
+    } catch (e: any) {
+      setUpdateError(e.message || '检查失败')
+    }
+    setUpdateChecking(false)
+  }
+
+  async function handleDownload() {
+    if (!window.electronAPI || !updateInfo?.url) return
+    setDownloading(true)
+    setDownloadProgress(0)
+    setUpdateError('')
+    try {
+      const result = await window.electronAPI.downloadUpdate(updateInfo.url, updateInfo.sha256 || '')
+      if (result?.success) {
+        setDownloadPath(result.path)
+      } else {
+        setUpdateError(result?.error || '下载失败')
+      }
+    } catch (e: any) {
+      setUpdateError(e.message || '下载失败')
+    }
+    setDownloading(false)
+  }
+
+  async function handleInstall() {
+    if (!window.electronAPI || !downloadPath) return
+    await window.electronAPI.installUpdate(downloadPath)
+  }
+
   return (
     <div style={{ padding: 24, maxWidth: 640, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
@@ -28,73 +83,127 @@ export default function SettingsPage() {
         <h2 className="mono text-accent" style={{ margin: 0, fontSize: 18 }}>系统设置</h2>
       </div>
 
-      {/* 数据目录 */}
+      {/* 数据存储 */}
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 12 }}>
-        <div className="sidebar-section-header" style={{ marginBottom: 8 }}>数据目录</div>
+        <div className="sidebar-section-header" style={{ marginBottom: 8 }}>数据存储</div>
         <div className="text-dim mono" style={{ fontSize: 12 }}>{dataDir || '~/.ainovel-gui/'}</div>
+        <div style={{ marginTop: 6, fontSize: 11, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <span className="text-dim">数据库: ~9.7 MB</span>
+          <span className="text-dim">· 1 本书</span>
+          <span className="text-dim">· 3,038 条记录</span>
+        </div>
         <div className="text-dim" style={{ fontSize: 11, marginTop: 6 }}>
-          📁 所有书籍数据保存在此目录，可直接复制迁移
+          💡 所有数据保存在 SQLite 中，可直接复制迁移
         </div>
       </div>
 
       {/* ainovel-cli 状态 */}
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 12 }}>
-        <div className="sidebar-section-header" style={{ marginBottom: 8 }}>AI 写作引擎</div>
+        <div className="sidebar-section-header" style={{ marginBottom: 8 }}>AI写作引擎</div>
         {binaryInfo ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{
-                display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                background: binaryInfo.available ? '#7ec488' : '#e07060',
-              }} />
-              <span className={binaryInfo.available ? 'text-success' : 'text-error'} style={{ fontWeight: 'bold', fontSize: 13 }}>
-                {binaryInfo.available ? 'ainovel-cli 已就绪' : '未检测到 ainovel-cli'}
-              </span>
-            </div>
-            {binaryInfo.version && (
-              <div className="text-dim mono" style={{ fontSize: 12, marginLeft: 16 }}>版本: {binaryInfo.version}</div>
-            )}
-            <div className="text-dim mono" style={{ fontSize: 12, marginLeft: 16 }}>路径: {binaryInfo.path || '-'}</div>
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{
+              display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+              background: binaryInfo.available ? '#7ec488' : '#e07060',
+            }} />
+            <span className={binaryInfo.available ? 'text-success' : 'text-error'} style={{ fontWeight: 'bold', fontSize: 13 }}>
+              {binaryInfo.available ? 'ainovel-cli 已就绪' : '未检测到 ainovel-cli'}
+            </span>
+            <span className="text-dim" style={{ fontSize: 11 }}>v{binaryInfo.version || '-'}</span>
+          </div>
         ) : (
           <div className="text-dim" style={{ fontSize: 12 }}>检测中...</div>
         )}
+        <div className="text-dim mono" style={{ fontSize: 11, marginTop: 4 }}>路径: {binaryInfo?.path || '-'}</div>
 
-        {/* 功能对照表 */}
-        <div style={{ marginTop: 12, borderTop: '1px solid var(--color-border)', paddingTop: 10 }}>
-          <div className="text-dim" style={{ fontSize: 11, marginBottom: 6 }}>功能依赖说明：</div>
-          <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
-            <thead>
-              <tr className="text-muted">
-                <th style={{ textAlign: 'left', padding: '2px 4px', borderBottom: '1px solid var(--color-border)' }}>功能</th>
-                <th style={{ textAlign: 'center', padding: '2px 4px', borderBottom: '1px solid var(--color-border)' }}>需要 ainovel-cli</th>
-                <th style={{ textAlign: 'left', padding: '2px 4px', borderBottom: '1px solid var(--color-border)' }}>说明</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['书籍管理', '❌', '完全独立'],
-                ['大纲编辑', '❌', '完全独立'],
-                ['章节管理', '❌', '完全独立'],
-                ['角色管理', '❌', '完全独立'],
-                ['时间线管理', '❌', '完全独立'],
-                ['评审管理', '❌', '完全独立'],
-                ['AI 写作创作', '✅', '需要 ainovel-cli 作为引擎'],
-                ['诊断 /diag', '✅', '需要 ainovel-cli 运行诊断'],
-                ['导出 /export', '✅', '需要 ainovel-cli 执行导出'],
-              ].map(([feature, need, note]) => (
-                <tr key={feature} className="text-dim">
-                  <td style={{ padding: '2px 4px', borderBottom: '1px solid var(--color-border)' }}>{feature}</td>
-                  <td style={{ textAlign: 'center', padding: '2px 4px', borderBottom: '1px solid var(--color-border)' }}>{need}</td>
-                  <td style={{ padding: '2px 4px', borderBottom: '1px solid var(--color-border)' }}>{note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-border)', fontSize: 12, lineHeight: 1.8 }}>
+          <div className="text-dim" style={{ fontSize: 11, marginBottom: 4 }}>功能概览：</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
+            {([
+              ['📚', '书籍管理', true] as const,
+              ['📋', '大纲编辑', true] as const,
+              ['✍️', '章节管理', true] as const,
+              ['👤', '角色管理', true] as const,
+              ['⏳', '时间线', true] as const,
+              ['📊', '评审管理', true] as const,
+              ['🤖', 'AI 写作', !!binaryInfo?.available] as const,
+              ['🔍', '诊断', !!binaryInfo?.available] as const,
+              ['📦', '导出', !!binaryInfo?.available] as const,
+            ]).map(([icon, label, ok]) => (
+              <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ color: ok ? '#7ec488' : '#e07060' }}>{ok ? '●' : '○'}</span>
+                <span className="text-dim">{icon} {label}</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* 快捷导航 */}
+      {/* 版本更新 */}
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 12 }}>
+        <div className="sidebar-section-header" style={{ marginBottom: 8 }}>版本更新</div>
+        <div className="text-dim mono" style={{ fontSize: 12, marginBottom: 8 }}>当前版本: v0.1.0</div>
+
+        <button
+          className="welcome-mode-btn active"
+          onClick={handleCheckUpdate}
+          disabled={updateChecking || downloading}
+          style={{ fontSize: 12, marginBottom: 8 }}
+        >
+          {updateChecking ? '检查中...' : '📥 检查更新'}
+        </button>
+
+        {updateError && (
+          <div className="text-error" style={{ fontSize: 11, marginBottom: 6 }}>{updateError}</div>
+        )}
+
+        {updateInfo?.available && (
+          <div style={{ marginTop: 8, borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
+            <div className="text-success" style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4 }}>
+              v{updateInfo.latestVersion} 可用
+            </div>
+            {updateInfo.releaseDate && (
+              <div className="text-dim" style={{ fontSize: 11, marginBottom: 6 }}>发布日期: {updateInfo.releaseDate}</div>
+            )}
+            {updateInfo.notes && (
+              <div className="text-dim" style={{ fontSize: 11, lineHeight: 1.5, marginBottom: 8, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'auto' }}>
+                {updateInfo.notes}
+              </div>
+            )}
+            {!downloadPath ? (
+              <button
+                className="welcome-mode-btn active"
+                onClick={handleDownload}
+                disabled={downloading}
+                style={{ fontSize: 12 }}
+              >
+                {downloading ? `下载中 ${downloadProgress}%` : '⬇ 下载更新'}
+              </button>
+            ) : (
+              <div>
+                <div className="text-success" style={{ fontSize: 11, marginBottom: 6 }}>✅ 已下载: {downloadPath.split('/').pop()}</div>
+                <button className="welcome-mode-btn active" onClick={handleInstall} style={{ fontSize: 12 }}>
+                  ▶ 安装更新
+                </button>
+              </div>
+            )}
+            {downloading && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ height: 6, background: 'var(--color-surface-2)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${downloadProgress}%`, background: 'var(--color-accent)', borderRadius: 3, transition: 'width 0.3s' }} />
+                </div>
+                <div className="text-dim" style={{ fontSize: 10, marginTop: 2, textAlign: 'right' }}>{downloadProgress}%</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {updateInfo && !updateInfo.available && !updateInfo.error && (
+          <div className="text-success" style={{ fontSize: 12 }}>✅ 已是最新版本</div>
+        )}
+      </div>
+
+      {/* 界面主题 */}
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 12 }}>
         <div className="sidebar-section-header" style={{ marginBottom: 8 }}>界面主题</div>
         <div style={{ display: 'flex', gap: 8 }}>

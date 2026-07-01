@@ -133,31 +133,50 @@ export default function StatusSidebar() {
         </div>
       )}
 
+      {/* 模型 */}
+      {snapshot.provider && (
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">模型</div>
+          <Field label="Provider" value={snapshot.provider} />
+          {snapshot.modelName && <Field label="模型" value={snapshot.modelName} />}
+        </div>
+      )}
+
       {/* 用量 */}
       {(snapshot.totalInputTokens > 0 || snapshot.totalOutputTokens > 0 || snapshot.totalCostUSD > 0) && (
         <div className="sidebar-section">
           <div className="sidebar-section-header">用量</div>
           <Field label="输入" value={formatTokensCompact(snapshot.totalInputTokens)} />
           <Field label="输出" value={formatTokensCompact(snapshot.totalOutputTokens)} />
-          {formatCostUSD(snapshot.totalCostUSD) && (
-            <Field label="费用" value={formatCostUSD(snapshot.totalCostUSD)} />
+          {snapshot.totalCostUSD > 0 && (
+            <Field label="费用" value={`$${(snapshot.totalCostUSD).toFixed(2)}`} />
           )}
           {snapshot.totalSavedUSD > 0 && (
-            <Field label="节省" value={formatCostUSD(snapshot.totalSavedUSD)} />
+            <Field label="节省" value={`$${(snapshot.totalSavedUSD).toFixed(2)}`} />
           )}
         </div>
       )}
 
-      {/* 上下文 */}
-      {snapshot.contextWindow > 0 && (
+      {/* 缓存 */}
+      {(snapshot.cacheReadTokens > 0 || snapshot.cacheWriteTokens > 0) && (
         <div className="sidebar-section">
-          <div className="sidebar-section-header">上下文</div>
-          <Field
-            label="占用"
-            value={`${snapshot.contextPercent.toFixed(0)}% · ${formatTokensCompact(snapshot.contextTokens)}/${formatTokensCompact(snapshot.contextWindow)}`}
-          />
+          <div className="sidebar-section-header">缓存</div>
+          <Field label="读取" value={formatTokensCompact(snapshot.cacheReadTokens)} />
+          <Field label="写入" value={formatTokensCompact(snapshot.cacheWriteTokens)} />
         </div>
       )}
+
+      {/* 上下文 */}
+      <div className="sidebar-section">
+        <div className="sidebar-section-header">上下文</div>
+        <Field label="占用" value={
+          snapshot.contextWindow > 0
+            ? `${snapshot.contextPercent.toFixed(0)}% · ${formatTokensCompact(snapshot.contextTokens)}/${formatTokensCompact(snapshot.contextWindow)}`
+            : snapshot.contextTokens > 0
+              ? `${formatTokensCompact(snapshot.contextTokens)} tokens`
+              : '-'
+        } />
+      </div>
     </div>
   )
 }

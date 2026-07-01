@@ -5,7 +5,7 @@ import type { ThemeMode } from '@/stores/useAppStore'
 import BookList from '@/pages/BookList'
 import Workspace from '@/pages/Workspace'
 import NewBook from '@/pages/NewBook'
-import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, SettingsPage, ModelsPage, SimulationPage, UserRulesPage, WorldRulesPage } from '@/pages'
+import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, SettingsPage, ModelsPage, SimulationPage, UserRulesPage, WorldRulesPage, SummaryPage, BookIntroPage } from '@/pages'
 import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
 
@@ -44,16 +44,19 @@ function AppRoutes() {
   const mode = useAppStore((s) => s.mode)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // 初始化：检查 binary
+  // 初始化：检查 binary + 加载快照
   useEffect(() => {
     async function init() {
       if (window.electronAPI) {
         const info = await window.electronAPI.checkBinary()
         setBinaryInfo(info)
+        // 首次加载快照（从 SQLite 读取已有数据）
+        await refreshSnapshot()
+        await refreshChapters()
       }
     }
     init()
-  }, [setBinaryInfo])
+  }, [setBinaryInfo, refreshSnapshot, refreshChapters])
 
   // 轮询快照和事件
   useEffect(() => {
@@ -79,6 +82,20 @@ function AppRoutes() {
     return cleanup
   }, [refreshSnapshot])
 
+  // 监听流式输出
+  useEffect(() => {
+    if (!window.electronAPI) return
+    const cleanup = window.electronAPI.onStreamOutput((data) => {
+      try {
+        const parsed = JSON.parse(data)
+        useAppStore.getState().appendStreamOutput(parsed)
+      } catch {
+        useAppStore.getState().appendStreamOutput({type: 'content', text: data})
+      }
+    })
+    return cleanup
+  }, [])
+
   // 键盘事件
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -98,6 +115,7 @@ function AppRoutes() {
       <Route path="/" element={<BookList />} />
       <Route path="/books/new" element={<NewBook />} />
       <Route path="/books/:id" element={<Workspace />} />
+      <Route path="/books/:id/workspace" element={<Workspace />} />
       <Route path="/books/:id/outline" element={<OutlinePage />} />
       <Route path="/books/:id/chapters/:num" element={<ChapterPage />} />
       <Route path="/books/:id/characters" element={<CharactersPage />} />
@@ -106,6 +124,8 @@ function AppRoutes() {
       <Route path="/books/:id/simulation" element={<SimulationPage />} />
       <Route path="/books/:id/rules" element={<UserRulesPage />} />
       <Route path="/books/:id/world" element={<WorldRulesPage />} />
+      <Route path="/books/:id/summaries" element={<SummaryPage />} />
+      <Route path="/books/:id/intro" element={<BookIntroPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/settings/models" element={<ModelsPage />} />
     </Routes>

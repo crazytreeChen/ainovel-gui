@@ -21,6 +21,10 @@ interface UserRulesData {
   uncertain: string[]
 }
 
+interface Directive {
+  id?: number; text: string; chapter: number; totalChapters: number; createdAt: string
+}
+
 const defaultStructured: UserRulesStructured = {
   genre: '',
   chapterWords: { min: 1000, max: 3000 },
@@ -39,7 +43,7 @@ export default function UserRulesPage() {
     version: 1, status: 'ready', structured: { ...defaultStructured },
     preferences: '', sources: [], uncertain: [],
   })
-  const [tab, setTab] = useState<'overview' | 'structure' | 'preferences'>('overview')
+  const [tab, setTab] = useState<'overview' | 'structure' | 'preferences' | 'directives'>('overview')
 
   // 新规则输入
   const [newChar, setNewChar] = useState('')
@@ -48,13 +52,19 @@ export default function UserRulesPage() {
   const [newFatigueCount, setNewFatigueCount] = useState(3)
   const [newSource, setNewSource] = useState('')
   const [newUncertain, setNewUncertain] = useState('')
+  // 指令
+  const [directives, setDirectives] = useState<Directive[]>([])
+  const [newDirective, setNewDirective] = useState('')
 
-  useEffect(() => { loadRules() }, [id])
+  useEffect(() => { loadAll() }, [id])
 
-  async function loadRules() {
+  async function loadAll() {
     if (!id || !window.electronAPI) return
     setLoading(true)
-    const data = await window.electronAPI.getUserRules(id)
+    const [data, dirs] = await Promise.all([
+      window.electronAPI.getUserRules(id),
+      window.electronAPI.getUserDirectives(id),
+    ])
     if (data) {
       setRules({
         version: data.version || 1,
@@ -71,15 +81,17 @@ export default function UserRulesPage() {
         uncertain: data.uncertain || [],
       })
     }
+    setDirectives(dirs || [])
     setLoading(false)
   }
 
   async function handleSave() {
     if (!id || !window.electronAPI) return
     setSaving(true)
-    const ok = await window.electronAPI.saveUserRules(id, rules)
+    const okRules = await window.electronAPI.saveUserRules(id, rules)
+    const okDirs = await window.electronAPI.saveUserDirectives(id, directives)
     setSaving(false)
-    setStatusMsg(ok ? '已保存' : '保存失败')
+    setStatusMsg(okRules && okDirs ? '已保存' : '保存失败')
     setTimeout(() => setStatusMsg(''), 2000)
   }
 
@@ -178,6 +190,7 @@ export default function UserRulesPage() {
           ['overview', '概览'],
           ['structure', '结构化规则'],
           ['preferences', '偏好说明'],
+          ['directives', `指令 (${directives.length})`],
         ] as const).map(([k, label]) => (
           <button key={k} className={`welcome-mode-btn ${tab === k ? 'active' : ''}`}
             onClick={() => setTab(k as any)} style={{ fontSize: 11 }}>{label}</button>
@@ -405,6 +418,45 @@ export default function UserRulesPage() {
                 <button className="welcome-mode-btn" onClick={() => { addItem('uncertain', newUncertain); setNewUncertain('') }}>添加</button>
               </div>
             </div>
+          </div>
+        )}
+
+        {tab === 'directives' && (
+          <div>
+            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 12 }}>
+              <div className="sidebar-section-header" style={{ marginBottom: 8 }}>添加指令</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={newDirective} onChange={e => setNewDirective(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (() => { if (newDirective.trim()) { setDirectives(prev => [...prev, { text: newDirective.trim(), chapter: 0, totalChapters: 0, createdAt: new Date().toISOString() }]); setNewDirective('') } })()}
+                  placeholder="输入对 AI 创作引擎的临时指令..."
+                  style={{ flex: 1, padding: '6px 10px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 12 }}
+                />
+                <button className="welcome-mode-btn" onClick={() => { if (newDirective.trim()) { setDirectives(prev => [...prev, { text: newDirective.trim(), chapter: 0, totalChapters: 0, createdAt: new Date().toISOString() }]); setNewDirective('') } }}>添加</button>
+              </div>
+            </div>
+
+            {directives.length === 0 ? (
+              <div className="text-dim" style={{ textAlign: 'center', marginTop: 40 }}>暂无指令</div>
+            ) : (
+              directives.map((d, i) => (
+                <div key={i} style={{
+                  padding: '10px 14px', marginBottom: 6, borderRadius: 'var(--radius)',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                  borderLeft: '3px solid var(--color-accent2)',
+                }}>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div className="text-accent2" style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+                      指令 #{i + 1}
+                      {d.chapter > 0 && <span className="text-dim"> (第{d.chapter}章)</span>}
+                    </div>
+                    <button onClick={() => setDirectives(prev => prev.filter((_, j) => j !== i))}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-dim)', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                  </div>
+                  <div className="text-dim" style={{ fontSize: 13, lineHeight: 1.6 }}>{d.text}</div>
+                  {d.createdAt && <div className="text-dim" style={{ fontSize: 10, marginTop: 4 }}>{new Date(d.createdAt).toLocaleString('zh-CN')}</div>}
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

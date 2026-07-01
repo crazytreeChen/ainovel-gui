@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/stores/useAppStore'
 import BookCover from './BookCover'
+import { AGENT_DISPLAY, AGENT_COLORS } from '@/types'
 
 export default function DetailPanel() {
   const snapshot = useAppStore((s) => s.snapshot)
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [bookName, setBookName] = useState('')
   const [usageStats, setUsageStats] = useState<any>(null)
   const [runMeta, setRunMeta] = useState<any>(null)
@@ -16,16 +18,23 @@ export default function DetailPanel() {
 
   useEffect(() => {
     if (!id || !window.electronAPI) return
+    // 从数据库读取书名（兜底）
+    if (!bookName) {
+      window.electronAPI.listBooks().then((books: any[]) => {
+        const b = books.find((x: any) => x.id === id)
+        if (b?.name) setBookName(b.name)
+      }).catch(() => {})
+    }
     window.electronAPI.getUsageStats(id).then(setUsageStats).catch(() => {})
     window.electronAPI.getRunMeta(id).then(setRunMeta).catch(() => {})
-  }, [id])
+  }, [id, bookName])
 
   return (
     <div>
       {/* 封面 + 书名 */}
       {id && (
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
-          <BookCover bookId={id} size="small" editable />
+          <BookCover bookId={id} size="small" />
           <div>
             <div style={{ fontWeight: 'bold', fontSize: 14, color: 'var(--color-text)' }}>{bookName || snapshot.novelName || '未定书名'}</div>
             <div className="text-dim mono" style={{ fontSize: 11, marginTop: 4 }}>
@@ -41,13 +50,21 @@ export default function DetailPanel() {
           <div className="sidebar-section-header">
             {snapshot.layered ? `大纲（${snapshot.currentVolumeArc || '动态规划'}）` : '大纲'}
           </div>
-          {snapshot.outline.slice(0, 30).map((item) => {
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+          {snapshot.outline.slice(-30).reverse().map((item) => {
             const isCompleted = snapshot.completedCount >= item.chapter
             const isCurrent = snapshot.inProgressChapter === item.chapter
             return (
               <div
                 key={item.chapter}
-                className={`outline-item ${isCompleted ? 'completed' : isCurrent ? 'current' : 'pending'}`}
+                className="cursor-clickable"
+                onClick={() => id && navigate(`/books/${id}/chapters/${item.chapter}`)}
+                style={{
+                  display: 'flex', gap: 4, alignItems: 'center', padding: '2px 4px', borderRadius: 'var(--radius-sm)',
+                  fontFamily: 'var(--font-mono)', fontSize: 12, margin: '2px 0',
+                  color: isCompleted ? 'var(--color-dim)' : isCurrent ? 'var(--color-accent)' : 'var(--color-muted)',
+                  fontWeight: isCurrent ? 'bold' : 'normal',
+                }}
               >
                 <span>{isCompleted ? '●' : isCurrent ? '▸' : '○'}</span>
                 <span style={{ minWidth: 20, textAlign: 'right' }}>{item.chapter}</span>
@@ -60,6 +77,7 @@ export default function DetailPanel() {
               </div>
             )
           })}
+          </div>
           {snapshot.layered && (
             <div className="text-dim" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', marginTop: 4 }}>
               <div>┄ 后续章节随创作推进自动生成</div>
@@ -132,6 +150,51 @@ export default function DetailPanel() {
                 <span className="text-success">${usageStats.total_saved.toFixed(4)}</span>
               </div>
             )}
+            {/* 缓存 */}
+            {(usageStats.cache_read || 0) > 0 && (
+              <div className="usage-row">
+                <span className="text-muted">缓存读取</span>
+                <span>{(usageStats.cache_read || 0).toLocaleString()}</span>
+              </div>
+            )}
+            {(usageStats.cache_write || 0) > 0 && (
+              <div className="usage-row">
+                <span className="text-muted">缓存写入</span>
+                <span>{(usageStats.cache_write || 0).toLocaleString()}</span>
+              </div>
+            )}
+            {/* 按模型统计 */}
+            {usageStats.per_model && Object.keys(usageStats.per_model).length > 0 && (
+              <>
+                <div className="usage-row" style={{ borderTop: '1px solid var(--color-border)', marginTop: 4, paddingTop: 4 }}>
+                  <span className="text-dim" style={{ fontSize: 10 }}>按模型</span>
+                  <span></span>
+                </div>
+                {Object.entries(usageStats.per_model).slice(0, 5).map(([model, stats]: [string, any]) => (
+                  <div key={model} className="usage-row">
+                    <span className="text-dim" style={{ fontSize: 10 }}>{model.split('/').pop()}</span>
+                    <span className="text-dim" style={{ fontSize: 10 }}>{(stats.input || 0).toLocaleString()}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {/* 按角色统计 */}
+            {usageStats.per_agent && Object.keys(usageStats.per_agent).length > 0 && (
+              <>
+                <div className="usage-row" style={{ borderTop: '1px solid var(--color-border)', marginTop: 4, paddingTop: 4 }}>
+                  <span className="text-dim" style={{ fontSize: 10 }}>按角色</span>
+                  <span></span>
+                </div>
+                {Object.entries(usageStats.per_agent).map(([agent, stats]: [string, any]) => (
+                  <div key={agent} className="usage-row">
+                    <span style={{ fontSize: 11, color: AGENT_COLORS[agent] || 'var(--color-dim)', fontWeight: 'bold' }}>
+                      {AGENT_DISPLAY[agent] || agent}
+                    </span>
+                    <span className="text-dim" style={{ fontSize: 10 }}>{(stats.input || 0).toLocaleString()}</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -144,7 +207,7 @@ export default function DetailPanel() {
             {runMeta.provider && <div>Provider: {runMeta.provider}</div>}
             {runMeta.model && <div>模型: {runMeta.model}</div>}
             {runMeta.style && <div>风格: {runMeta.style}</div>}
-            {runMeta.planning_tier && <div>规划: {runMeta.planning_tier}</div>}
+            {runMeta.planning_tier && <div>规划: {({ short: '短篇', mid: '中篇', long: '长篇' } as Record<string, string>)[runMeta.planning_tier] || runMeta.planning_tier}</div>}
             {runMeta.started_at && <div>开始: {new Date(runMeta.started_at).toLocaleString('zh-CN')}</div>}
             {runMeta.pending_steer && <div style={{ color: 'var(--color-review)' }}>待处理: {runMeta.pending_steer}</div>}
           </div>

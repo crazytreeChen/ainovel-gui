@@ -144,9 +144,43 @@ class AppDatabase {
       this.database.exec(SCHEMA_SQL)
       this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', '1')
     }
+    // 迁移：添加 tags 列（如果不存在）
+    try { this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""') } catch {}
   }
 
-  listBooks() { return this.database.prepare('SELECT * FROM books ORDER BY last_opened_at DESC').all() }
+  listBooks() {
+    const rows = this.database.prepare(`
+      SELECT b.*, 
+        COALESCE(p.completed_chapters, '[]') as completed_chapters_json,
+        COALESCE(p.total_chapters, 0) as total_chapters
+      FROM books b
+      LEFT JOIN progress p ON p.book_id = b.id
+      ORDER BY b.last_opened_at DESC
+    `).all()
+    return rows.map(r => {
+      const completed = (() => { try { return JSON.parse(r.completed_chapters_json || '[]') } catch { return [] } })()
+      return {
+        id: r.id,
+        name: r.name,
+        style: r.style || 'default',
+        phase: r.phase || 'init',
+        flow: r.flow || '',
+        completedCount: Array.isArray(completed) ? completed.length : 0,
+        totalWordCount: r.total_word_count || 0,
+        premise: (r.premise || '')
+          .replace(/^#+\s*/gm, '')
+          .replace(/\*\*(.+?)\*\*/g, '$1')
+          .replace(/__(.+?)__/g, '$1')
+          .replace(/\n{2,}/g, '\n')
+          .trim()
+          .slice(0, 200),
+        tags: r.tags || '',
+        createdAt: r.created_at,
+        lastOpenedAt: r.last_opened_at,
+        workspaceDir: r.workspace_dir,
+      }
+    })
+  }
 
   getBook(id) { return this.database.prepare('SELECT * FROM books WHERE id = ?').get(id) }
 
@@ -533,10 +567,67 @@ class AppDatabase {
     if (fields.style !== undefined) { sets.push('style = ?'); params.push(fields.style) }
     if (fields.premise !== undefined) { sets.push('premise = ?'); params.push(fields.premise) }
     if (fields.phase !== undefined) { sets.push('phase = ?'); params.push(fields.phase) }
+    if (fields.tags !== undefined) { sets.push('tags = ?'); params.push(fields.tags) }
     params.push(new Date().toISOString(), id)
     if (sets.length > 0) {
       this.database.prepare(`UPDATE books SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).run(...params)
     }
+  }
+
+  // ── 摘要管理 ──
+
+  saveSummaries(bookId, summaries) {
+    const del = this.database.prepare('DELETE FROM summaries WHERE book_id = ?')
+    const ins = this.database.prepare('INSERT INTO summaries (book_id, type, ref_key, summary, characters, key_events) VALUES (?,?,?,?,?,?)')
+    const tx = this.database.transaction(() => {
+      del.run(bookId)
+      for (const s of summaries || []) {
+        ins.run(bookId, s.type || 'chapter', s.ref_key || String(s.chapter || ''), s.summary || '', JSON.stringify(s.characters || []), JSON.stringify(s.key_events || []))
+      }
+    })
+    tx()
+  }
+
+  getSummaries(bookId) {
+    const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ? ORDER BY type, ref_key').all(bookId)
+    return rows.map(r => ({
+      id: r.id,
+      type: r.type,
+      refKey: r.ref_key,
+      summary: r.summary || '',
+      characters: typeof r.characters === 'string' ? JSON.parse(r.characters) : (r.characters || []),
+      keyEvents: typeof r.key_events === 'string' ? JSON.parse(r.key_events) : (r.key_events || []),
+    }))
+  }
+
+  getSummariesByType(bookId, type) {
+    const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ? AND type = ? ORDER BY ref_key').all(bookId, type)
+    return rows.map(r => ({
+      id: r.id,
+      type: r.type,
+      refKey: r.ref_key,
+      summary: r.summary || '',
+      characters: typeof r.characters === 'string' ? JSON.parse(r.characters) : (r.characters || []),
+      keyEvents: typeof r.key_events === 'string' ? JSON.parse(r.key_events) : (r.key_events || []),
+    }))
+  }
+
+  // ── 用户指令 ──
+
+  saveUserDirectives(bookId, directives) {
+    const del = this.database.prepare('DELETE FROM user_directives WHERE book_id = ?')
+    const ins = this.database.prepare('INSERT INTO user_directives (book_id, text, chapter, total_chapters, created_at) VALUES (?,?,?,?,?)')
+    const tx = this.database.transaction(() => {
+      del.run(bookId)
+      for (const d of directives || []) {
+        ins.run(bookId, d.text || '', d.chapter || 0, d.total_chapters || 0, d.created_at || '')
+      }
+    })
+    tx()
+  }
+
+  getUserDirectives(bookId) {
+    return this.database.prepare('SELECT * FROM user_directives WHERE book_id = ? ORDER BY chapter').all(bookId)
   }
 
   close() { this.database.close() }

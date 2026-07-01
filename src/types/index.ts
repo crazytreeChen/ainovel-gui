@@ -27,6 +27,8 @@ export interface UISnapshot {
   totalOutputTokens: number
   totalCostUSD: number
   totalSavedUSD: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
   contextPercent: number
   contextTokens: number
   contextWindow: number

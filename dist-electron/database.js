@@ -115,6 +115,10 @@ CREATE TABLE IF NOT EXISTS user_rules (book_id TEXT PRIMARY KEY REFERENCES books
 
 CREATE TABLE IF NOT EXISTS simulation_profiles (book_id TEXT PRIMARY KEY REFERENCES books(id), profile TEXT DEFAULT '{}');
 
+CREATE TABLE IF NOT EXISTS user_directives (id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id TEXT NOT NULL REFERENCES books(id), text TEXT NOT NULL, chapter INTEGER DEFAULT 0,
+  total_chapters INTEGER DEFAULT 0, created_at TEXT DEFAULT '');
+
 CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE INDEX IF NOT EXISTS idx_outline_book ON outline_entries(book_id, chapter);
@@ -138,8 +142,50 @@ class AppDatabase {
             this.database.exec(SCHEMA_SQL);
             this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', '1');
         }
+        // 迁移：添加 tags 列（如果不存在）
+        try {
+            this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""');
+        }
+        catch { }
     }
-    listBooks() { return this.database.prepare('SELECT * FROM books ORDER BY last_opened_at DESC').all(); }
+    listBooks() {
+        const rows = this.database.prepare(`
+      SELECT b.*, 
+        COALESCE(p.completed_chapters, '[]') as completed_chapters_json,
+        COALESCE(p.total_chapters, 0) as total_chapters
+      FROM books b
+      LEFT JOIN progress p ON p.book_id = b.id
+      ORDER BY b.last_opened_at DESC
+    `).all();
+        return rows.map(r => {
+            const completed = (() => { try {
+                return JSON.parse(r.completed_chapters_json || '[]');
+            }
+            catch {
+                return [];
+            } })();
+            return {
+                id: r.id,
+                name: r.name,
+                style: r.style || 'default',
+                phase: r.phase || 'init',
+                flow: r.flow || '',
+                completedCount: Array.isArray(completed) ? completed.length : 0,
+                totalWordCount: r.total_word_count || 0,
+                premise: (r.premise || '')
+                    .replace(/^#+\s*/gm, '')
+                    .replace(/\*\*(.+?)\*\*/g, '$1')
+                    .replace(/__(.+?)__/g, '$1')
+                    .replace(/\n{2,}/g, '\n')
+                    .trim()
+                    .slice(0, 200),
+                tags: r.tags || '',
+                createdAt: r.created_at,
+                lastOpenedAt: r.last_opened_at,
+                workspaceDir: r.workspace_dir,
+            };
+        });
+    }
     getBook(id) { return this.database.prepare('SELECT * FROM books WHERE id = ?').get(id); }
     createBook(book) {
         this.database.prepare(`INSERT INTO books (id, name, premise, style, planning_tier, phase, flow, layered, total_word_count, workspace_dir, created_at, updated_at, last_opened_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
@@ -148,7 +194,7 @@ class AppDatabase {
         return book;
     }
     deleteBook(id) {
-        const tables = ['progress', 'outline_entries', 'volumes', 'arcs', 'arc_chapters', 'compass', 'chapters', 'drafts', 'chapter_plans', 'summaries', 'characters_t', 'character_snapshots', 'cast_entries', 'timeline_events', 'foreshadow_entries', 'relationship_entries', 'state_changes', 'world_rules', 'style_rules', 'reviews', 'run_meta', 'usage_stats', 'user_rules', 'simulation_profiles'];
+        const tables = ['progress', 'outline_entries', 'volumes', 'arcs', 'arc_chapters', 'compass', 'chapters', 'drafts', 'chapter_plans', 'summaries', 'characters_t', 'character_snapshots', 'cast_entries', 'timeline_events', 'foreshadow_entries', 'relationship_entries', 'state_changes', 'world_rules', 'style_rules', 'reviews', 'run_meta', 'usage_stats', 'user_rules', 'simulation_profiles', 'user_directives'];
         const del = this.database.transaction(() => {
             for (const t of tables)
                 this.database.prepare(`DELETE FROM ${t} WHERE book_id = ?`).run(id);
@@ -404,6 +450,151 @@ class AppDatabase {
             contract_misses: typeof r.contract_misses === 'string' ? JSON.parse(r.contract_misses) : r.contract_misses,
             affected_chapters: typeof r.affected_chapters === 'string' ? JSON.parse(r.affected_chapters) : r.affected_chapters,
         }));
+    }
+    // ── 配角名册 ──
+    saveCastEntries(bookId, entries) {
+        const del = this.database.prepare('DELETE FROM cast_entries WHERE book_id = ?');
+        const ins = this.database.prepare('INSERT INTO cast_entries (book_id, name, aliases, brief_role, first_seen, last_seen, appearance_count, appearance_chapters, promoted) VALUES (?,?,?,?,?,?,?,?,?)');
+        const tx = this.database.transaction(() => {
+            del.run(bookId);
+            for (const e of entries || []) {
+                ins.run(bookId, e.name || '', JSON.stringify(e.aliases || []), e.briefRole || e.brief_role || '', e.firstSeenChapter || e.first_seen || 0, e.lastSeenChapter || e.last_seen || 0, e.appearanceCount || e.appearance_count || 0, JSON.stringify(e.appearanceChapters || e.appearance_chapters || []), e.promoted ? 1 : 0);
+            }
+        });
+        tx();
+    }
+    getCastEntries(bookId) {
+        const rows = this.database.prepare('SELECT * FROM cast_entries WHERE book_id = ? ORDER BY appearance_count DESC').all(bookId);
+        return rows.map(r => ({
+            ...r,
+            aliases: typeof r.aliases === 'string' ? JSON.parse(r.aliases) : r.aliases,
+            appearanceChapters: typeof r.appearance_chapters === 'string' ? JSON.parse(r.appearance_chapters) : r.appearance_chapters,
+            promoted: !!r.promoted,
+        }));
+    }
+    // ── 世界观规则 ──
+    saveWorldRules(bookId, rules) {
+        const del = this.database.prepare('DELETE FROM world_rules WHERE book_id = ?');
+        const ins = this.database.prepare('INSERT INTO world_rules (book_id, category, rule_text, boundary) VALUES (?,?,?,?)');
+        const tx = this.database.transaction(() => {
+            del.run(bookId);
+            for (const r of rules || [])
+                ins.run(bookId, r.category || '', r.ruleText || r.rule_text || '', r.boundary || '');
+        });
+        tx();
+    }
+    getWorldRules(bookId) {
+        return this.database.prepare('SELECT * FROM world_rules WHERE book_id = ? ORDER BY category, id').all(bookId);
+    }
+    saveStyleRules(bookId, rules) {
+        this.database.prepare('INSERT OR REPLACE INTO style_rules (book_id, volume, arc, prose, dialogue, taboos, updated_at) VALUES (?,?,?,?,?,?,?)')
+            .run(bookId, rules.volume || 0, rules.arc || 0, JSON.stringify(rules.prose || []), JSON.stringify(rules.dialogue || []), JSON.stringify(rules.taboos || []), new Date().toISOString());
+    }
+    getStyleRules(bookId) {
+        const row = this.database.prepare('SELECT * FROM style_rules WHERE book_id = ?').get(bookId);
+        if (!row)
+            return null;
+        return { ...row, prose: typeof row.prose === 'string' ? JSON.parse(row.prose) : row.prose, dialogue: typeof row.dialogue === 'string' ? JSON.parse(row.dialogue) : row.dialogue, taboos: typeof row.taboos === 'string' ? JSON.parse(row.taboos) : row.taboos };
+    }
+    // ── 运行元信息 ──
+    saveRunMeta(bookId, meta) {
+        this.database.prepare('INSERT OR REPLACE INTO run_meta (book_id, started_at, provider, style, model, planning_tier, steer_history, pending_steer) VALUES (?,?,?,?,?,?,?,?)')
+            .run(bookId, meta.startedAt || meta.started_at || '', meta.provider || '', meta.style || '', meta.model || '', meta.planningTier || meta.planning_tier || '', JSON.stringify(meta.steerHistory || meta.steer_history || []), meta.pendingSteer || meta.pending_steer || '');
+    }
+    getRunMeta(bookId) {
+        const row = this.database.prepare('SELECT * FROM run_meta WHERE book_id = ?').get(bookId);
+        if (!row)
+            return null;
+        return { ...row, steerHistory: typeof row.steer_history === 'string' ? JSON.parse(row.steer_history) : row.steer_history };
+    }
+    // ── 用量统计 ──
+    saveUsageStats(bookId, stats) {
+        this.database.prepare('INSERT OR REPLACE INTO usage_stats (book_id, total_input, total_output, total_cost, total_saved, cache_read, cache_write, per_agent, per_model) VALUES (?,?,?,?,?,?,?,?,?)')
+            .run(bookId, stats.total_input || stats.totalInput || 0, stats.total_output || stats.totalOutput || 0, stats.total_cost || stats.totalCost || 0, stats.total_saved || stats.totalSaved || 0, stats.cache_read || stats.cacheRead || 0, stats.cache_write || stats.cacheWrite || 0, JSON.stringify(stats.per_agent || stats.perAgent || {}), JSON.stringify(stats.per_model || stats.perModel || {}));
+    }
+    getUsageStats(bookId) {
+        const row = this.database.prepare('SELECT * FROM usage_stats WHERE book_id = ?').get(bookId);
+        if (!row)
+            return null;
+        return { ...row, per_agent: typeof row.per_agent === 'string' ? JSON.parse(row.per_agent) : row.per_agent, per_model: typeof row.per_model === 'string' ? JSON.parse(row.per_model) : row.per_model };
+    }
+    // ── 书籍编辑 ──
+    updateBook(id, fields) {
+        const sets = [];
+        const params = [];
+        if (fields.name !== undefined) {
+            sets.push('name = ?');
+            params.push(fields.name);
+        }
+        if (fields.style !== undefined) {
+            sets.push('style = ?');
+            params.push(fields.style);
+        }
+        if (fields.premise !== undefined) {
+            sets.push('premise = ?');
+            params.push(fields.premise);
+        }
+        if (fields.phase !== undefined) {
+            sets.push('phase = ?');
+            params.push(fields.phase);
+        }
+        if (fields.tags !== undefined) {
+            sets.push('tags = ?');
+            params.push(fields.tags);
+        }
+        params.push(new Date().toISOString(), id);
+        if (sets.length > 0) {
+            this.database.prepare(`UPDATE books SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).run(...params);
+        }
+    }
+    // ── 摘要管理 ──
+    saveSummaries(bookId, summaries) {
+        const del = this.database.prepare('DELETE FROM summaries WHERE book_id = ?');
+        const ins = this.database.prepare('INSERT INTO summaries (book_id, type, ref_key, summary, characters, key_events) VALUES (?,?,?,?,?,?)');
+        const tx = this.database.transaction(() => {
+            del.run(bookId);
+            for (const s of summaries || []) {
+                ins.run(bookId, s.type || 'chapter', s.ref_key || String(s.chapter || ''), s.summary || '', JSON.stringify(s.characters || []), JSON.stringify(s.key_events || []));
+            }
+        });
+        tx();
+    }
+    getSummaries(bookId) {
+        const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ? ORDER BY type, ref_key').all(bookId);
+        return rows.map(r => ({
+            id: r.id,
+            type: r.type,
+            refKey: r.ref_key,
+            summary: r.summary || '',
+            characters: typeof r.characters === 'string' ? JSON.parse(r.characters) : (r.characters || []),
+            keyEvents: typeof r.key_events === 'string' ? JSON.parse(r.key_events) : (r.key_events || []),
+        }));
+    }
+    getSummariesByType(bookId, type) {
+        const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ? AND type = ? ORDER BY ref_key').all(bookId, type);
+        return rows.map(r => ({
+            id: r.id,
+            type: r.type,
+            refKey: r.ref_key,
+            summary: r.summary || '',
+            characters: typeof r.characters === 'string' ? JSON.parse(r.characters) : (r.characters || []),
+            keyEvents: typeof r.key_events === 'string' ? JSON.parse(r.key_events) : (r.key_events || []),
+        }));
+    }
+    // ── 用户指令 ──
+    saveUserDirectives(bookId, directives) {
+        const del = this.database.prepare('DELETE FROM user_directives WHERE book_id = ?');
+        const ins = this.database.prepare('INSERT INTO user_directives (book_id, text, chapter, total_chapters, created_at) VALUES (?,?,?,?,?)');
+        const tx = this.database.transaction(() => {
+            del.run(bookId);
+            for (const d of directives || []) {
+                ins.run(bookId, d.text || '', d.chapter || 0, d.total_chapters || 0, d.created_at || '');
+            }
+        });
+        tx();
+    }
+    getUserDirectives(bookId) {
+        return this.database.prepare('SELECT * FROM user_directives WHERE book_id = ? ORDER BY chapter').all(bookId);
     }
     close() { this.database.close(); }
 }

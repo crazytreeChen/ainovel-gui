@@ -19,6 +19,9 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     // 角色管理
     getBookCharacters: (id) => electron_1.ipcRenderer.invoke('get-book-characters', id),
     saveBookCharacters: (id, chars) => electron_1.ipcRenderer.invoke('save-book-characters', id, chars),
+    // 配角名册
+    getBookCast: (id) => electron_1.ipcRenderer.invoke('get-book-cast', id),
+    saveBookCast: (id, entries) => electron_1.ipcRenderer.invoke('save-book-cast', id, entries),
     // 时间线管理
     getBookTimeline: (id) => electron_1.ipcRenderer.invoke('get-book-timeline', id),
     // 评审管理
@@ -43,7 +46,8 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     readChapter: (chapterNum) => electron_1.ipcRenderer.invoke('read-chapter', chapterNum),
     listChapters: () => electron_1.ipcRenderer.invoke('list-chapters'),
     // 创作控制
-    startWriting: (prompt) => electron_1.ipcRenderer.invoke('start-writing', prompt),
+    startWriting: (prompt, bookId) => electron_1.ipcRenderer.invoke('start-writing', prompt, bookId),
+    resumeWriting: (bookId) => electron_1.ipcRenderer.invoke('resume-writing', bookId),
     sendInput: (text) => electron_1.ipcRenderer.invoke('send-input', text),
     pauseWriting: () => electron_1.ipcRenderer.invoke('pause-writing'),
     stopWriting: () => electron_1.ipcRenderer.invoke('stop-writing'),
@@ -61,6 +65,35 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     openDirectory: (dir) => electron_1.ipcRenderer.invoke('open-directory', dir),
     // 系统
     checkBinary: () => electron_1.ipcRenderer.invoke('check-binary'),
+    // 调试
+    debugDb: () => electron_1.ipcRenderer.invoke('debug-db'),
+    // 世界观/风格规则
+    getWorldRules: (id) => electron_1.ipcRenderer.invoke('get-world-rules', id),
+    saveWorldRules: (id, rules) => electron_1.ipcRenderer.invoke('save-world-rules', id, rules),
+    getStyleRules: (id) => electron_1.ipcRenderer.invoke('get-style-rules', id),
+    saveStyleRules: (id, rules) => electron_1.ipcRenderer.invoke('save-style-rules', id, rules),
+    // 运行元信息/用量
+    getRunMeta: (id) => electron_1.ipcRenderer.invoke('get-run-meta', id),
+    saveRunMeta: (id, meta) => electron_1.ipcRenderer.invoke('save-run-meta', id, meta),
+    getUsageStats: (id) => electron_1.ipcRenderer.invoke('get-usage-stats', id),
+    saveUsageStats: (id, stats) => electron_1.ipcRenderer.invoke('save-usage-stats', id, stats),
+    // 书籍编辑
+    updateBook: (id, fields) => electron_1.ipcRenderer.invoke('update-book', id, fields),
+    // 摘要管理
+    getBookSummaries: (id) => electron_1.ipcRenderer.invoke('get-book-summaries', id),
+    saveBookSummaries: (id, summaries) => electron_1.ipcRenderer.invoke('save-book-summaries', id, summaries),
+    // 用户指令
+    getUserDirectives: (id) => electron_1.ipcRenderer.invoke('get-user-directives', id),
+    saveUserDirectives: (id, directives) => electron_1.ipcRenderer.invoke('save-user-directives', id, directives),
+    // 自动更新
+    checkUpdate: () => electron_1.ipcRenderer.invoke('check-update'),
+    downloadUpdate: (url, sha256) => electron_1.ipcRenderer.invoke('download-update', url, sha256),
+    installUpdate: (path) => electron_1.ipcRenderer.invoke('install-update', path),
+    onDownloadProgress: (callback) => {
+        const handler = (_event, data) => callback(data);
+        electron_1.ipcRenderer.on('download-progress', handler);
+        return () => electron_1.ipcRenderer.removeListener('download-progress', handler);
+    },
     // 事件监听
     onProcessExited: (callback) => {
         electron_1.ipcRenderer.on('process-exited', callback);
@@ -69,6 +102,11 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     onSnapshotUpdate: (callback) => {
         electron_1.ipcRenderer.on('snapshot-update', (_event, data) => callback(data));
         return () => electron_1.ipcRenderer.removeListener('snapshot-update', callback);
+    },
+    onStreamOutput: (callback) => {
+        const handler = (_event, data) => callback(data);
+        electron_1.ipcRenderer.on('stream-output', handler);
+        return () => electron_1.ipcRenderer.removeListener('stream-output', handler);
     },
 });
 //# sourceMappingURL=preload.js.map

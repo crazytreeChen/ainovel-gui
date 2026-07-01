@@ -8,6 +8,8 @@ import ModelsPage_ from './ModelsPage'
 import SimulationPage_ from './SimulationPage'
 import UserRulesPage_ from './UserRulesPage'
 import WorldRulesPage_ from './WorldRulesPage'
+import SummaryPage_ from './SummaryPage'
+import BookIntroPage_ from './BookIntroPage'
 
 export const OutlinePage = OutlinePage_
 export const ChapterPage = ChapterPage_
@@ -19,3 +21,5 @@ export const ModelsPage = ModelsPage_
 export const SimulationPage = SimulationPage_
 export const UserRulesPage = UserRulesPage_
 export const WorldRulesPage = WorldRulesPage_
+export const SummaryPage = SummaryPage_
+export const BookIntroPage = BookIntroPage_

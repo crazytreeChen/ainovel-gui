@@ -45,17 +45,31 @@ export default function EventFlow() {
 
         let icon = '·'
         let summary = ev.summary
+        let agentName = ev.agent || ''
+        let lineColor = color
 
         switch (ev.category) {
           case 'DISPATCH':
             icon = '✓'
+            // 用 tui 风格：agent 名称加粗 + 斜体任务描述
+            if (agentName) {
+              const agentColor = AGENT_COLORS[agentName] || color
+              summary = `${AGENT_DISPLAY[agentName] || agentName.toUpperCase()} ${ev.summary.replace(agentName, '').trim()}`
+            }
             break
           case 'TOOL':
             icon = ev.depth > 0 ? '├' : '◇'
+            // TOOL 事件用 tool 颜色
+            if (agentName && AGENT_COLORS[agentName]) {
+              lineColor = AGENT_COLORS[agentName]
+            } else {
+              lineColor = '#7ec5d8'
+            }
             break
           case 'ERROR':
             icon = '✕'
             summary = `ERROR: ${ev.summary}`
+            lineColor = 'var(--color-error)'
             break
           case 'SYSTEM':
             icon = '⚙'
@@ -73,11 +87,11 @@ export default function EventFlow() {
           <div
             key={i}
             className="event-line"
-            style={{ color: ev.category === 'ERROR' ? 'var(--color-error)' : undefined }}
+            style={{ color: lineColor }}
           >
             <span className="event-time">{ts}</span>
             {indent}
-            <span className="event-icon" style={{ color }}>{icon}</span>
+            <span className="event-icon">{icon}</span>
             <span className="event-summary">{summary}</span>
             {ev.duration > 0 && (
               <span className="text-dim" style={{ fontSize: 10 }}>

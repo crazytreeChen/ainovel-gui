@@ -3,13 +3,13 @@ import { STATUS_CONFIG } from '@/types'
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
-export default function TopBar() {
+export default function TopBar({ bookName }: { bookName?: string }) {
   const snapshot = useAppStore((s) => s.snapshot)
   const version = '0.1.0'
 
   const spinnerClass = snapshot.isRunning ? 'status-spinner' : ''
 
-  const novelName = snapshot.novelName || '未定书名'
+  const novelName = bookName || snapshot.novelName || '未定书名'
 
   // 左侧信息
   const leftParts: string[] = []

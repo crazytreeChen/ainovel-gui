@@ -57,7 +57,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listChapters: () => ipcRenderer.invoke('list-chapters'),
 
   // 创作控制
-  startWriting: (prompt: string) => ipcRenderer.invoke('start-writing', prompt),
+  startWriting: (prompt: string, bookId?: string) => ipcRenderer.invoke('start-writing', prompt, bookId),
+  resumeWriting: (bookId: string) => ipcRenderer.invoke('resume-writing', bookId),
   sendInput: (text: string) => ipcRenderer.invoke('send-input', text),
   pauseWriting: () => ipcRenderer.invoke('pause-writing'),
   stopWriting: () => ipcRenderer.invoke('stop-writing'),
@@ -80,6 +81,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 系统
   checkBinary: () => ipcRenderer.invoke('check-binary'),
 
+  // 调试
+  debugDb: () => ipcRenderer.invoke('debug-db'),
+
   // 世界观/风格规则
   getWorldRules: (id: string) => ipcRenderer.invoke('get-world-rules', id),
   saveWorldRules: (id: string, rules: any[]) => ipcRenderer.invoke('save-world-rules', id, rules),
@@ -95,6 +99,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 书籍编辑
   updateBook: (id: string, fields: any) => ipcRenderer.invoke('update-book', id, fields),
 
+  // 摘要管理
+  getBookSummaries: (id: string) => ipcRenderer.invoke('get-book-summaries', id),
+  saveBookSummaries: (id: string, summaries: any[]) => ipcRenderer.invoke('save-book-summaries', id, summaries),
+
+  // 用户指令
+  getUserDirectives: (id: string) => ipcRenderer.invoke('get-user-directives', id),
+  saveUserDirectives: (id: string, directives: any[]) => ipcRenderer.invoke('save-user-directives', id, directives),
+
+  // 自动更新
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
+  downloadUpdate: (url: string, sha256: string) => ipcRenderer.invoke('download-update', url, sha256),
+  installUpdate: (path: string) => ipcRenderer.invoke('install-update', path),
+  onDownloadProgress: (callback: (data: any) => void) => {
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('download-progress', handler)
+    return () => ipcRenderer.removeListener('download-progress', handler)
+  },
+
   // 事件监听
   onProcessExited: (callback: () => void) => {
     ipcRenderer.on('process-exited', callback)
@@ -103,5 +125,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSnapshotUpdate: (callback: (data: any) => void) => {
     ipcRenderer.on('snapshot-update', (_event, data) => callback(data))
     return () => ipcRenderer.removeListener('snapshot-update', callback)
+  },
+  onStreamOutput: (callback: (data: string) => void) => {
+    const handler = (_event: any, data: string) => callback(data)
+    ipcRenderer.on('stream-output', handler)
+    return () => ipcRenderer.removeListener('stream-output', handler)
   },
 })

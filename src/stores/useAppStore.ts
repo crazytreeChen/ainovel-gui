@@ -65,7 +65,8 @@ declare global {
       getEvents: () => Promise<EventItem[]>
       readChapter: (chapterNum: number) => Promise<string>
       listChapters: () => Promise<ChapterInfo[]>
-      startWriting: (prompt: string) => Promise<boolean>
+      startWriting: (prompt: string, bookId?: string) => Promise<boolean>
+      resumeWriting: (bookId: string) => Promise<boolean>
       sendInput: (text: string) => Promise<boolean>
       pauseWriting: () => Promise<boolean>
       stopWriting: () => Promise<boolean>
@@ -95,8 +96,23 @@ declare global {
       // 书籍编辑
       updateBook: (id: string, fields: any) => Promise<boolean>
 
+      // 摘要管理
+      getBookSummaries: (id: string) => Promise<any[]>
+      saveBookSummaries: (id: string, summaries: any[]) => Promise<boolean>
+
+      // 用户指令
+      getUserDirectives: (id: string) => Promise<any[]>
+      saveUserDirectives: (id: string, directives: any[]) => Promise<boolean>
+
+      // 自动更新
+      checkUpdate: () => Promise<any>
+      downloadUpdate: (url: string, sha256: string) => Promise<any>
+      installUpdate: (filePath: string) => Promise<any>
+      onDownloadProgress: (callback: (data: any) => void) => () => void
+
       onProcessExited: (callback: () => void) => () => void
       onSnapshotUpdate: (callback: (data: any) => void) => () => void
+      onStreamOutput: (callback: (data: string) => void) => () => void
     }
   }
 }
@@ -115,7 +131,7 @@ interface AppState {
   events: EventItem[]
   chapters: ChapterInfo[]
   chapterContent: string
-  streamOutput: string[]
+  streamOutput: { type: string; text: string }[]
   inputHistory: string[]
 
   // 模态框
@@ -142,7 +158,7 @@ interface AppState {
   setWorkingDir: (dir: string) => void
   setBinaryInfo: (info: BinaryInfo | null) => void
   setInputValue: (value: string) => void
-  appendStreamOutput: (text: string) => void
+  appendStreamOutput: (text: { type: string; text: string } | string) => void
   clearStreamOutput: () => void
   pushToHistory: (text: string) => void
   setError: (err: string | null) => void
@@ -162,7 +178,8 @@ interface AppState {
   refreshChapters: () => Promise<void>
 
   // 创作控制
-  startWriting: (prompt: string) => Promise<boolean>
+  startWriting: (prompt: string, bookId?: string) => Promise<boolean>
+  resumeWriting: (bookId: string) => Promise<boolean>
   sendInput: (text: string) => Promise<boolean>
   pauseWriting: () => Promise<boolean>
   stopWriting: () => Promise<boolean>
@@ -205,6 +222,8 @@ const emptySnapshot: UISnapshot = {
   totalOutputTokens: 0,
   totalCostUSD: 0,
   totalSavedUSD: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
   contextPercent: 0,
   contextTokens: 0,
   contextWindow: 0,
@@ -249,7 +268,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   setWorkingDir: (workingDir) => set({ workingDir }),
   setBinaryInfo: (binaryInfo) => set({ binaryInfo }),
   setInputValue: (inputValue) => set({ inputValue }),
-  appendStreamOutput: (text) => set((s) => ({ streamOutput: [...s.streamOutput, text] })),
+  appendStreamOutput: (text) => set((s) => {
+    const entry = typeof text === 'string' ? {type: 'content', text} : text
+    const prev = s.streamOutput
+    if (prev.length === 0) return { streamOutput: [entry] }
+    const last = prev[prev.length - 1]
+    if (last.type === entry.type && last.text.length < 5000) {
+      prev[prev.length - 1] = { type: last.type, text: last.text + entry.text }
+      return { streamOutput: [...prev] }
+    }
+    return { streamOutput: [...prev, entry] }
+  }),
   clearStreamOutput: () => set({ streamOutput: [] }),
   pushToHistory: (text) => set((s) => ({
     inputHistory: [...s.inputHistory.slice(-199), text],
@@ -286,12 +315,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ chapters })
   },
 
-  startWriting: async (prompt) => {
+  startWriting: async (prompt, bookId) => {
     const api = window.electronAPI
     if (!api) return false
     try {
       set({ mode: 'running', error: null })
-      const result = await api.startWriting(prompt)
+      const result = await api.startWriting(prompt, bookId)
+      return result
+    } catch (e: any) {
+      set({ error: e.message, mode: 'welcome' })
+      return false
+    }
+  },
+
+  resumeWriting: async (bookId) => {
+    const api = window.electronAPI
+    if (!api) return false
+    try {
+      set({ mode: 'running', error: null })
+      const result = await api.resumeWriting(bookId)
       return result
     } catch (e: any) {
       set({ error: e.message, mode: 'welcome' })
