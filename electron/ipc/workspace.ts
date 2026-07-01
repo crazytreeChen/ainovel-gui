@@ -9,6 +9,14 @@ const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } = requ
 
 const log = createLogger('ipc:workspace')
 
+/** 异步 JSON 写入（不阻塞响应，用于 CLI 兼容） */
+function writeJSON(dir, rel, data) {
+  try {
+    const content = rel.endsWith('.md') ? data : JSON.stringify(data, null, 2)
+    writeFileSync(join(dir, rel), content, 'utf8')
+  } catch (e) { log.error(`writeJSON:${rel}`, e) }
+}
+
 function getBookDirById(id) {
   try {
     const book = getDB().getBook(id)
@@ -88,9 +96,10 @@ function register(ipcMain) {
       }
       if (data.compass) db.saveCompass(id, data.compass)
     } catch (e) { log.error('save-book-outline:sqlite', e) }
-    if (data.outline) writeFileSync(join(dir, 'outline.json'), JSON.stringify(data.outline, null, 2))
-    if (data.layeredOutline) writeFileSync(join(dir, 'layered_outline.json'), JSON.stringify(data.layeredOutline, null, 2))
-    if (data.compass) writeFileSync(join(dir, 'compass.json'), JSON.stringify(data.compass, null, 2))
+    // JSON 写（CLI 兼容，不阻塞）
+    if (data.outline) writeJSON(dir, 'outline.json', data.outline)
+    if (data.layeredOutline) writeJSON(dir, 'layered_outline.json', data.layeredOutline)
+    if (data.compass) writeJSON(dir, 'compass.json', data.compass)
     if (data.premise !== undefined) writeFileSync(join(dir, 'premise.md'), data.premise)
     return true
   })
@@ -145,9 +154,8 @@ function register(ipcMain) {
     const dir = getBookDirById(id)
     if (!dir) return false
     try { getDB().saveChapter(id, num, content, '') } catch (e) { log.error('save-chapter', e) }
-    const chDir = join(dir, 'chapters')
-    if (!existsSync(chDir)) mkdirSync(chDir, { recursive: true })
-    writeFileSync(join(chDir, `${String(num).padStart(2, '0')}.md`), content, 'utf8')
+    // JSON 写（CLI 兼容）
+    writeJSON(chDir, `${String(num).padStart(2, '0')}.md`, content)
     return true
   })
 
@@ -168,7 +176,8 @@ function register(ipcMain) {
     const dir = getBookDirById(id)
     if (!dir) return false
     try { getDB().saveCharacters(id, chars) } catch (e) { log.error('save-characters', e) }
-    writeFileSync(join(dir, 'characters.json'), JSON.stringify(chars, null, 2))
+    // JSON 写用于 CLI 兼容
+    writeJSON(dir, 'characters.json', chars)
     return true
   })
 
@@ -227,8 +236,6 @@ function register(ipcMain) {
   ipcMain.handle('save-simulation-profile', async (_e, bookId, profile) => {
     try {
       getDB().saveSimulationProfile(bookId, profile)
-      const dir = getBookDirById(bookId)
-      if (dir) writeFileSync(join(dir, 'simulation_profile.json'), JSON.stringify(profile, null, 2))
       return true
     } catch (e) { log.error('save-sim-profile', e); return false }
   })
