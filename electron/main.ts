@@ -5,6 +5,10 @@ const { ChildProcess, spawn, execSync } = require('child_process')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
 const os = require('os')
 const { AppDatabase } = require('./database')
+const { createLogger, tryOrLog, tryOrLogAsync } = require('./logger')
+
+// ── 日志 ──
+const log = createLogger('main')
 
 // ── 运行环境 ──
 const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev')
@@ -51,7 +55,7 @@ function getAinovelBinary() {
     const cmd = os.platform() === 'win32' ? 'where ainovel-cli' : 'which ainovel-cli'
     const which = execSync(cmd, { encoding: 'utf8' }).trim().split('\n')[0]
     if (which) return which
-  } catch { /* ignore */ }
+  } catch { log.debug('ainovel-cli not in PATH, checking common locations') }
 
   // 常见位置
   const home = app.getPath('home')
@@ -91,11 +95,11 @@ function readStoreJSON(relativePath) {
           candidates.push(join(outputSub, entry.name, relativePath))
         }
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
   }
   for (const fullPath of candidates) {
     if (existsSync(fullPath)) {
-      try { return JSON.parse(readFileSync(fullPath, 'utf8')) } catch { return null }
+      try { return JSON.parse(readFileSync(fullPath, 'utf8')) } catch (e) { log.error('handler', e); return null }
     }
   }
   return null
@@ -116,11 +120,11 @@ function readStoreText(relativePath) {
           candidates.push(join(outputSub, entry.name, relativePath))
         }
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
   }
   for (const fullPath of candidates) {
     if (existsSync(fullPath)) {
-      try { return readFileSync(fullPath, 'utf8') } catch { return null }
+      try { return readFileSync(fullPath, 'utf8') } catch (e) { log.error('handler', e); return null }
     }
   }
   return null
@@ -132,7 +136,7 @@ function readStoreJSONAt(baseDir, relativePath) {
   if (!existsSync(fullPath)) return null
   try {
     return JSON.parse(readFileSync(fullPath, 'utf8'))
-  } catch { return null }
+  } catch (e) { log.error('handler', e); return null }
 }
 
 function readStoreTextAt(baseDir, relativePath) {
@@ -140,7 +144,7 @@ function readStoreTextAt(baseDir, relativePath) {
   if (!existsSync(fullPath)) return null
   try {
     return readFileSync(fullPath, 'utf8')
-  } catch { return null }
+  } catch (e) { log.error('handler', e); return null }
 }
 
 // 查找 outputDir/output/ 下有效的作品目录（包含 meta/progress.json）
@@ -156,7 +160,7 @@ function findActiveBookDir() {
         if (existsSync(progressFile)) return join(outputSub, entry.name)
       }
     }
-  } catch {}
+  } catch (e) { log.error('handler', e) }
   return join(outputSub) // 降级到 outputDir/output
 }
 
@@ -180,7 +184,7 @@ function setupIPC() {
         snap.totalWordCount = book.totalWordCount || 0
         snap.completedCount = book.completedCount || 0
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // 运行时数据从 ainovel-cli 读取（如果正在运行）
     if (isAlive) {
@@ -223,7 +227,7 @@ function setupIPC() {
             if (chars && chars.length > 0) {
               snap.characters = chars.map((c: any) => c.name + (c.role ? `（${c.role}）` : ''))
             }
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
           // 读取扁平大纲（后 30 条，最新章节优先）
           try {
             const entries = getDB().getOutlineEntries(bookId)
@@ -234,7 +238,7 @@ function setupIPC() {
                 coreEvent: e.core_event || '',
               }))
             }
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
           // 读取指南针
           try {
             const compass = getDB().getCompass(bookId)
@@ -242,7 +246,7 @@ function setupIPC() {
               snap.compassDirection = compass.endingDirection || ''
               snap.compassScale = compass.estimatedScale || ''
             }
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
           // 读取最近评审
           try {
             const reviews = getDB().getReviews(bookId)
@@ -250,7 +254,7 @@ function setupIPC() {
               const last = reviews[reviews.length - 1]
               snap.lastReviewSummary = last.summary ? `第${last.chapter}章: ${last.summary.slice(0, 80)}` : ''
             }
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
           // 读取用量统计
           try {
             const usage = getDB().getUsageStats(bookId)
@@ -263,7 +267,7 @@ function setupIPC() {
               snap.cacheReadTokens = usage.cache_read || 0
               snap.cacheWriteTokens = usage.cache_write || 0
             }
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
           // 读取运行信息（provider/model）
           try {
             const meta = getDB().getRunMeta(bookId)
@@ -271,18 +275,18 @@ function setupIPC() {
               snap.provider = meta.provider || ''
               snap.modelName = meta.model || ''
             }
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
           // 读取进度（总章节数、分层状态）
           try {
             const prog = getDB().database.prepare('SELECT * FROM progress WHERE book_id=?').get(bookId)
             if (prog) {
               snap.layered = !!prog.layered
               if (prog.total_chapters > 0) snap.totalChapters = prog.total_chapters
-              snap.completedCount = (() => { try { return JSON.parse(prog.completed_chapters || '[]').length } catch { return 0 } })()
+              snap.completedCount = (() => { try { return JSON.parse(prog.completed_chapters || '[]').length } catch (e) { log.error('handler', e); return 0 } })()
             }
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
         }
-      } catch {}
+      } catch (e) { log.error('snapshot:book', e) }
     }
 
     snap.statusLabel = deriveStatusLabel(snap)
@@ -296,14 +300,14 @@ function setupIPC() {
         try {
           const fullBook = getDB().getBook(bookId)
           if (fullBook?.premise && !snap.premise) snap.premise = fullBook.premise.slice(0, 200)
-        } catch {}
+        } catch (e) { log.error('snapshot:book', e) }
         // 角色
         try {
           const chars = getDB().getCharacters(bookId)
           if (chars && chars.length > 0 && snap.characters.length === 0) {
             snap.characters = chars.map((c: any) => c.name + (c.role ? `（${c.role}）` : ''))
           }
-        } catch {}
+        } catch (e) { log.error('snapshot:book', e) }
         // 大纲（仅当 snapshot 中没有时补充）
         try {
           if (snap.outline.length === 0) {
@@ -316,7 +320,7 @@ function setupIPC() {
               }))
             }
           }
-        } catch {}
+        } catch (e) { log.error('snapshot:book', e) }
         // 指南针
         try {
           if (!snap.compassDirection) {
@@ -326,7 +330,7 @@ function setupIPC() {
               snap.compassScale = compass.estimatedScale || ''
             }
           }
-        } catch {}
+        } catch (e) { log.error('snapshot:book', e) }
         // 最近评审
         try {
           if (!snap.lastReviewSummary) {
@@ -336,7 +340,7 @@ function setupIPC() {
               snap.lastReviewSummary = last.summary ? `第${last.chapter}章: ${last.summary.slice(0, 80)}` : ''
             }
           }
-        } catch {}
+        } catch (e) { log.error('snapshot:book', e) }
         // 用量
         try {
           const usage = getDB().getUsageStats(bookId)
@@ -348,7 +352,7 @@ function setupIPC() {
             if (!snap.cacheReadTokens) snap.cacheReadTokens = usage.cache_read || 0
             if (!snap.cacheWriteTokens) snap.cacheWriteTokens = usage.cache_write || 0
           }
-        } catch {}
+        } catch (e) { log.error('snapshot:book', e) }
         // 运行信息（provider/model）
         try {
           const meta = getDB().getRunMeta(bookId)
@@ -356,9 +360,9 @@ function setupIPC() {
             if (!snap.provider) snap.provider = meta.provider || ''
             if (!snap.modelName) snap.modelName = meta.model || ''
           }
-        } catch {}
+        } catch (e) { log.error('snapshot:book', e) }
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     return snap
   })
@@ -390,14 +394,15 @@ function setupIPC() {
             agent: p.agent || '', depth: p.depth || 0,
             level: p.level || 'info', duration: p.duration || 0,
           }
-        } catch {
+        } catch (e) {
+          log.warn('get-events: failed to parse checkpoint line', e?.message || e)
           return {
             time: '', category: 'SYSTEM', summary: line,
             detail: '', agent: '', depth: 0, level: 'info', duration: 0,
           }
         }
       })
-    } catch { return [] }
+    } catch (e) { log.error('handler', e); return [] }
   })
 
   ipcMain.handle('read-chapter', async (_e, ch) => {
@@ -408,10 +413,10 @@ function setupIPC() {
     if (!existsSync(f)) {
       // 回退到 outputDir/output/chapters/
       const fallback = join(outputDir, 'output', 'chapters', `${String(ch).padStart(2, '0')}.md`)
-      if (existsSync(fallback)) try { return readFileSync(fallback, 'utf8') } catch { return '' }
+      if (existsSync(fallback)) try { return readFileSync(fallback, 'utf8') } catch (e) { log.error('handler', e); return '' }
       return ''
     }
-    try { return readFileSync(f, 'utf8') } catch { return '' }
+    try { return readFileSync(f, 'utf8') } catch (e) { log.error('handler', e); return '' }
   })
 
   ipcMain.handle('list-chapters', async () => {
@@ -459,7 +464,7 @@ function setupIPC() {
       try {
         const book = getDB().getBook(bookId)
         if (book?.workspace_dir) cwd = book.workspace_dir
-      } catch {}
+      } catch (e) { log.error('snapshot:book', e) }
     }
     try {
       // 以 /simulate 为 prompt 启动 headless，引擎会执行仿写分析
@@ -489,7 +494,7 @@ function setupIPC() {
       try {
         const book = getDB().getBook(bookId)
         if (book?.workspace_dir) cwd = book.workspace_dir
-      } catch {}
+      } catch (e) { log.error('snapshot:book', e) }
     }
     if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true })
     // 更新全局 outputDir
@@ -509,7 +514,7 @@ function setupIPC() {
       // 启动运行时数据同步
       startRuntimeSync()
       return true
-    } catch { return false }
+    } catch (e) { log.error('handler', e); return false }
   })
 
   // 从 checkpoint 恢复写作（不传 --prompt，引擎自动检测进度恢复）
@@ -523,7 +528,7 @@ function setupIPC() {
       try {
         const book = getDB().getBook(bookId)
         if (book?.workspace_dir) cwd = book.workspace_dir
-      } catch {}
+      } catch (e) { log.error('snapshot:book', e) }
     }
     if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }); return false }
     // 引擎的 output_dir 在 config 中配置为相对路径（如 output/novel），
@@ -629,7 +634,7 @@ function setupIPC() {
       ainovelProcess.on('error', () => { ainovelProcess = null })
       startRuntimeSync()
       return true
-    } catch { return false }
+    } catch (e) { log.error('handler', e); return false }
   })
 
   ipcMain.handle('send-input', async (_e, text) => {
@@ -650,12 +655,12 @@ function setupIPC() {
         duration: 0,
       })
       return true
-    } catch { return false }
+    } catch (e) { log.error('handler', e); return false }
   })
 
   ipcMain.handle('pause-writing', async () => {
     if (!ainovelProcess || ainovelProcess.exitCode !== null) return false
-    try { ainovelProcess.kill('SIGINT'); return true } catch { return false }
+    try { ainovelProcess.kill('SIGINT'); return true } catch (e) { log.error('handler', e); return false }
   })
 
   ipcMain.handle('stop-writing', async () => { await stopAinovelProcess(); return true })
@@ -685,7 +690,8 @@ function setupIPC() {
       if (!existsSync(binary)) return { available: false, version: '', path: binary }
       const version = execSync(`"${binary}" --version 2>&1`, { encoding: 'utf8' }).trim()
       return { available: true, version, path: binary }
-    } catch {
+    } catch (e) {
+      log.warn('check-binary: failed to get version', e?.message || e)
       return { available: false, version: '', path: '' }
     }
   })
@@ -698,8 +704,7 @@ function setupIPC() {
   // ── 书籍管理 IPC ──
 
   ipcMain.handle('list-books', async () => {
-    try { return getDB().listBooks() }
-    catch { return [] }
+    try { return getDB().listBooks() } catch (e) { log.error('handler', e); return [] }
   })
 
   ipcMain.handle('create-book', async (_e, name, style, phase, premise, tags) => {
@@ -785,7 +790,7 @@ function setupIPC() {
         hasCharacters: existsSync(join(dir, 'characters.json')),
         hasOutline: existsSync(join(dir, 'outline.json')),
       }
-    } catch { return null }
+    } catch (e) { log.error('handler', e); return null }
   })
 
   ipcMain.handle('import-workspace', async (_e, dir) => {
@@ -879,7 +884,7 @@ function setupIPC() {
         if (existsSync(reviewDir)) {
           const revFiles = readdirSync(reviewDir).filter(f => f.endsWith('.json'))
           const reviews = revFiles.map(f => {
-            try { return JSON.parse(readFileSync(join(reviewDir, f), 'utf8')) } catch { return null }
+            try { return JSON.parse(readFileSync(join(reviewDir, f), 'utf8')) } catch (e) { log.error('handler', e); return null }
           }).filter(Boolean)
           if (reviews.length > 0) db.saveReviews(id, reviews)
         }
@@ -900,7 +905,7 @@ function setupIPC() {
               if (s.arc !== undefined) return { type: 'arc', ref_key: `arc-v${String(s.volume).padStart(2,'0')}a${String(s.arc).padStart(2,'0')}`, summary: s.summary || '', characters: [], key_events: s.keyEvents || s.key_events || [] }
               if (s.volume && s.arc === undefined) return { type: 'volume', ref_key: `vol-v${String(s.volume).padStart(2,'0')}`, summary: s.summary || '', characters: [], key_events: s.keyEvents || s.key_events || [] }
               return null
-            } catch { return null }
+            } catch (e) { log.error('handler', e); return null }
           }).filter(Boolean)
           if (summaries.length > 0) db.saveSummaries(id, summaries)
         }
@@ -910,12 +915,12 @@ function setupIPC() {
           try {
             const directives = JSON.parse(readFileSync(userDirPath, 'utf8'))
             if (directives.length > 0) db.saveUserDirectives(id, directives)
-          } catch {}
+          } catch (e) { log.error('snapshot:book', e) }
         }
-      } catch {}
+      } catch (e) { log.error('snapshot:book', e) }
 
       return { ...book, completedCount: progress?.completedChapters?.length || 0 }
-    } catch { return null }
+    } catch (e) { log.error('handler', e); return null }
   })
 
   // ── 大纲/章节数据 IPC ──
@@ -924,7 +929,7 @@ function setupIPC() {
     try {
       const book = getDB().getBook(id)
       if (book) return join(GUI_DATA_DIR, 'books', id)
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
     // fallback
     return join(GUI_DATA_DIR, 'books', id)
   }
@@ -956,19 +961,19 @@ function setupIPC() {
       }
 
       compass = db.getCompass(id)
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // SQLite 无数据时从 JSON 回退
     if (!outline || outline.length === 0) {
       outline = readStoreJSONAt(dir, 'outline.json')
-      try { if (outline && outline.length > 0) db.saveOutlineEntries(id, outline) } catch {}
+      try { if (outline && outline.length > 0) db.saveOutlineEntries(id, outline) } catch (e) { log.error('handler', e) }
     }
     if (!layeredOutline || layeredOutline.length === 0) {
       layeredOutline = readStoreJSONAt(dir, 'layered_outline.json')
     }
     if (!compass) {
       compass = readStoreJSONAt(dir, 'compass.json')
-      try { if (compass) db.saveCompass(id, compass) } catch {}
+      try { if (compass) db.saveCompass(id, compass) } catch (e) { log.error('handler', e) }
     }
     if (!premise) {
       premise = readStoreTextAt(dir, 'premise.md')
@@ -1001,7 +1006,7 @@ function setupIPC() {
         db.saveArcChapters(id, allArcChapters)
       }
       if (data.compass) db.saveCompass(id, data.compass)
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // JSON (ainovel-cli 兼容)
     if (data.outline) writeFileSync(join(dir, 'outline.json'), JSON.stringify(data.outline, null, 2))
@@ -1025,7 +1030,7 @@ function setupIPC() {
           wordCount: c.word_count || 0, status: c.status || 'completed',
         }))
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // 回退到 JSON
     if (!existsSync(chDir)) return []
@@ -1038,9 +1043,12 @@ function setupIPC() {
         const firstLine = content.split('\n')[0] || ''
         const title = firstLine.replace(/^#\s*/, '').trim() || `第${num}章`
         // 同步到 SQLite
-        try { getDB().saveChapter(id, num, content, title) } catch {}
+        try { getDB().saveChapter(id, num, content, title) } catch (e) { log.error('handler', e) }
         return { num, title, wordCount: content.length, status: 'completed' }
-      } catch { return { num, title: `第${num}章`, wordCount: 0, status: 'completed' } }
+      } catch (e) {
+        log.warn('list-chapters: failed to read chapter', e?.message || e)
+        return { num, title: `第${num}章`, wordCount: 0, status: 'completed' }
+      }
     }).filter(Boolean)
   })
 
@@ -1056,7 +1064,7 @@ function setupIPC() {
       if (dbCh && dbCh.content) {
         return { num, content: dbCh.content || '', draft: dbDraft || '', plan: dbPlan }
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // 回退到 JSON
     const chFile = join(dir, 'chapters', `${String(num).padStart(2, '0')}.md`)
@@ -1067,14 +1075,14 @@ function setupIPC() {
     let plan = null
     if (existsSync(chFile)) content = readFileSync(chFile, 'utf8')
     if (existsSync(draftFile)) draft = readFileSync(draftFile, 'utf8')
-    if (existsSync(planFile)) { try { plan = JSON.parse(readFileSync(planFile, 'utf8')) } catch {} }
+    if (existsSync(planFile)) { try { plan = JSON.parse(readFileSync(planFile, 'utf8')) } catch (e) { log.error('handler', e) } }
 
     // 同步到 SQLite
     try {
       if (content) getDB().saveChapter(id, num, content, '')
       if (draft) getDB().saveDraft(id, num, draft)
       if (plan) getDB().saveChapterPlan(id, num, plan)
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     return { num, content, draft, plan }
   })
@@ -1083,7 +1091,7 @@ function setupIPC() {
     const dir = getBookDirById(id)
     if (!dir) return false
     // SQLite
-    try { getDB().saveChapter(id, num, content, '') } catch {}
+    try { getDB().saveChapter(id, num, content, '') } catch (e) { log.error('handler', e) }
     // JSON
     const chDir = join(dir, 'chapters')
     if (!existsSync(chDir)) mkdirSync(chDir, { recursive: true })
@@ -1100,11 +1108,11 @@ function setupIPC() {
     try {
       const chars = getDB().getCharacters(id)
       if (chars && chars.length > 0) return chars
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // 回退到 JSON
     const chars = readStoreJSONAt(dir, 'characters.json') || []
-    try { if (chars.length > 0) getDB().saveCharacters(id, chars) } catch {}
+    try { if (chars.length > 0) getDB().saveCharacters(id, chars) } catch (e) { log.error('handler', e) }
     return chars
   })
 
@@ -1112,7 +1120,7 @@ function setupIPC() {
     const dir = getBookDirById(id)
     if (!dir) return false
     // SQLite
-    try { getDB().saveCharacters(id, chars) } catch {}
+    try { getDB().saveCharacters(id, chars) } catch (e) { log.error('handler', e) }
     // JSON
     writeFileSync(join(dir, 'characters.json'), JSON.stringify(chars, null, 2))
     return true
@@ -1134,7 +1142,7 @@ function setupIPC() {
           stateChanges: getDB().getStateChanges(id),
         }
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // 回退到 JSON
     const timeline = readStoreJSONAt(dir, 'timeline.json') || []
@@ -1148,7 +1156,7 @@ function setupIPC() {
       if (foreshadow.length > 0) getDB().saveForeshadowEntries(id, foreshadow)
       if (relationships.length > 0) getDB().saveRelationshipEntries(id, relationships)
       if (stateChanges.length > 0) getDB().saveStateChanges(id, stateChanges)
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     return { timeline, foreshadow, relationships, stateChanges }
   })
@@ -1162,18 +1170,17 @@ function setupIPC() {
     try {
       const reviews = getDB().getReviews(id)
       if (reviews && reviews.length > 0) return reviews
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
 
     // 回退到 JSON
     const reviewDir = join(dir, 'reviews')
     if (!existsSync(reviewDir)) return []
     const reviews = readdirSync(reviewDir).filter(f => f.endsWith('.json')).map(file => {
-      try { return { ...JSON.parse(readFileSync(join(reviewDir, file), 'utf8')), _file: file } }
-      catch { return null }
+      try { return { ...JSON.parse(readFileSync(join(reviewDir, file), 'utf8')), _file: file } } catch (e) { log.error('handler', e); return null }
     }).filter(Boolean).sort((a, b) => (a.chapter || 0) - (b.chapter || 0))
 
     // 同步到 SQLite
-    try { if (reviews.length > 0) getDB().saveReviews(id, reviews) } catch {}
+    try { if (reviews.length > 0) getDB().saveReviews(id, reviews) } catch (e) { log.error('handler', e) }
 
     return reviews
   })
@@ -1186,14 +1193,14 @@ function setupIPC() {
       const db = getDB()
       const row = db.getSimulationProfile(bookId)
       if (row) return row
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
     // 回退到 JSON 文件
     const dir = getBookDirById(bookId)
     if (!dir) return null
     const profile = readStoreJSONAt(dir, 'simulation_profile.json')
     if (profile) {
       // 同步到 SQLite
-      try { getDB().saveSimulationProfile(bookId, profile) } catch {}
+      try { getDB().saveSimulationProfile(bookId, profile) } catch (e) { log.error('handler', e) }
       return profile
     }
     return null
@@ -1210,19 +1217,17 @@ function setupIPC() {
         writeFileSync(join(dir, 'simulation_profile.json'), JSON.stringify(profile, null, 2))
       }
       return true
-    } catch { return false }
+    } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 用户规则 IPC ──
 
   ipcMain.handle('get-user-rules', async (_e, bookId) => {
-    try { return getDB().getUserRules(bookId) }
-    catch { return null }
+    try { return getDB().getUserRules(bookId) } catch (e) { log.error('handler', e); return null }
   })
 
   ipcMain.handle('save-user-rules', async (_e, bookId, rules) => {
-    try { getDB().saveUserRules(bookId, rules); return true }
-    catch { return false }
+    try { getDB().saveUserRules(bookId, rules); return true } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 封面图片 IPC ──
@@ -1249,7 +1254,7 @@ function setupIPC() {
     // 删除旧封面
     for (const e of coverExts) {
       const old = join(dir, 'cover' + e)
-      if (old !== dest && existsSync(old)) try { unlinkSync(old) } catch {}
+      if (old !== dest && existsSync(old)) try { unlinkSync(old) } catch (e) { log.error('handler', e) }
     }
     try { copyFileSync(imagePath, dest); return true } catch (e: any) { console.error('[cover] copy failed:', e.message); return e.message }
   })
@@ -1292,19 +1297,19 @@ function setupIPC() {
     try {
       const config = db.getConfig('provider_config')
       if (config) return config
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
     // 回退到 JSON 并同步到 SQLite
     if (!existsSync(CONFIG_PATH)) return null
     try {
       const jsonConfig = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))
       db.setConfig('provider_config', jsonConfig)
       return jsonConfig
-    } catch { return null }
+    } catch (e) { log.error('handler', e); return null }
   })
 
   ipcMain.handle('save-provider-config', async (_e, config) => {
     // SQLite
-    try { getDB().setConfig('provider_config', config) } catch {}
+    try { getDB().setConfig('provider_config', config) } catch (e) { log.error('handler', e) }
     // JSON (ainovel-cli 兼容)
     const dir = dirname(CONFIG_PATH)
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -1315,88 +1320,73 @@ function setupIPC() {
   // ── 配角名册 IPC ──
 
   ipcMain.handle('get-book-cast', async (_e, bookId) => {
-    try { return getDB().getCastEntries(bookId) }
-    catch { return [] }
+    try { return getDB().getCastEntries(bookId) } catch (e) { log.error('handler', e); return [] }
   })
 
   ipcMain.handle('save-book-cast', async (_e, bookId, entries) => {
-    try { getDB().saveCastEntries(bookId, entries); return true }
-    catch { return false }
+    try { getDB().saveCastEntries(bookId, entries); return true } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 世界观/风格规则 IPC ──
 
   ipcMain.handle('get-world-rules', async (_e, bookId) => {
-    try { return getDB().getWorldRules(bookId) }
-    catch { return [] }
+    try { return getDB().getWorldRules(bookId) } catch (e) { log.error('handler', e); return [] }
   })
 
   ipcMain.handle('save-world-rules', async (_e, bookId, rules) => {
-    try { getDB().saveWorldRules(bookId, rules); return true }
-    catch { return false }
+    try { getDB().saveWorldRules(bookId, rules); return true } catch (e) { log.error('handler', e); return false }
   })
 
   ipcMain.handle('get-style-rules', async (_e, bookId) => {
-    try { return getDB().getStyleRules(bookId) }
-    catch { return null }
+    try { return getDB().getStyleRules(bookId) } catch (e) { log.error('handler', e); return null }
   })
 
   ipcMain.handle('save-style-rules', async (_e, bookId, rules) => {
-    try { getDB().saveStyleRules(bookId, rules); return true }
-    catch { return false }
+    try { getDB().saveStyleRules(bookId, rules); return true } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 运行元信息/用量统计 IPC ──
 
   ipcMain.handle('get-run-meta', async (_e, bookId) => {
-    try { return getDB().getRunMeta(bookId) }
-    catch { return null }
+    try { return getDB().getRunMeta(bookId) } catch (e) { log.error('handler', e); return null }
   })
 
   ipcMain.handle('save-run-meta', async (_e, bookId, meta) => {
-    try { getDB().saveRunMeta(bookId, meta); return true }
-    catch { return false }
+    try { getDB().saveRunMeta(bookId, meta); return true } catch (e) { log.error('handler', e); return false }
   })
 
   ipcMain.handle('get-usage-stats', async (_e, bookId) => {
-    try { return getDB().getUsageStats(bookId) }
-    catch { return null }
+    try { return getDB().getUsageStats(bookId) } catch (e) { log.error('handler', e); return null }
   })
 
   ipcMain.handle('save-usage-stats', async (_e, bookId, stats) => {
-    try { getDB().saveUsageStats(bookId, stats); return true }
-    catch { return false }
+    try { getDB().saveUsageStats(bookId, stats); return true } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 书籍编辑 IPC ──
 
   ipcMain.handle('update-book', async (_e, id, fields) => {
-    try { getDB().updateBook(id, fields); return true }
-    catch { return false }
+    try { getDB().updateBook(id, fields); return true } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 摘要管理 IPC ──
 
   ipcMain.handle('get-book-summaries', async (_e, bookId) => {
-    try { return getDB().getSummaries(bookId) }
-    catch { return [] }
+    try { return getDB().getSummaries(bookId) } catch (e) { log.error('handler', e); return [] }
   })
 
   ipcMain.handle('save-book-summaries', async (_e, bookId, summaries) => {
-    try { getDB().saveSummaries(bookId, summaries); return true }
-    catch { return false }
+    try { getDB().saveSummaries(bookId, summaries); return true } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 用户指令 IPC ──
 
   ipcMain.handle('get-user-directives', async (_e, bookId) => {
-    try { return getDB().getUserDirectives(bookId) }
-    catch { return [] }
+    try { return getDB().getUserDirectives(bookId) } catch (e) { log.error('handler', e); return [] }
   })
 
   ipcMain.handle('save-user-directives', async (_e, bookId, directives) => {
-    try { getDB().saveUserDirectives(bookId, directives); return true }
-    catch { return false }
+    try { getDB().saveUserDirectives(bookId, directives); return true } catch (e) { log.error('handler', e); return false }
   })
 
   // ── 自动更新 IPC ──
@@ -1532,7 +1522,7 @@ async function stopAinovelProcess() {
       const timeout = setTimeout(() => resolve(), 5000)
       ainovelProcess.on('exit', () => { clearTimeout(timeout); resolve() })
     })
-  } catch { /* ignore */ }
+  } catch { log.warn('stopAinovelProcess: process may have already exited') }
   ainovelProcess = null
   // 清空事件缓冲区
   engineEvents.length = 0
@@ -1630,11 +1620,11 @@ function startRuntimeSync() {
               const title = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || `第${num}章`
               getDB().saveChapter(bookId, num, content, title)
               console.log('[sync] 新章节导入:', num, title)
-            } catch {}
+            } catch (e) { log.error('snapshot:book', e) }
           }
         }
       }
-    } catch {}
+    } catch (e) { log.error('snapshot:book', e) }
   }, 10000) // 每 10 秒同步一次
 }
 

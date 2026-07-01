@@ -145,7 +145,7 @@ class AppDatabase {
       this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', '1')
     }
     // 迁移：添加 tags 列（如果不存在）
-    try { this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""') } catch {}
+    try { this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""') } catch (e) { /* 列已存在，忽略错误 */ }
   }
 
   listBooks() {
@@ -158,7 +158,7 @@ class AppDatabase {
       ORDER BY b.last_opened_at DESC
     `).all()
     return rows.map(r => {
-      const completed = (() => { try { return JSON.parse(r.completed_chapters_json || '[]') } catch { return [] } })()
+      const completed = (() => { try { return JSON.parse(r.completed_chapters_json || '[]') } catch (e) { return [] } })()
       return {
         id: r.id,
         name: r.name,
