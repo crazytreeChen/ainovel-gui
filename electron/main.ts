@@ -1413,7 +1413,7 @@ function setupIPC() {
   }
 
   // 当前版本
-  const APP_VERSION = '0.1.0'
+  const APP_VERSION = '0.2.0'
   const UPDATE_MANIFEST_URL = 'https://github.com/crazytreeChen/ainovel-gui/releases/download/v' +
     '{version}/download.json'
 

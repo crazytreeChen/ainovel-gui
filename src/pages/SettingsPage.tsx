@@ -142,7 +142,7 @@ export default function SettingsPage() {
       {/* 版本更新 */}
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 12 }}>
         <div className="sidebar-section-header" style={{ marginBottom: 8 }}>版本更新</div>
-        <div className="text-dim mono" style={{ fontSize: 12, marginBottom: 8 }}>当前版本: v0.1.0</div>
+        <div className="text-dim mono" style={{ fontSize: 12, marginBottom: 8 }}>当前版本: v0.2.0</div>
 
         <button
           className="welcome-mode-btn active"
@@ -224,7 +224,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="text-dim" style={{ fontSize: 11, marginTop: 16, textAlign: 'center' }}>
-        <div className="mono">AINovel GUI v0.1.0</div>
+        <div className="mono">AINovel GUI v0.2.0</div>
       </div>
     </div>
   )

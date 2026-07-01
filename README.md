@@ -280,15 +280,10 @@ npm run generate-icons   # 从 SVG 生成多尺寸图标
 
 ## 致敬
 
-- [ainovel-cli](https://github.com/crazytreeChen/ainovel-cli) — AI 小说创作引擎核心，提供完整的多智能体协作写作能力
 - [voocel/ainovel-cli](https://github.com/voocel/ainovel-cli) — 社区 fork，提供安装脚本与持续维护
-
-## 致谢
-
-感谢所有 AI 写作工具生态的贡献者，让技术辅助创作成为可能。
 
 ---
 
 ## 许可证
 
-MIT
+MIT © 2026 crazytree

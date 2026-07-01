@@ -5,7 +5,7 @@ const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', 
 
 export default function TopBar({ bookName }: { bookName?: string }) {
   const snapshot = useAppStore((s) => s.snapshot)
-  const version = '0.1.0'
+  const version = '0.2.0'
 
   const spinnerClass = snapshot.isRunning ? 'status-spinner' : ''
 
@@ -16,7 +16,6 @@ export default function TopBar({ bookName }: { bookName?: string }) {
   if (version) leftParts.push(`ainovel-gui ${version}`)
   if (snapshot.provider) leftParts.push(snapshot.provider)
   if (snapshot.modelName) leftParts.push(snapshot.modelName)
-  leftParts.push('v0.1.0')
   const leftText = leftParts.join(' · ')
 
   // 右侧状态

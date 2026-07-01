@@ -139,6 +139,16 @@ npm run dist:win
 - React 组件使用函数组件 + Hooks，样式使用 CSS class（非 CSS-in-JS）。
 - **模块实现顺序**：按 P0→P1→...→P7 顺序实施，每完成一个模块更新一次知识库。
 
+### 版本管理
+
+- 每次功能更新后必须同步更新 `package.json` 和 `download.json` 中的版本号。
+- 版本号遵循 `主版本.次版本.修订号`（语义化版本）：
+  - **主版本号**：重大架构变更、不兼容的 API 变更、全新大模块上线
+  - **次版本号**：新增功能模块、新增页面、重要 UI 重构
+  - **修订号**：Bug 修复、文案调整、小优化
+- 发布 Release 时，tag 格式为 `v{版本号}`（如 `v0.2.0`）。
+- `download.json` 中的 `release_notes` 需同步更新为本版本的变更摘要。
+
 ---
 
 ## 知识资产保存（Knowledge Base / Obsidian）
