@@ -1,0 +1,178 @@
+/**
+ * Electron IPC 通道合约类型
+ *
+ * 主进程 ↔ 渲染进程 通信的类型定义，两端共享。
+ */
+
+import type { UISnapshot, EventItem } from '@/types'
+export interface BookItem {
+  id: string; name: string; style: string; phase: string; flow: string
+  completedCount: number; totalWordCount: number; premise: string
+  tags: string; createdAt: string; lastOpenedAt: string; workspaceDir?: string
+}
+
+export interface BookCreateParams {
+  name: string; style?: string; phase?: string; premise?: string; tags?: string
+}
+
+// ── 大纲 ──
+export interface OutlineData {
+  outline: any[]; layeredOutline: any[]; compass: any | null; premise: string
+}
+
+export interface OutlineSaveData {
+  outline?: any[]; layeredOutline?: any[]; compass?: any | null; premise?: string
+}
+
+// ── 章节 ──
+export interface ChapterItem {
+  num: number; title: string; wordCount: number; status?: string
+}
+
+export interface ChapterDetail {
+  num: number; content: string; draft: string; plan: any | null
+}
+
+// ── 角色 ──
+export interface CharacterItem {
+  name: string; aliases: string[]; role: string
+  tier: 'core' | 'important' | 'secondary' | 'decorative'
+  description: string; arc: string; traits: string[]
+}
+
+// ── 二进制信息 ──
+export interface BinaryInfo {
+  available: boolean; version: string; path: string
+}
+
+// ── 诊断 ──
+export interface DiagResult {
+  text?: string; error?: string
+}
+
+// ── 更新 ──
+export interface UpdateInfo {
+  available: boolean; currentVersion: string; latestVersion: string
+  url: string; notes: string; releaseDate: string
+  size: number; sha256: string; error?: string
+}
+
+export interface DownloadProgress {
+  percent: number; bytesPerSecond: number; downloaded: number; total: number
+}
+
+export interface ElectronAPI {
+  // 书籍
+  listBooks: () => Promise<BookItem[]>
+  createBook: (name: string, style: string, phase?: string, premise?: string, tags?: string) => Promise<BookItem>
+  deleteBook: (id: string) => Promise<boolean>
+  getBook: (id: string) => Promise<BookItem | null>
+  updateBook: (id: string, fields: Record<string, any>) => Promise<boolean>
+  getBookDir: (id: string) => Promise<string | null>
+  getGuiDataDir: () => Promise<string>
+
+  // 大纲
+  getBookOutline: (id: string) => Promise<OutlineData | null>
+  saveBookOutline: (id: string, data: OutlineSaveData) => Promise<boolean>
+
+  // 章节
+  getBookChapters: (id: string) => Promise<ChapterItem[]>
+  getBookChapter: (id: string, num: number) => Promise<ChapterDetail | null>
+  saveBookChapter: (id: string, num: number, content: string) => Promise<boolean>
+
+  // 角色
+  getBookCharacters: (id: string) => Promise<CharacterItem[]>
+  saveBookCharacters: (id: string, chars: CharacterItem[]) => Promise<boolean>
+
+  // 配角名册
+  getBookCast: (id: string) => Promise<any[]>
+  saveBookCast: (id: string, entries: any[]) => Promise<boolean>
+
+  // 时间线
+  getBookTimeline: (id: string) => Promise<any>
+
+  // 评审
+  getBookReviews: (id: string) => Promise<any[]>
+
+  // 封面
+  selectCoverImage: () => Promise<string | null>
+  saveBookCover: (id: string, imagePath: string) => Promise<boolean | string>
+  getBookCover: (id: string) => Promise<string | null>
+
+  // 仿写画像
+  getSimulationProfile: (id: string) => Promise<any>
+  saveSimulationProfile: (id: string, profile: any) => Promise<boolean>
+
+  // 用户规则
+  getUserRules: (id: string) => Promise<any>
+  saveUserRules: (id: string, rules: any) => Promise<boolean>
+
+  // 模型
+  fetchModels: (baseUrl: string, apiKey: string, protocol: string) => Promise<{ models?: string[]; error?: string }>
+  loadProviderConfig: () => Promise<any>
+  saveProviderConfig: (config: any) => Promise<boolean>
+
+  // 快照/事件/章节
+  getSnapshot: () => Promise<UISnapshot>
+  getEvents: () => Promise<EventItem[]>
+  readChapter: (chapterNum: number) => Promise<string>
+  listChapters: () => Promise<ChapterItem[]>
+
+  // 创作控制
+  startWriting: (prompt: string, bookId?: string) => Promise<boolean>
+  resumeWriting: (bookId: string) => Promise<boolean>
+  sendInput: (text: string) => Promise<boolean>
+  pauseWriting: () => Promise<boolean>
+  stopWriting: () => Promise<boolean>
+
+  // 诊断
+  runDiag: () => Promise<string>
+  readDiagReport: () => Promise<string>
+  runSimulate: (bookId: string) => Promise<string>
+
+  // 导出
+  runExport: (args: string) => Promise<string>
+
+  // 目录
+  selectDirectory: () => Promise<string | null>
+  scanWorkspace: (dir: string) => Promise<any>
+  importWorkspace: (dir: string) => Promise<any>
+  setDirectory: (dir: string) => Promise<boolean>
+  getDirectory: () => Promise<string>
+  openDirectory: (dir: string) => Promise<void>
+
+  // 系统
+  checkBinary: () => Promise<BinaryInfo>
+  debugDb: () => Promise<any>
+
+  // 世界观/风格规则
+  getWorldRules: (id: string) => Promise<any[]>
+  saveWorldRules: (id: string, rules: any[]) => Promise<boolean>
+  getStyleRules: (id: string) => Promise<any>
+  saveStyleRules: (id: string, rules: any) => Promise<boolean>
+
+  // 运行元/用量
+  getRunMeta: (id: string) => Promise<any>
+  saveRunMeta: (id: string, meta: any) => Promise<boolean>
+  getUsageStats: (id: string) => Promise<any>
+  saveUsageStats: (id: string, stats: any) => Promise<boolean>
+
+  // 摘要
+  getBookSummaries: (id: string) => Promise<any[]>
+  saveBookSummaries: (id: string, summaries: any[]) => Promise<boolean>
+
+  // 用户指令
+  getUserDirectives: (id: string) => Promise<any[]>
+  saveUserDirectives: (id: string, directives: any[]) => Promise<boolean>
+
+  // 更新
+  checkUpdate: () => Promise<UpdateInfo>
+  downloadUpdate: (url: string, sha256: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  installUpdate: (path: string) => Promise<{ success: boolean; error?: string }>
+  onDownloadProgress: (callback: (data: DownloadProgress) => void) => () => void
+
+  // 事件监听
+  onProcessExited: (callback: () => void) => () => void
+  onSnapshotUpdate: (callback: (data: UISnapshot) => void) => () => void
+  onStreamOutput: (callback: (data: string) => void) => () => void
+}

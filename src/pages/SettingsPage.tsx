@@ -61,7 +61,7 @@ export default function SettingsPage() {
     try {
       const result = await window.electronAPI.downloadUpdate(updateInfo.url, updateInfo.sha256 || '')
       if (result?.success) {
-        setDownloadPath(result.path)
+        setDownloadPath(result.path || '')
       } else {
         setUpdateError(result?.error || '下载失败')
       }

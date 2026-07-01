@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { UISnapshot, EventItem, AppMode, StartupMode, FocusPane, BinaryInfo, ChapterInfo } from '@/types'
+import type { ElectronAPI } from '@/shared/ipc'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -9,112 +10,10 @@ interface ToastItem {
   type: 'error' | 'success' | 'info'
 }
 
-// 声明 electron API 类型
+// 声明 electron API 类型（从共享合约导入）
 declare global {
   interface Window {
-    electronAPI: {
-      // 书籍管理
-      listBooks: () => Promise<any[]>
-      createBook: (name: string, style: string, phase?: string, premise?: string, tags?: string) => Promise<any>
-      deleteBook: (id: string) => Promise<boolean>
-      getBookDir: (id: string) => Promise<string | null>
-      getGuiDataDir: () => Promise<string>
-
-      // 大纲
-      getBookOutline: (id: string) => Promise<any>
-      saveBookOutline: (id: string, data: any) => Promise<boolean>
-
-      // 章节
-      getBookChapters: (id: string) => Promise<any[]>
-      getBookChapter: (id: string, num: number) => Promise<any>
-      saveBookChapter: (id: string, num: number, content: string) => Promise<boolean>
-
-      // 角色
-      getBookCharacters: (id: string) => Promise<any[]>
-      saveBookCharacters: (id: string, chars: any[]) => Promise<boolean>
-
-      // 配角名册
-      getBookCast: (id: string) => Promise<any[]>
-      saveBookCast: (id: string, entries: any[]) => Promise<boolean>
-
-      // 时间线
-      getBookTimeline: (id: string) => Promise<any>
-
-      // 评审
-      getBookReviews: (id: string) => Promise<any[]>
-
-      // 封面
-      selectCoverImage: () => Promise<string | null>
-      saveBookCover: (id: string, imagePath: string) => Promise<boolean>
-      getBookCover: (id: string) => Promise<string | null>
-
-      // 仿写画像
-      getSimulationProfile: (id: string) => Promise<any>
-      saveSimulationProfile: (id: string, profile: any) => Promise<boolean>
-
-      // 用户规则
-      getUserRules: (id: string) => Promise<any>
-      saveUserRules: (id: string, rules: any) => Promise<boolean>
-
-      // 模型
-      fetchModels: (baseUrl: string, apiKey: string, protocol: string) => Promise<{ models?: string[]; error?: string }>
-      loadProviderConfig: () => Promise<any>
-      saveProviderConfig: (config: any) => Promise<boolean>
-
-      getSnapshot: () => Promise<UISnapshot>
-      getEvents: () => Promise<EventItem[]>
-      readChapter: (chapterNum: number) => Promise<string>
-      listChapters: () => Promise<ChapterInfo[]>
-      startWriting: (prompt: string, bookId?: string) => Promise<boolean>
-      resumeWriting: (bookId: string) => Promise<boolean>
-      sendInput: (text: string) => Promise<boolean>
-      pauseWriting: () => Promise<boolean>
-      stopWriting: () => Promise<boolean>
-      runDiag: () => Promise<string>
-      readDiagReport: () => Promise<string>
-      runSimulate: (bookId: string) => Promise<string>
-      runExport: (args: string) => Promise<string>
-      selectDirectory: () => Promise<string | null>
-      scanWorkspace: (dir: string) => Promise<any>
-      importWorkspace: (dir: string) => Promise<any>
-      setDirectory: (dir: string) => Promise<boolean>
-      getDirectory: () => Promise<string>
-      openDirectory: (dir: string) => Promise<void>
-      checkBinary: () => Promise<BinaryInfo>
-
-      // 世界观/风格规则
-      getWorldRules: (id: string) => Promise<any[]>
-      saveWorldRules: (id: string, rules: any[]) => Promise<boolean>
-      getStyleRules: (id: string) => Promise<any>
-      saveStyleRules: (id: string, rules: any) => Promise<boolean>
-
-      // 运行元信息/用量
-      getRunMeta: (id: string) => Promise<any>
-      saveRunMeta: (id: string, meta: any) => Promise<boolean>
-      getUsageStats: (id: string) => Promise<any>
-      saveUsageStats: (id: string, stats: any) => Promise<boolean>
-
-      // 书籍编辑
-      updateBook: (id: string, fields: any) => Promise<boolean>
-
-      // 摘要管理
-      getBookSummaries: (id: string) => Promise<any[]>
-      saveBookSummaries: (id: string, summaries: any[]) => Promise<boolean>
-
-      // 用户指令
-      getUserDirectives: (id: string) => Promise<any[]>
-      saveUserDirectives: (id: string, directives: any[]) => Promise<boolean>
-
-      // 自动更新
-      checkUpdate: () => Promise<any>
-      downloadUpdate: (url: string, sha256: string) => Promise<any>
-      installUpdate: (filePath: string) => Promise<any>
-      onDownloadProgress: (callback: (data: any) => void) => () => void
-
-      onProcessExited: (callback: () => void) => () => void
-      onSnapshotUpdate: (callback: (data: any) => void) => () => void
-      onStreamOutput: (callback: (data: string) => void) => () => void
-    }
+    electronAPI: ElectronAPI
   }
 }
 
