@@ -50,63 +50,52 @@ export default function Workspace() {
   const isComplete = snapshot.phase === 'complete'
 
   return (
-    <div className="app-container" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* 顶栏 */}
-      <div className="top-bar"><TopBar bookName={book?.name} /></div>
+    <div style={{ padding: 24, height: '100vh', display: 'flex', gap: 24 }}>
+      <BookNavSidebar bookId={id || ''} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* 顶栏 */}
+        <div className="top-bar" style={{ padding: 0, marginBottom: 8 }}><TopBar bookName={book?.name} /></div>
 
-      {/* 主体：左侧（导航+状态） + 右侧（中心+详情+输入框） */}
-      <div className="main-body" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* 左侧列：导航侧栏 + 状态侧栏（全高） */}
-        <div style={{ display: 'flex', height: '100%' }}>
-          {sidebarVisible && <BookNavSidebar bookId={id || ''} />}
-          <div
-            className="cursor-clickable"
-            onClick={() => setSidebarVisible(!sidebarVisible)}
-            style={{
-              width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRight: '1px solid var(--color-border)', cursor: 'pointer',
-              fontSize: 10, color: 'var(--color-dim)', userSelect: 'none',
-            }}
-            title={sidebarVisible ? '隐藏侧栏' : '显示侧栏'}
-          >
-            {sidebarVisible ? '◀' : '▶'}
-          </div>
-          <div className="state-panel" style={{ height: '100%' }}>
-            {!isRunning && !isComplete && (
-              <div style={{ marginBottom: 8 }}>
-                <button onClick={handleResume} className="welcome-mode-btn active"
-                  style={{ width: '100%', fontSize: 12, padding: '6px 0', textAlign: 'center' }}>
-                  ▶️ {book?.completedCount ? '继续创作' : '开始创作'}
-                </button>
-              </div>
-            )}
-            {isRunning && (
-              <div style={{ marginBottom: 8 }}>
-                <button onClick={() => pauseWriting()} className="welcome-mode-btn"
-                  style={{ width: '100%', fontSize: 12, padding: '6px 0', textAlign: 'center', borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>
-                  ⏸ 暂停
-                </button>
-              </div>
-            )}
-            <StatusSidebar />
-          </div>
-        </div>
-
-        {/* 右侧列：中心面板 + 详情 + 底部输入框 */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            <div className="center-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div className="event-panel" style={{ flex: 4, overflow: 'auto', padding: 8, borderBottom: '1px solid var(--color-border)' }}>
-                <EventFlow />
-              </div>
-              <div className="stream-panel" style={{ flex: 6, overflow: 'auto', padding: 8 }}>
-                <StreamOutput />
-              </div>
+        {/* 主体内容 */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          {/* 状态侧栏 */}
+          {!isRunning && !isComplete && (
+            <div style={{ marginBottom: 8, flexShrink: 0, width: '23%', minWidth: 240, borderRight: '1px solid var(--color-border)', paddingRight: 8, overflow: 'auto' }}>
+              <button onClick={handleResume} className="welcome-mode-btn active"
+                style={{ width: '100%', fontSize: 12, padding: '6px 0', textAlign: 'center', marginBottom: 8 }}>
+                ▶️ {book?.completedCount ? '继续创作' : '开始创作'}
+              </button>
+              <StatusSidebar />
             </div>
-            <div className="detail-panel"><DetailPanel /></div>
+          )}
+          {isRunning && (
+            <div style={{ flexShrink: 0, width: '23%', minWidth: 240, borderRight: '1px solid var(--color-border)', paddingRight: 8, overflow: 'auto' }}>
+              <button onClick={() => pauseWriting()} className="welcome-mode-btn"
+                style={{ width: '100%', fontSize: 12, padding: '6px 0', textAlign: 'center', borderColor: 'var(--color-error)', color: 'var(--color-error)', marginBottom: 8 }}>
+                ⏸ 暂停
+              </button>
+              <StatusSidebar />
+            </div>
+          )}
+
+          {/* 中央：事件流 + 实时输出 */}
+          <div className="center-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '0 8px' }}>
+            <div className="event-panel" style={{ flex: 4, overflow: 'auto', padding: 8, borderBottom: '1px solid var(--color-border)' }}>
+              <EventFlow />
+            </div>
+            <div className="stream-panel" style={{ flex: 6, overflow: 'auto', padding: 8 }}>
+              <StreamOutput />
+            </div>
           </div>
-          <div className="bottom-bar"><InputBox /></div>
+
+          {/* 右侧详情 */}
+          <div className="detail-panel" style={{ width: '27%', minWidth: 280, borderLeft: '1px solid var(--color-border)', paddingLeft: 8, overflow: 'auto' }}>
+            <DetailPanel />
+          </div>
         </div>
+
+        {/* 底部输入 */}
+        <div className="bottom-bar" style={{ padding: 0, marginTop: 8 }}><InputBox /></div>
       </div>
 
       {/* 模态框 */}

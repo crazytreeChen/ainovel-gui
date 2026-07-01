@@ -138,9 +138,6 @@ export default function SimulationPage() {
           <div className="text-dim" style={{ fontSize: 12, marginBottom: 16 }}>
             需要先运行 ainovel-cli 的 /simulate 命令生成数据
           </div>
-          <button className="welcome-mode-btn active" onClick={handleRunSimulate}>
-            运行 /simulate
-          </button>
         </div>
       ) : (
         <>

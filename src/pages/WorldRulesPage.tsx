@@ -137,7 +137,7 @@ export default function WorldRulesPage() {
                         display: 'flex', gap: 8, alignItems: 'flex-start',
                       }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, lineHeight: 1.5 }}>{r.ruleText}</div>
+                          <div style={{ fontSize: 12, lineHeight: 1.5 }}>{r.ruleText || r.rule_text || ''}</div>
                           {r.boundary && <div className="text-dim" style={{ fontSize: 11, marginTop: 2 }}>边界: {r.boundary}</div>}
                         </div>
                         <button onClick={() => removeWorldRule(globalIdx)}
