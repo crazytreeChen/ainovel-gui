@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 诊断
   runDiag: () => ipcRenderer.invoke('run-diag'),
   readDiagReport: () => ipcRenderer.invoke('read-diag-report'),
+  runSimulate: (bookId: string) => ipcRenderer.invoke('run-simulate', bookId),
 
   // 导出
   runExport: (args: string) => ipcRenderer.invoke('run-export', args),

@@ -16,7 +16,7 @@ export default function WorldRulesPage() {
   const [saving, setSaving] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   // 风格规则
-  const [styleRules, setStyleRules] = useState<{ prose: string[]; dialogue: string[]; taboos: string[] }>({ prose: [], dialogue: [], taboos: [] })
+  const [styleRules, setStyleRules] = useState<{ prose: string[]; dialogue: (string | { name: string; rules: string[] })[]; taboos: string[] }>({ prose: [], dialogue: [], taboos: [] })
 
   // 新增世界观的输入
   const [newCategory, setNewCategory] = useState('')
@@ -186,12 +186,17 @@ export default function WorldRulesPage() {
                 <button className="welcome-mode-btn" onClick={() => { if (newDialogue.trim()) { setStyleRules(prev => ({ ...prev, dialogue: [...prev.dialogue, newDialogue.trim()] })); setNewDialogue('') } }}>添加</button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {styleRules.dialogue.map((item, i) => (
-                  <span key={i} style={{ padding: '2px 8px', background: 'rgba(94,184,163,0.15)', color: '#5fb8a3', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {item}
-                    <button onClick={() => setStyleRules(prev => ({ ...prev, dialogue: prev.dialogue.filter((_, j) => j !== i) }))} style={{ background: 'none', border: 'none', color: '#5fb8a3', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
+                {styleRules.dialogue.map((item, i) => {
+                  if (typeof item === 'string') {
+                    return <span key={i} style={{ padding: '2px 8px', background: 'rgba(94,184,163,0.15)', color: '#5fb8a3', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>{item}
+                      <button onClick={() => setStyleRules(prev => ({ ...prev, dialogue: prev.dialogue.filter((_, j) => j !== i) }))} style={{ background: 'none', border: 'none', color: '#5fb8a3', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
+                    </span>
+                  }
+                  return <span key={i} style={{ padding: '4px 10px', background: 'rgba(94,184,163,0.1)', color: '#5fb8a3', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'inline-block', marginBottom: 4 }}>
+                    <strong>{item.name}</strong>: {(item.rules || []).join('；')}
+                    <button onClick={() => setStyleRules(prev => ({ ...prev, dialogue: prev.dialogue.filter((_, j) => j !== i) }))} style={{ background: 'none', border: 'none', color: '#5fb8a3', cursor: 'pointer', padding: 0, fontSize: 12, marginLeft: 4 }}>✕</button>
                   </span>
-                ))}
+                })}
               </div>
             </div>
 

@@ -72,6 +72,7 @@ declare global {
       stopWriting: () => Promise<boolean>
       runDiag: () => Promise<string>
       readDiagReport: () => Promise<string>
+      runSimulate: (bookId: string) => Promise<string>
       runExport: (args: string) => Promise<string>
       selectDirectory: () => Promise<string | null>
       scanWorkspace: (dir: string) => Promise<any>

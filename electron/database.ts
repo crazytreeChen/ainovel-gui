@@ -498,9 +498,13 @@ class AppDatabase {
   getCastEntries(bookId) {
     const rows = this.database.prepare('SELECT * FROM cast_entries WHERE book_id = ? ORDER BY appearance_count DESC').all(bookId)
     return rows.map(r => ({
-      ...r,
-      aliases: typeof r.aliases === 'string' ? JSON.parse(r.aliases) : r.aliases,
-      appearanceChapters: typeof r.appearance_chapters === 'string' ? JSON.parse(r.appearance_chapters) : r.appearance_chapters,
+      name: r.name,
+      aliases: typeof r.aliases === 'string' ? JSON.parse(r.aliases) : (r.aliases || []),
+      briefRole: r.brief_role || '',
+      firstSeenChapter: r.first_seen || 0,
+      lastSeenChapter: r.last_seen || 0,
+      appearanceCount: r.appearance_count || 0,
+      appearanceChapters: typeof r.appearance_chapters === 'string' ? JSON.parse(r.appearance_chapters) : (r.appearance_chapters || []),
       promoted: !!r.promoted,
     }))
   }
@@ -589,7 +593,15 @@ class AppDatabase {
   }
 
   getSummaries(bookId) {
-    const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ? ORDER BY type, ref_key').all(bookId)
+    const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ?').all(bookId)
+    // 按数字排序：ref_key 是数字（章节）则按数值排序，否则按字符串排序
+    rows.sort((a, b) => {
+      if (a.type !== b.type) return a.type.localeCompare(b.type)
+      const na = parseInt(a.ref_key, 10)
+      const nb = parseInt(b.ref_key, 10)
+      if (!isNaN(na) && !isNaN(nb)) return na - nb
+      return a.ref_key.localeCompare(b.ref_key)
+    })
     return rows.map(r => ({
       id: r.id,
       type: r.type,

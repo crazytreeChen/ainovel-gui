@@ -518,6 +518,24 @@ function setupIPC() {
             return '';
         return readFileSync(f, 'utf8');
     });
+    ipcMain.handle('run-simulate', async (_e, bookId) => {
+        const binary = getAinovelBinary();
+        let cwd = outputDir || app.getPath('documents');
+        if (bookId) {
+            try {
+                const book = getDB().getBook(bookId);
+                if (book?.workspace_dir)
+                    cwd = book.workspace_dir;
+            }
+            catch { }
+        }
+        try {
+            return execSync(`"${binary}" --headless /simulate 2>&1`, { cwd, encoding: 'utf8', timeout: 120000 });
+        }
+        catch (e) {
+            return e.stdout || e.stderr || e.message || '仿写分析执行失败';
+        }
+    });
     ipcMain.handle('run-export', async (_e, args) => {
         const binary = getAinovelBinary();
         const cwd = outputDir || app.getPath('documents');

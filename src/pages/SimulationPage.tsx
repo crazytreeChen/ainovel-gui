@@ -101,7 +101,7 @@ export default function SimulationPage() {
 
   async function handleRunSimulate() {
     if (!window.electronAPI) return
-    await window.electronAPI.runDiag()
+    await window.electronAPI.runSimulate(id || '')
     // 重新加载
     setTimeout(loadProfile, 3000)
   }
