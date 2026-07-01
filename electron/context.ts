@@ -38,33 +38,44 @@ function getDB() {
 }
 
 function getAinovelBinary() {
-  const { execSync } = require('child_process')
+  const { execSync, exec } = require('child_process')
   const os = require('os')
-  // 1) 打包后的 extraResources
   const { join: pJoin } = require('path')
   const ext = os.platform() === 'win32' ? '.exe' : ''
-  const bundled = pJoin(__dirname, '..', 'ainovel-cli', 'ainovel-cli' + ext)
-  if (existsSync(bundled)) return bundled
+  const binName = 'ainovel-cli' + ext
 
-  // 2) PATH
+  // 1) 打包后的 extraResources（electron-builder 将 build/ainovel-cli/bin/ 复制到 Resources/ainovel-cli/）
+  try {
+    const resourcesPath = require('electron').app ? require('electron').app.getAppPath() : ''
+    const packaged = pJoin(process.resourcesPath || '', 'ainovel-cli', binName)
+    if (existsSync(packaged)) return packaged
+  } catch {}
+
+  // 2) 开发构建位置（scripts/build-cli.js 输出目录）
+  const devBin = pJoin(__dirname, '..', 'build', 'ainovel-cli', 'bin', binName)
+  if (existsSync(devBin)) return devBin
+
+  // 3) PATH
   try {
     const cmd = os.platform() === 'win32' ? 'where ainovel-cli' : 'which ainovel-cli'
     const which = execSync(cmd, { encoding: 'utf8' }).trim().split('\n')[0]
     if (which) return which
   } catch { log.debug('ainovel-cli not in PATH') }
 
-  // 3) 常见位置
+  // 4) 常见位置
   const h = app.getPath('home')
   const candidates = os.platform() === 'win32'
-    ? [pJoin(h, 'AppData', 'Local', 'ainovel-cli', 'ainovel-cli.exe'),
-       pJoin(h, 'go', 'bin', 'ainovel-cli.exe')]
-    : ['/usr/local/bin/ainovel-cli', '/usr/bin/ainovel-cli',
-       pJoin(h, 'go', 'bin', 'ainovel-cli'),
-       pJoin(h, '.local', 'bin', 'ainovel-cli')]
+    ? [pJoin(h, 'AppData', 'Local', 'ainovel-cli', binName),
+       pJoin(h, 'go', 'bin', binName)]
+    : ['/usr/local/bin/' + binName, '/usr/bin/' + binName,
+       pJoin(h, 'go', 'bin', binName),
+       pJoin(h, '.local', 'bin', binName)]
   for (const c of candidates) {
     if (existsSync(c)) return c
   }
-  return bundled
+
+  // 5) 降级到任何能找到的 ainovel-cli（fallback）
+  return binName
 }
 
 module.exports = { state, getDB, getAinovelBinary, GUI_DATA_DIR, home, log }
