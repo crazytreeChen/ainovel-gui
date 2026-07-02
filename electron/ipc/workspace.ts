@@ -1,4 +1,5 @@
-// @ts-nocheck — CJS IPC 模块
+export {}
+
 /**
  * 创作工作台数据 IPC（大纲/章节/角色/时间线/评审等）
  */
@@ -155,7 +156,7 @@ function register(ipcMain) {
     if (!dir) return false
     try { getDB().saveChapter(id, num, content, '') } catch (e) { log.error('save-chapter', e) }
     // JSON 写（CLI 兼容）
-    writeJSON(chDir, `${String(num).padStart(2, '0')}.md`, content)
+    writeJSON(dir, `${String(num).padStart(2, '0')}.md`, content)
     return true
   })
 
