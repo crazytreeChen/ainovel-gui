@@ -307,7 +307,7 @@ function deriveStatusLabel(snap) {
 }
 
 function stopAinovelProcess() {
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     if (!state.ainovelProcess || state.ainovelProcess.exitCode !== null) { resolve(); return }
     const proc = state.ainovelProcess
     let sigtermTimer = null
