@@ -11,6 +11,7 @@ export default function DetailPanel() {
   const [bookName, setBookName] = useState('')
   const [usageStats, setUsageStats] = useState<any>(null)
   const [runMeta, setRunMeta] = useState<any>(null)
+  const [cast, setCast] = useState<any[]>([])
 
   useEffect(() => {
     if (snapshot.novelName) setBookName(snapshot.novelName)
@@ -27,6 +28,7 @@ export default function DetailPanel() {
     }
     window.electronAPI.getUsageStats(id).then(setUsageStats).catch(() => {})
     window.electronAPI.getRunMeta(id).then(setRunMeta).catch(() => {})
+    window.electronAPI.getBookCast(id).then(setCast).catch(() => {})
   }, [id, bookName])
 
   return (
@@ -98,6 +100,38 @@ export default function DetailPanel() {
               · {c}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 配角生态 */}
+      {cast.length > 0 && (
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">配角生态</div>
+          <div style={{ fontSize: 12, lineHeight: 1.8 }}>
+            <div className="text-dim" style={{ marginBottom: 4 }}>
+              共 {cast.length} 个配角 · {cast.filter(c => c.promoted).length} 个已晋级
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {[...cast]
+                .sort((a, b) => b.appearanceCount - a.appearanceCount)
+                .slice(0, 12)
+                .map((c, i) => (
+                  <span key={c.name} className="text-dim" style={{
+                    padding: '1px 6px', background: 'var(--color-surface-2)',
+                    borderRadius: 8, fontSize: 11, display: 'inline-flex',
+                    alignItems: 'center', gap: 4,
+                    border: c.promoted ? '1px solid var(--color-accent)' : 'none',
+                    color: c.promoted ? 'var(--color-accent)' : 'var(--color-dim)',
+                  }}>
+                    {c.name}
+                    <span className="mono" style={{ fontSize: 9, opacity: 0.6 }}>{c.appearanceCount}</span>
+                  </span>
+                ))}
+            </div>
+            <div className="text-dim" style={{ fontSize: 10, marginTop: 4 }}>
+              TOP 12 出场配角 · 点击角色管理查看完整生态
+            </div>
+          </div>
         </div>
       )}
 
