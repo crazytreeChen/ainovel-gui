@@ -178,7 +178,7 @@ function bumpVersion() {
   if (FORCE_PATCH) bumpArgs.push('--patch')
   if (DRY_RUN) bumpArgs.push('--dry-run')
 
-  const cmd = `node scripts/bump-version.js ${bumpArgs.join(' ')}`
+  const cmd = `node scripts/bump-version.cjs ${bumpArgs.join(' ')}`
   try {
     run(cmd)
   } catch (e) {
@@ -215,7 +215,7 @@ function build() {
 
   // 生成图标
   log('生成应用图标...')
-  run('node scripts/generate-icons.js')
+  run('node scripts/generate-icons.cjs')
 
   // 编译前端 + Electron
   log('编译前端与 Electron 主进程...')

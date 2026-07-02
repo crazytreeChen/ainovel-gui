@@ -3,12 +3,12 @@
  * 一键编译 + 发布到 GitHub Release 脚本
  *
  * 用法:
- *   node scripts/release.js              # 编译 mac + win，并发布 Release
- *   node scripts/release.js --build-only # 仅编译，不发布
- *   node scripts/release.js --dry-run    # 干跑，显示会做什么但不执行
- *   node scripts/release.js --skip-mac   # 跳过 macOS 编译
- *   node scripts/release.js --skip-win   # 跳过 Windows 编译
- *   node scripts/release.js --skip-build # 跳过编译，直接发布已有产物
+ *   node scripts/release.cjs              # 编译 mac + win，并发布 Release
+ *   node scripts/release.cjs --build-only # 仅编译，不发布
+ *   node scripts/release.cjs --dry-run    # 干跑，显示会做什么但不执行
+ *   node scripts/release.cjs --skip-mac   # 跳过 macOS 编译
+ *   node scripts/release.cjs --skip-win   # 跳过 Windows 编译
+ *   node scripts/release.cjs --skip-build # 跳过编译，直接发布已有产物
  *
  * 前置条件:
  *   - git (已配置 remote origin)
@@ -150,7 +150,7 @@ async function buildAll() {
 
   // Step 1: 生成图标
   log('生成应用图标...')
-  run('node scripts/generate-icons.js')
+  run('node scripts/generate-icons.cjs')
 
   // Step 2: 编译前端 + Electron
   log('编译前端与 Electron...')
@@ -313,7 +313,7 @@ function publishRelease(artifacts) {
   }
 
   if (!notes) {
-    notes = `## v${version} 更新内容\n\n### 🚀 编译版本\n\n- macOS arm64: DMG + zip\n- Windows x64: NSIS 安装包 + zip\n\n> 由 \`scripts/release.js\` 一键发布 ${releaseDate}`
+    notes = `## v${version} 更新内容\n\n### 🚀 编译版本\n\n- macOS arm64: DMG + zip\n- Windows x64: NSIS 安装包 + zip\n\n> 由 \`scripts/release.cjs\` 一键发布 ${releaseDate}`
   }
 
   // 收集产物文件路径
@@ -400,7 +400,7 @@ async function main() {
     header('自动迭代版本号')
     log('根据 commit 记录自动判断 bump 级别...')
     try {
-      execSync('node scripts/bump-version.js', {
+      execSync('node scripts/bump-version.cjs', {
         cwd: ROOT,
         encoding: 'utf8',
         stdio: 'inherit',

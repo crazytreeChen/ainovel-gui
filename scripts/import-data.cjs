@@ -1,7 +1,7 @@
 /**
  * 数据迁移脚本 — 将 ainovel-cli 输出目录导入到 ainovel-gui SQLite
  *
- * 用法: node scripts/import-data.js
+ * 用法: node scripts/import-data.cjs
  *
  * 从 /Users/qinglinchen/01-Code/98-Custom/ainovel-cli/output/novel
  * 导入到 ~/.ainovel-gui/ainovel.db

@@ -10,7 +10,7 @@
  * - macOS: Xcode Command Line Tools（iconutil 需要）
  * - Windows: 建议安装 sharp（npm i -D sharp）
  * 
- * 用法: node scripts/generate-icons.js
+ * 用法: node scripts/generate-icons.cjs
  */
 
 const { execSync } = require('child_process')

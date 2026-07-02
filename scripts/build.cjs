@@ -11,11 +11,11 @@
  *   5. electron-builder 打包分发
  * 
  * 用法:
- *   node scripts/build.js          # 构建当前平台
- *   node scripts/build.js mac      # 构建 macOS DMG
- *   node scripts/build.js win      # 构建 Windows NSIS
- *   node scripts/build.js all      # 构建所有平台
- *   node scripts/build.js --no-clean # 跳过 node_modules 清理
+ *   node scripts/build.cjs          # 构建当前平台
+ *   node scripts/build.cjs mac      # 构建 macOS DMG
+ *   node scripts/build.cjs win      # 构建 Windows NSIS
+ *   node scripts/build.cjs all      # 构建所有平台
+ *   node scripts/build.cjs --no-clean # 跳过 node_modules 清理
  * 
  * 环境变量:
  *   AINOVEL_BIN=path  指定 ainovel-cli 路径（自动打包进安装包）
@@ -58,7 +58,7 @@ function run(cmd, opts = {}) {
 function buildCliBinary() {
   log('cli', 'Building ainovel-cli from submodule...')
   try {
-    execSync('node scripts/build-cli.js', { cwd: ROOT, stdio: 'inherit' })
+    execSync('node scripts/build-cli.cjs', { cwd: ROOT, stdio: 'inherit' })
   } catch {
     warn('ainovel-cli build failed, continuing without bundled CLI')
   }
@@ -93,7 +93,7 @@ function prepareAinovelBinary() {
 function generateIcons() {
   log('icons', 'Generating application icons...')
   try {
-    run('node scripts/generate-icons.js')
+    run('node scripts/generate-icons.cjs')
   } catch {
     warn('Icon generation failed, continuing with placeholder icons')
   }
@@ -106,7 +106,7 @@ function cleanNodeModules() {
   }
   log('clean', 'Cleaning node_modules (removing dev files from asar)...')
   try {
-    run('node scripts/clean-node-modules.js')
+    run('node scripts/clean-node-modules.cjs')
   } catch {
     warn('node_modules cleanup failed, continuing with original node_modules')
   }

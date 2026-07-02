@@ -3,11 +3,11 @@
  * 版本号自动迭代脚本
  *
  * 用法:
- *   node scripts/bump-version.js              # 根据 commit 自动判断 bump 类型
- *   node scripts/bump-version.js --major      # 强制主版本号 +1
- *   node scripts/bump-version.js --minor      # 强制次版本号 +1
- *   node scripts/bump-version.js --patch      # 强制修订号 +1
- *   node scripts/bump-version.js --dry-run    # 干跑，显示会怎样 bump 但不修改
+ *   node scripts/bump-version.cjs              # 根据 commit 自动判断 bump 类型
+ *   node scripts/bump-version.cjs --major      # 强制主版本号 +1
+ *   node scripts/bump-version.cjs --minor      # 强制次版本号 +1
+ *   node scripts/bump-version.cjs --patch      # 强制修订号 +1
+ *   node scripts/bump-version.cjs --dry-run    # 干跑，显示会怎样 bump 但不修改
  *
  * 自动判断规则（基于 conventional commits）：
  *   BREAKING CHANGE / feat! → major

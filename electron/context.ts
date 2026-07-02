@@ -51,7 +51,7 @@ function getAinovelBinary() {
     if (existsSync(packaged)) return packaged
   } catch {}
 
-  // 2) 开发构建位置（scripts/build-cli.js 输出目录）
+  // 2) 开发构建位置（scripts/build-cli.cjs 输出目录）
   const devBin = pJoin(__dirname, '..', 'build', 'ainovel-cli', 'bin', binName)
   if (existsSync(devBin)) return devBin
 

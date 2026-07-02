@@ -150,7 +150,7 @@ ainovel-gui/
 │       └── host/                 # 宿主环境交互
 ├── scripts/
 │   ├── build.js                  # 构建脚本
-│   ├── build-cli.js              # ainovel-cli 子模块编译
+│   ├── build-cli.cjs              # ainovel-cli 子模块编译
 │   └── generate-icons.js         # 图标生成
 ├── build/                        # 构建资源（图标等）
 ├── package.json                  # 依赖 + electron-builder 配置

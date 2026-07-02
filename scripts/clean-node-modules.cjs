@@ -6,8 +6,8 @@
  * 减小 asar 体积。保守清理，只删明确无用的文件类型。
  *
  * 用法:
- *   node scripts/clean-node-modules.js          # 清理当前 node_modules
- *   node scripts/clean-node-modules.js --dry-run # 只列出不做删除
+ *   node scripts/clean-node-modules.cjs          # 清理当前 node_modules
+ *   node scripts/clean-node-modules.cjs --dry-run # 只列出不做删除
  */
 
 const { existsSync, readdirSync, statSync, unlinkSync, rmdirSync } = require('fs')

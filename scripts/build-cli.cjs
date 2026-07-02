@@ -6,10 +6,10 @@
  * 编译完成后尝试 UPX 压缩（需安装 upx），可将 11MB → ~3MB
  * 
  * 用法:
- *   node scripts/build-cli.js          # 编译当前平台
- *   node scripts/build-cli.js --check  # 只检查是否需要编译
- *   node scripts/build-cli.js --no-upx # 编译但不进行 UPX 压缩
- *   node scripts/build-cli.js --only-upx # 只进行 UPX 压缩（已有二进制）
+ *   node scripts/build-cli.cjs          # 编译当前平台
+ *   node scripts/build-cli.cjs --check  # 只检查是否需要编译
+ *   node scripts/build-cli.cjs --no-upx # 编译但不进行 UPX 压缩
+ *   node scripts/build-cli.cjs --only-upx # 只进行 UPX 压缩（已有二进制）
  */
 
 const { execSync } = require('child_process')
