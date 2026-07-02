@@ -53,9 +53,7 @@ export default function Workspace() {
 
   const handleResume = async () => {
     if (!id) return
-    console.log('resumeWriting called for bookId:', id)
     const ok = await resumeWriting(id)
-    console.log('resumeWriting result:', ok)
     if (!ok) alert('恢复失败，请检查控制台错误信息')
   }
 
