@@ -255,7 +255,7 @@ function register(ipcMain: Electron.IpcMain) {
   })
 }
 
-const APP_VERSION = '0.3.0'
+const APP_VERSION = '0.4.0'
 function semverGt(a: string, b: string) {
   const pa = a.replace(/^v/, '').split('.').map(Number)
   const pb = b.replace(/^v/, '').split('.').map(Number)
