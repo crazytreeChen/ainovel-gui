@@ -1,4 +1,3 @@
-// @ts-nocheck
 const Database = require('better-sqlite3')
 const pathM = require('path')
 const fsM = require('fs')
@@ -129,6 +128,8 @@ CREATE INDEX IF NOT EXISTS idx_reviews_book ON reviews(book_id, chapter);
 `;
 
 class AppDatabase {
+  database: any
+
   constructor(dbPath) {
     const dir = pathM.dirname(dbPath)
     if (!fsM.existsSync(dir)) fsM.mkdirSync(dir, { recursive: true })
