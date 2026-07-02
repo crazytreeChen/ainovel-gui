@@ -1,4 +1,5 @@
-// @ts-nocheck — Electron 主进程使用 CJS require，类型由运行时保证
+export {}
+
 const { app, BrowserWindow, ipcMain } = require('electron')
 const { join } = require('path')
 const { existsSync } = require('fs')

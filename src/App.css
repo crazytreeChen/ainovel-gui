@@ -431,6 +431,53 @@ html, body, #root {
 .cursor-clickable { cursor: pointer; }
 .cursor-clickable:hover { opacity: 0.8; }
 
+/* ── 通用面板卡片 ── */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.card-sm { padding: 8px 10px; }
+.card-borderless { background: var(--color-surface); border-radius: var(--radius); padding: 12px; }
+
+/* ── 标签/badge ── */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  font-size: 12px; line-height: 1.6;
+}
+.tag-sm { font-size: 10px; padding: 1px 6px; }
+
+/* ── 小字号 ── */
+.text-xs { font-size: 11px; }
+.text-2xs { font-size: 10px; }
+
+/* ── 对齐 ── */
+.text-center { text-align: center; }
+
+/* ── 边距扩增 ── */
+.mt-4 { margin-top: 4px; }
+.mt-8 { margin-top: 8px; }
+.mt-40 { margin-top: 40px; }
+.mt-60 { margin-top: 60px; }
+.mr-8 { margin-right: 8px; }
+
+/* ── 便捷布局组合 ── */
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.flex-wrap { flex-wrap: wrap; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+
+/* ── 滚动区域 ── */
+.scroll-y { overflow-y: auto; }
+.scroll-x { overflow-x: auto; }
+
+/* ── 边框 ── */
+.border-bottom { border-bottom: 1px solid var(--color-border); }
+.border-right { border-right: 1px solid var(--color-border); }
+
 /* ── select 下拉框 ── */
 select {
   padding: 4px 8px; background: var(--color-bg); color: var(--color-text);

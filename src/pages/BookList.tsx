@@ -5,18 +5,9 @@ import BookEditModal from '@/components/BookEditModal'
 import BookFilters from '@/components/BookFilters'
 
 interface BookItem {
-  id: string
-  name: string
-  style: string
-  phase: string
-  flow: string
-  completedCount: number
-  totalWordCount: number
-  premise?: string
-  tags?: string
-  createdAt: string
-  lastOpenedAt: string
-  workspaceDir?: string
+  id: string; name: string; style: string; phase: string; flow: string
+  completedCount: number; totalWordCount: number
+  premise?: string; tags?: string; createdAt: string; lastOpenedAt: string; workspaceDir?: string
 }
 
 export default function BookList() {
@@ -99,52 +90,34 @@ export default function BookList() {
       return
     }
 
-    const msg = `检测到作品：${info.name || '未命名'}\n` +
-      `阶段: ${info.phase || 'init'}\n` +
-      `章节: ${info.chapterCount || 0}\n` +
-      `字数: ${(info.totalWordCount || 0).toLocaleString()}\n\n` +
-      `确认导入此作品？`
+    const msg = `检测到作品：${info.name || '未命名'}\n阶段: ${info.phase || 'init'}\n章节: ${info.chapterCount || 0}\n字数: ${(info.totalWordCount || 0).toLocaleString()}\n\n确认导入此作品？`
     if (!confirm(msg)) return
 
     const book = await window.electronAPI.importWorkspace(dir)
-    if (book) {
-      await loadBooks()
-    } else {
-      alert('导入失败')
-    }
+    if (book) { await loadBooks() } else { alert('导入失败') }
   }
 
   return (
-    <div style={{ padding: 32, height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* 顶栏 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexShrink: 0 }}>
+    <div className="p-32 flex-col" style={{ height: '100vh' }}>
+      <div className="flex-row items-center justify-between mb-24 flex-shrink-0">
         <div>
-          <h1 style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', fontSize: 28, letterSpacing: 6, margin: 0 }}>
+          <h1 className="mono text-accent m-0" style={{ fontSize: 28, letterSpacing: 6 }}>
             <span style={{ letterSpacing: 4 }}>AI小说管理</span>
           </h1>
-          <div className="text-dim" style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>AI小说创作管理平台</div>
+          <div className="text-dim text-xs mono">AI小说创作管理平台</div>
         </div>
-        <BookFilters
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          onNewBook={() => navigate('/books/new')}
-          onImport={handleImport}
-        />
+        <BookFilters viewMode={viewMode} setViewMode={setViewMode}
+          onNewBook={() => navigate('/books/new')} onImport={handleImport} />
       </div>
 
-      {/* 书籍列表 */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {loading && (
-          <div className="text-dim" style={{ textAlign: 'center', marginTop: 60, fontSize: 14 }}>
-            加载中...
-          </div>
-        )}
+      <div className="flex-1 scroll-y">
+        {loading && <div className="text-dim text-center mt-60 text-sm">加载中...</div>}
 
         {!loading && books.length === 0 && (
-          <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--color-dim)' }}>
+          <div className="text-dim text-center mt-60">
             <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.3 }}>📖</div>
             <p style={{ fontSize: 16, marginBottom: 8 }}>还没有书籍</p>
-            <p style={{ fontSize: 13 }}>点击"新建书籍"开始创作，或"打开目录"导入已有作品</p>
+            <p className="text-sm">点击"新建书籍"开始创作，或"打开目录"导入已有作品</p>
           </div>
         )}
 
@@ -156,92 +129,59 @@ export default function BookList() {
             gap: viewMode === 'card' ? 16 : 6,
           }}>
             {books.map(book => (
-              <BookCard
-                key={book.id}
-                book={book}
-                viewMode={viewMode}
+              <BookCard key={book.id} book={book} viewMode={viewMode}
                 onClick={() => navigate(`/books/${book.id}/workspace?mode=writing`)}
                 onEdit={(e) => handleEditClick(book, e)}
-                onDelete={(e) => handleDelete(book.id, e)}
-              />
+                onDelete={(e) => handleDelete(book.id, e)} />
             ))}
           </div>
         )}
       </div>
 
-      {/* 底部导航 */}
-      <div className="text-dim" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', paddingTop: 12, borderTop: '1px solid var(--color-border)', flexShrink: 0 }}>
+      <div className="text-dim text-xs mono border-bottom" style={{ paddingTop: 12, flexShrink: 0 }}>
         <Link to="/settings" style={{ color: 'var(--color-dim)', textDecoration: 'none' }}>系统设置</Link>
         {' · '}
         <Link to="/settings/models" style={{ color: 'var(--color-dim)', textDecoration: 'none' }}>模型管理</Link>
       </div>
 
-      {/* 编辑书籍弹窗 */}
       {editBook && (
-        <BookEditModal
-          book={editBook}
-          editName={editName}
-          setEditName={setEditName}
-          editStyle={editStyle}
-          setEditStyle={setEditStyle}
-          editPhase={editPhase}
-          setEditPhase={setEditPhase}
-          editTags={editTags}
-          setEditTags={setEditTags}
-          editPremise={editPremise}
-          setEditPremise={setEditPremise}
-          editSaving={editSaving}
-          onSave={handleEditSave}
-          onClose={() => setEditBook(null)}
-        />
+        <BookEditModal book={editBook} editName={editName} setEditName={setEditName}
+          editStyle={editStyle} setEditStyle={setEditStyle}
+          editPhase={editPhase} setEditPhase={setEditPhase}
+          editTags={editTags} setEditTags={setEditTags}
+          editPremise={editPremise} setEditPremise={setEditPremise}
+          editSaving={editSaving} onSave={handleEditSave} onClose={() => setEditBook(null)} />
       )}
 
-      {/* 删除确认弹窗 */}
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => { setDeleteTarget(null); setDeleteConfirm('') }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ minWidth: 380, maxWidth: 420 }}>
             <button className="modal-close" onClick={() => { setDeleteTarget(null); setDeleteConfirm('') }}>✕</button>
-            <div className="modal-title" style={{ color: 'var(--color-error)' }}>⚠️ 删除书籍</div>
+            <div className="modal-title text-error">⚠️ 删除书籍</div>
 
-            <div style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.6 }}>
+            <div className="mb-12 text-sm" style={{ lineHeight: 1.6 }}>
               <p>确认要删除 <strong style={{ color: 'var(--color-text)' }}>《{deleteTarget.name}》</strong> 吗？</p>
-              <p className="text-dim" style={{ fontSize: 12, marginTop: 6 }}>此操作不可恢复，所有章节、大纲、角色数据将被永久删除。</p>
+              <p className="text-dim text-xs mt-8">此操作不可恢复，所有章节、大纲、角色数据将被永久删除。</p>
             </div>
 
-            <div style={{ marginBottom: 14 }}>
-              <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 12 }}>
-                请输入 <strong style={{ color: 'var(--color-error)', fontFamily: 'var(--font-mono)' }}>确认删除</strong> 后点击确认
+            <div className="mb-12">
+              <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>
+                请输入 <strong className="mono text-error">确认删除</strong> 后点击确认
               </label>
-              <input
-                value={deleteConfirm}
-                onChange={e => setDeleteConfirm(e.target.value)}
+              <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleDeleteConfirm()}
-                placeholder="输入「确认删除」"
-                autoFocus
-                style={{
-                  width: '100%', padding: '8px 12px', background: 'var(--color-bg)',
-                  color: 'var(--color-text)', border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius)', outline: 'none', fontSize: 13,
-                  fontFamily: 'var(--font-mono)',
-                }}
-              />
+                placeholder="输入「确认删除」" autoFocus className="input-field text-sm mono" />
             </div>
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div className="flex-row gap-8" style={{ justifyContent: 'flex-end' }}>
               <button className="welcome-mode-btn" onClick={() => { setDeleteTarget(null); setDeleteConfirm('') }}>取消</button>
-              <button
-                onClick={handleDeleteConfirm}
-                disabled={deleteConfirm !== '确认删除'}
-                style={{
-                  padding: '6px 16px', borderRadius: 'var(--radius)',
+              <button onClick={handleDeleteConfirm} disabled={deleteConfirm !== '确认删除'}
+                style={{ padding: '6px 16px', borderRadius: 'var(--radius)',
                   background: deleteConfirm === '确认删除' ? '#e07060' : 'var(--color-surface)',
                   color: deleteConfirm === '确认删除' ? '#fff' : 'var(--color-dim)',
                   border: `1px solid ${deleteConfirm === '确认删除' ? '#e07060' : 'var(--color-border)'}`,
                   cursor: deleteConfirm === '确认删除' ? 'pointer' : 'not-allowed',
-                  fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 'bold',
-                  transition: 'all 0.15s',
-                }}
-              >
+                  fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 'bold', transition: 'all 0.15s' }}>
                 确认删除
               </button>
             </div>

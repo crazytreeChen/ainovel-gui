@@ -4,7 +4,7 @@ import BookNavSidebar from '@/components/BookNavSidebar'
 import BookCover from '@/components/BookCover'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
-const PAGE_SIZE = 60 // 3 列 × 20 行 = 60 章/页
+const PAGE_SIZE = 60
 
 export default function BookIntroPage() {
   const { id } = useParams<{ id: string }>()
@@ -31,32 +31,26 @@ export default function BookIntroPage() {
   const start = (page - 1) * PAGE_SIZE
   const pageChapters = chapters.slice(start, start + PAGE_SIZE)
 
-  if (loading) return <div className="text-dim" style={{ padding: 32 }}>加载中...</div>
+  if (loading) return <div className="text-dim p-32">加载中...</div>
 
   return (
-    <div style={{ padding: 24, height: '100vh', display: 'flex', gap: 24 }}>
+    <div className="flex-row p-24" style={{ height: '100vh', gap: 24 }}>
       <BookNavSidebar bookId={id || ''} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* 返回 + 书名 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
+      <div className="flex-1 flex-col overflow-hidden">
+        <div className="flex-row items-center gap-12 mb-16 flex-shrink-0">
           <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/workspace?mode=writing`)}>← 工作台</button>
-          <h2 className="mono text-accent" style={{ margin: 0, fontSize: 18 }}>书籍简介</h2>
+          <h2 className="mono text-accent m-0 text-lg">书籍简介</h2>
         </div>
 
-        {/* 书籍信息卡片 */}
         {book && (
-          <div style={{
-            display: 'flex', gap: 16, padding: 16, marginBottom: 16, flexShrink: 0,
-            background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius)',
-          }}>
+          <div className="card flex-row gap-16 mb-16 flex-shrink-0" style={{ padding: 16 }}>
             <BookCover bookId={id || ''} size="medium" />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--color-text)', marginBottom: 4 }}>{book.name}</div>
-              <div className="text-dim" style={{ fontSize: 12, fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
+            <div className="flex-1">
+              <div className="text-lg" style={{ fontWeight: 'bold', color: 'var(--color-text)', marginBottom: 4 }}>{book.name}</div>
+              <div className="text-dim text-xs mono" style={{ lineHeight: 1.8 }}>
                 <div>{getPhaseLabel(book.phase)} · {book.completedCount || 0} 章 · {(book.totalWordCount || 0).toLocaleString()} 字 · 风格: {book.style || 'default'}</div>
               </div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              <div className="flex-row flex-wrap mt-8" style={{ gap: 6 }}>
                 <button className="welcome-mode-btn active" onClick={() => navigate(`/books/${id}/workspace?mode=writing`)}>✍️ 开始创作</button>
                 <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/outline`)}>📋 大纲</button>
                 <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/characters`)}>👤 角色</button>
@@ -66,72 +60,35 @@ export default function BookIntroPage() {
           </div>
         )}
 
-        {/* 章节列表 — 紧凑网格 3 列 */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <div className="sidebar-section-header" style={{ fontSize: 12, marginBottom: 8 }}>
-            章节列表 ({chapters.length} 章)
-          </div>
+        <div className="flex-1 scroll-y">
+          <div className="sidebar-section-header text-sm mb-8">章节列表 ({chapters.length} 章)</div>
 
           {chapters.length === 0 ? (
-            <div className="text-dim" style={{ textAlign: 'center', padding: 40 }}>
-              暂无章节，进入工作台开始创作
-            </div>
+            <div className="text-dim text-center p-32">暂无章节，进入工作台开始创作</div>
           ) : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
                 {pageChapters.map(ch => (
-                  <div
-                    key={ch.num}
-                    className="cursor-clickable"
-                    onClick={() => navigate(`/books/${id}/chapters/${ch.num}`)}
-                    style={{
-                      padding: '6px 10px', borderRadius: 'var(--radius-sm)',
-                      background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-                      cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-mono)',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      transition: 'border-color 0.1s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-accent)'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-border)'}
-                  >
+                  <div key={ch.num} className="cursor-clickable card-sm flex-row items-center gap-6 mono text-sm"
+                    onClick={() => navigate(`/books/${id}/chapters/${ch.num}`)}>
                     <span className="text-accent" style={{ fontWeight: 'bold', minWidth: 28, flexShrink: 0 }}>#{ch.num}</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text)' }}>
-                      {ch.title}
-                    </span>
-                    <span className="text-dim" style={{ fontSize: 10, flexShrink: 0 }}>
-                      {ch.wordCount.toLocaleString()}字
-                    </span>
+                    <span className="flex-1 truncate" style={{ color: 'var(--color-text)' }}>{ch.title}</span>
+                    <span className="text-dim text-xs flex-shrink-0">{ch.wordCount.toLocaleString()}字</span>
                   </div>
                 ))}
               </div>
 
-              {/* 分页 */}
               {totalPages > 1 && (
-                <div style={{
-                  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6,
-                  marginTop: 12, padding: 8, flexShrink: 0,
-                }}>
-                  <button className="welcome-mode-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-                    style={{ fontSize: 11, padding: '4px 10px' }}>
+                <div className="flex-row items-center justify-center gap-8 mt-12 p-8 flex-shrink-0">
+                  <button className="welcome-mode-btn btn-sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
                     ← 上一页
                   </button>
-                  <div className="text-dim mono" style={{ fontSize: 12 }}>
-                    {page} / {totalPages}
-                  </div>
-                  <button className="welcome-mode-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                    style={{ fontSize: 11, padding: '4px 10px' }}>
+                  <div className="text-dim mono text-sm">{page} / {totalPages}</div>
+                  <button className="welcome-mode-btn btn-sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
                     下一页 →
                   </button>
-                  <span style={{ fontSize: 11, marginLeft: 8 }}>
-                    <select
-                      value={page}
-                      onChange={e => setPage(parseInt(e.target.value))}
-                      style={{
-                        padding: '3px 6px', background: 'var(--color-bg)', color: 'var(--color-text)',
-                        border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
-                        fontSize: 11, outline: 'none',
-                      }}
-                    >
+                  <span className="text-xs ml-8">
+                    <select value={page} onChange={e => setPage(parseInt(e.target.value))}>
                       {Array.from({ length: totalPages }, (_, i) => (
                         <option key={i + 1} value={i + 1}>第{i + 1}页</option>
                       ))}

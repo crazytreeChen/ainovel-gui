@@ -24,7 +24,6 @@ export default function NewBook() {
         const book = await window.electronAPI.createBook(name.trim(), style, phase, premise, tags)
         if (book?.id) {
           setCreatedId(book.id)
-          // 如果有选择的图片，保存为封面
           if (selectedImage) {
             await window.electronAPI.saveBookCover(book.id, selectedImage)
           }
@@ -44,92 +43,64 @@ export default function NewBook() {
   }
 
   return (
-    <div style={{ padding: 32, maxWidth: 560, margin: '0 auto', marginTop: 60 }}>
-      <h2 style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', marginBottom: 24, fontSize: 20 }}>
+    <div className="p-32" style={{ maxWidth: 560, margin: '0 auto', marginTop: 60 }}>
+      <h2 className="mono text-accent mb-24 text-lg" style={{ fontSize: 20 }}>
         + 新建书籍
       </h2>
 
-      <div style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
-        {/* 封面区域 */}
-        <div style={{ flexShrink: 0 }}>
+      <div className="flex-row gap-24 mb-24">
+        <div className="flex-shrink-0">
           {createdId ? (
             <BookCover bookId={createdId} size="medium" editable />
           ) : (
-            <div
-              onClick={handleSelectCover}
-              className="cursor-clickable"
-              style={{
-                width: 100, height: 140, borderRadius: 4,
+            <div onClick={handleSelectCover} className="cursor-clickable flex-col items-center justify-center"
+              style={{ width: 100, height: 140, borderRadius: 4,
                 border: selectedImage ? '1px solid var(--color-border)' : '2px dashed var(--color-dim)',
-                background: 'var(--color-surface-2)',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', gap: 6,
-              }}
-            >
+                background: 'var(--color-surface-2)', cursor: 'pointer', gap: 6 }}>
               {selectedImage ? (
                 <img src={selectedImage} alt="封面预览" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 3 }} />
               ) : (
                 <>
                   <span style={{ fontSize: 28, opacity: 0.4 }}>📖</span>
-                  <span className="text-dim" style={{ fontSize: 11 }}>添加封面</span>
+                  <span className="text-dim text-xs">添加封面</span>
                 </>
               )}
             </div>
           )}
         </div>
 
-        <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: 16 }}>
-            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>书名</label>
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
+        <div className="flex-1">
+          <div className="mb-16">
+            <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>书名</label>
+            <input value={name} onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              style={{
-                width: '100%', padding: '10px 14px',
-                background: 'var(--color-surface-2)', color: 'var(--color-text)',
-                border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none',
-              }}
-              placeholder="输入书名，如「光斑」「星穹之旅」"
-              autoFocus
-            />
+              className="input-field text-sm" style={{ padding: '10px 14px', fontSize: 14 }}
+              placeholder="输入书名，如「光斑」「星穹之旅」" autoFocus />
           </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>写作风格</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="mb-16">
+            <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>写作风格</label>
+            <div className="flex-row flex-wrap" style={{ gap: 6 }}>
               {[
                 { key: 'default', label: '通用' },
                 { key: 'fantasy', label: '仙侠/玄幻' },
                 { key: 'suspense', label: '悬疑推理' },
                 { key: 'romance', label: '言情' },
               ].map(s => (
-                <button
-                  key={s.key}
+                <button key={s.key}
                   className={`welcome-mode-btn ${style === s.key ? 'active' : ''}`}
-                  onClick={() => setStyle(s.key)}
-                  style={{ fontSize: 12, padding: '6px 14px' }}
-                >
-                  {s.label}
-                </button>
+                  onClick={() => setStyle(s.key)}>{s.label}</button>
               ))}
             </div>
           </div>
 
-          <button
-            className="welcome-mode-btn"
-            onClick={handleSelectCover}
-            style={{ fontSize: 12, padding: '6px 14px', marginBottom: 12 }}
-          >
+          <button className="welcome-mode-btn text-sm mb-12" onClick={handleSelectCover}>
             {selectedImage ? '更换封面图片' : '选择封面图片'}
           </button>
 
-          {/* 写作阶段 */}
-          <div style={{ marginBottom: 16 }}>
-            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>写作阶段</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="mb-16">
+            <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>写作阶段</label>
+            <div className="flex-row flex-wrap" style={{ gap: 6 }}>
               {[
                 { key: 'init', label: getPhaseLabel('init') },
                 { key: 'premise', label: getPhaseLabel('premise') },
@@ -139,50 +110,38 @@ export default function NewBook() {
               ].map(s => (
                 <button key={s.key}
                   className={`welcome-mode-btn ${phase === s.key ? 'active' : ''}`}
-                  onClick={() => setPhase(s.key)}
-                  style={{ fontSize: 12, padding: '6px 14px' }}
-                >{s.label}</button>
+                  onClick={() => setPhase(s.key)}>{s.label}</button>
               ))}
             </div>
           </div>
 
-          {/* 标签 */}
-          <div style={{ marginBottom: 16 }}>
-            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>标签</label>
+          <div className="mb-16">
+            <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>标签</label>
             <input value={tags} onChange={e => setTags(e.target.value)}
               placeholder="用逗号分隔，如: 玄幻, 后宫, 末日"
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 13 }}
-            />
+              className="input-field" />
           </div>
 
-          {/* 内容简介 */}
-          <div style={{ marginBottom: 16 }}>
-            <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>内容简介</label>
+          <div className="mb-16">
+            <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>内容简介</label>
             <textarea value={premise} onChange={e => setPremise(e.target.value)}
-              placeholder="输入书籍内容简介..."
-              rows={3}
-              style={{ width: '100%', padding: '8px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 13, resize: 'vertical', fontFamily: 'var(--font-mono)' }}
-            />
+              placeholder="输入书籍内容简介..." rows={3}
+              className="textarea-field" />
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="text-error" style={{ fontSize: 13, marginBottom: 12, fontFamily: 'var(--font-mono)' }}>
-          {error}
-        </div>
+        <div className="text-error text-sm mono mb-12">{error}</div>
       )}
 
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button
-          className="welcome-mode-btn active"
-          onClick={handleCreate}
-          disabled={creating}
-          style={{ fontSize: 13, padding: '8px 24px', opacity: creating ? 0.6 : 1 }}
-        >
+      <div className="flex-row gap-10">
+        <button className="welcome-mode-btn active" onClick={handleCreate} disabled={creating}
+          style={{ fontSize: 13, padding: '8px 24px', opacity: creating ? 0.6 : 1 }}>
           {creating ? '创建中...' : '创建书籍'}
         </button>
-        <button className="welcome-mode-btn" onClick={() => navigate('/')} style={{ fontSize: 13, padding: '8px 24px' }}>
+        <button className="welcome-mode-btn" onClick={() => navigate('/')}
+          style={{ fontSize: 13, padding: '8px 24px' }}>
           取消
         </button>
       </div>
