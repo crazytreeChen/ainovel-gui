@@ -1,5 +1,6 @@
 import { useAppStore } from '@/stores/useAppStore'
-import { PHASE_LABELS, FLOW_LABELS, AGENT_DISPLAY, AGENT_COLORS, AGENT_TASK_LABELS } from '@/types'
+import { FLOW_LABELS, AGENT_DISPLAY, AGENT_COLORS, AGENT_TASK_LABELS } from '@/types'
+import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
 function formatNumber(n: number): string {
   if (n === 0) return '0'
@@ -65,7 +66,7 @@ export default function StatusSidebar() {
       <div className="sidebar-section">
         <div className="sidebar-section-header">概览</div>
         <Field label="运行态" value={snapshot.runtimeState === 'running' ? '运行中' : snapshot.runtimeState === 'paused' ? '已暂停' : '空闲'} />
-        <Field label="阶段" value={PHASE_LABELS[snapshot.phase] || snapshot.phase || '-'} />
+        <Field label="阶段" value={getPhaseLabel(snapshot.phase) || '-'} />
         <Field label="流程" value={FLOW_LABELS[snapshot.flow] || snapshot.flow || '-'} />
         {snapshot.layered ? (
           <>

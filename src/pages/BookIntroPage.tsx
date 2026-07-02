@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import BookCover from '@/components/BookCover'
+import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
 const PAGE_SIZE = 60 // 3 列 × 20 行 = 60 章/页
 
@@ -30,11 +31,6 @@ export default function BookIntroPage() {
   const start = (page - 1) * PAGE_SIZE
   const pageChapters = chapters.slice(start, start + PAGE_SIZE)
 
-  const phaseLabel: Record<string, string> = {
-    init: '初始化', premise: '前提', outline: '大纲',
-    writing: '写作中', complete: '完成',
-  }
-
   if (loading) return <div className="text-dim" style={{ padding: 32 }}>加载中...</div>
 
   return (
@@ -58,7 +54,7 @@ export default function BookIntroPage() {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--color-text)', marginBottom: 4 }}>{book.name}</div>
               <div className="text-dim" style={{ fontSize: 12, fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
-                <div>{phaseLabel[book.phase] || book.phase} · {book.completedCount || 0} 章 · {(book.totalWordCount || 0).toLocaleString()} 字 · 风格: {book.style || 'default'}</div>
+                <div>{getPhaseLabel(book.phase)} · {book.completedCount || 0} 章 · {(book.totalWordCount || 0).toLocaleString()} 字 · 风格: {book.style || 'default'}</div>
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 <button className="welcome-mode-btn active" onClick={() => navigate(`/books/${id}/workspace?mode=writing`)}>✍️ 开始创作</button>

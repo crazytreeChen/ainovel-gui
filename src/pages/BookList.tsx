@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import BookCover from '@/components/BookCover'
+import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
 interface BookItem {
   id: string
@@ -114,11 +115,6 @@ export default function BookList() {
     }
   }
 
-  const phaseLabel: Record<string, string> = {
-    init: '初始化', premise: '前提', outline: '大纲',
-    writing: '写作', complete: '完成',
-  }
-
   return (
     <div style={{ padding: 32, height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 顶栏 */}
@@ -195,7 +191,7 @@ export default function BookList() {
                     </div>
                   </div>
                   <div className="mono text-dim" style={{ fontSize: viewMode === 'card' ? 11 : 10, lineHeight: viewMode === 'card' ? 1.7 : 1.5 }}>
-                    <div>状态: {phaseLabel[book.phase] || book.phase} · {book.completedCount || 0} 章 · {(book.totalWordCount || 0).toLocaleString()} 字 · {book.style || 'default'}</div>
+                    <div>状态: {getPhaseLabel(book.phase)} · {book.completedCount || 0} 章 · {(book.totalWordCount || 0).toLocaleString()} 字 · {book.style || 'default'}</div>
                   </div>
                   {book.premise && (
                     <div className="text-dim" style={{
@@ -268,11 +264,11 @@ export default function BookList() {
               <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>写作阶段</label>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
-                  { key: 'init', label: '初始化' },
-                  { key: 'premise', label: '前提' },
-                  { key: 'outline', label: '大纲' },
-                  { key: 'writing', label: '写作' },
-                  { key: 'complete', label: '完成' },
+                  { key: 'init', label: getPhaseLabel('init') },
+                  { key: 'premise', label: getPhaseLabel('premise') },
+                  { key: 'outline', label: getPhaseLabel('outline') },
+                  { key: 'writing', label: getPhaseLabel('writing') },
+                  { key: 'complete', label: getPhaseLabel('complete') },
                 ].map(s => (
                   <button key={s.key}
                     className={`welcome-mode-btn ${editPhase === s.key ? 'active' : ''}`}

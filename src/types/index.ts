@@ -98,14 +98,6 @@ export const STATUS_CONFIG: Record<StatusLabel, { icon: string; label: string; c
   ERROR:    { icon: '✕', label: '错误',     color: '#e07060' },
 }
 
-export const PHASE_LABELS: Record<string, string> = {
-  init: '初始化',
-  premise: '前提',
-  outline: '大纲',
-  writing: '写作',
-  complete: '完成',
-}
-
 export const FLOW_LABELS: Record<string, string> = {
   '': '-',
   writing: '写作',

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookCover from '@/components/BookCover'
+import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
 export default function NewBook() {
   const navigate = useNavigate()
@@ -130,11 +131,11 @@ export default function NewBook() {
             <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>写作阶段</label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[
-                { key: 'init', label: '初始化' },
-                { key: 'premise', label: '前提' },
-                { key: 'outline', label: '大纲' },
-                { key: 'writing', label: '写作' },
-                { key: 'complete', label: '完成' },
+                { key: 'init', label: getPhaseLabel('init') },
+                { key: 'premise', label: getPhaseLabel('premise') },
+                { key: 'outline', label: getPhaseLabel('outline') },
+                { key: 'writing', label: getPhaseLabel('writing') },
+                { key: 'complete', label: getPhaseLabel('complete') },
               ].map(s => (
                 <button key={s.key}
                   className={`welcome-mode-btn ${phase === s.key ? 'active' : ''}`}
