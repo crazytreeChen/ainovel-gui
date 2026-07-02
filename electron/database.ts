@@ -130,7 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_reviews_book ON reviews(book_id, chapter);
 class AppDatabase {
   database: any
 
-  constructor(dbPath) {
+  constructor(dbPath: string) {
     const dir = pathM.dirname(dbPath)
     if (!fsM.existsSync(dir)) fsM.mkdirSync(dir, { recursive: true })
     this.database = new Database(dbPath)
@@ -146,7 +146,7 @@ class AppDatabase {
       this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', '1')
     }
     // 迁移：添加 tags 列（如果不存在）
-    try { this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""') } catch (e) { /* 列已存在，忽略错误 */ }
+    try { this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""') } catch (e: any) { /* 列已存在，忽略错误 */ }
   }
 
   listBooks() {
@@ -158,7 +158,7 @@ class AppDatabase {
       LEFT JOIN progress p ON p.book_id = b.id
       ORDER BY b.last_opened_at DESC
     `).all()
-    return rows.map(r => {
+    return rows.map((r: any) => {
       const completed = (() => { try { return JSON.parse(r.completed_chapters_json || '[]') } catch (e) { return [] } })()
       return {
         id: r.id,
@@ -183,16 +183,16 @@ class AppDatabase {
     })
   }
 
-  getBook(id) { return this.database.prepare('SELECT * FROM books WHERE id = ?').get(id) }
+  getBook(id: string) { return this.database.prepare('SELECT * FROM books WHERE id = ?').get(id) }
 
-  createBook(book) {
+  createBook(book: any) {
     this.database.prepare(`INSERT INTO books (id, name, premise, style, planning_tier, phase, flow, layered, total_word_count, workspace_dir, created_at, updated_at, last_opened_at, tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(book.id, book.name, book.premise, book.style, book.planning_tier, book.phase, book.flow, book.layered ? 1 : 0, book.total_word_count || 0, book.workspace_dir || null, book.created_at, book.updated_at, book.last_opened_at, book.tags || '')
     this.database.prepare(`INSERT INTO progress (book_id, novel_name, phase) VALUES (?,?,?)`).run(book.id, book.name, 'init')
     return book
   }
 
-  deleteBook(id) {
+  deleteBook(id: string) {
     const tables = ['progress', 'outline_entries', 'volumes', 'arcs', 'arc_chapters', 'compass', 'chapters', 'drafts', 'chapter_plans', 'summaries', 'characters_t', 'character_snapshots', 'cast_entries', 'timeline_events', 'foreshadow_entries', 'relationship_entries', 'state_changes', 'world_rules', 'style_rules', 'reviews', 'run_meta', 'usage_stats', 'user_rules', 'simulation_profiles', 'user_directives']
     const del = this.database.transaction(() => {
       for (const t of tables) this.database.prepare(`DELETE FROM ${t} WHERE book_id = ?`).run(id)
@@ -201,16 +201,16 @@ class AppDatabase {
     del()
   }
 
-  getConfig(key) {
+  getConfig(key: string) {
     const row = this.database.prepare('SELECT value FROM config WHERE key = ?').get(key)
     return row ? JSON.parse(row.value) : null
   }
 
-  setConfig(key, value) {
+  setConfig(key: string, value: any) {
     this.database.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?,?)').run(key, JSON.stringify(value))
   }
 
-  getUserRules(bookId) {
+  getUserRules(bookId: string) {
     const row = this.database.prepare('SELECT * FROM user_rules WHERE book_id = ?').get(bookId)
     if (!row) return null
     return {
@@ -221,7 +221,7 @@ class AppDatabase {
     }
   }
 
-  saveUserRules(bookId, rules) {
+  saveUserRules(bookId: string, rules: any) {
     this.database.prepare(`INSERT OR REPLACE INTO user_rules (book_id, version, status, structured, preferences, sources, uncertain) VALUES (?,?,?,?,?,?,?)`)
       .run(
         bookId,
@@ -234,20 +234,20 @@ class AppDatabase {
       )
   }
 
-  getSimulationProfile(bookId) {
+  getSimulationProfile(bookId: string) {
     const row = this.database.prepare('SELECT profile FROM simulation_profiles WHERE book_id = ?').get(bookId)
     if (!row) return null
     return typeof row.profile === 'string' ? JSON.parse(row.profile) : row.profile
   }
 
-  saveSimulationProfile(bookId, profile) {
+  saveSimulationProfile(bookId: string, profile: any) {
     this.database.prepare('INSERT OR REPLACE INTO simulation_profiles (book_id, profile) VALUES (?,?)')
       .run(bookId, JSON.stringify(profile))
   }
 
   // ── 大纲管理 ──
 
-  saveOutlineEntries(bookId, entries) {
+  saveOutlineEntries(bookId: string, entries: any[]) {
     const del = this.database.prepare('DELETE FROM outline_entries WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO outline_entries (book_id, chapter, title, core_event, hook, scenes) VALUES (?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -259,12 +259,12 @@ class AppDatabase {
     tx()
   }
 
-  getOutlineEntries(bookId) {
+  getOutlineEntries(bookId: string) {
     const rows = this.database.prepare('SELECT * FROM outline_entries WHERE book_id = ? ORDER BY chapter').all(bookId)
-    return rows.map(r => ({ ...r, scenes: typeof r.scenes === 'string' ? JSON.parse(r.scenes) : r.scenes }))
+    return rows.map((r: any) => ({ ...r, scenes: typeof r.scenes === 'string' ? JSON.parse(r.scenes) : r.scenes }))
   }
 
-  saveVolumes(bookId, volumes) {
+  saveVolumes(bookId: string, volumes: any[]) {
     const del = this.database.prepare('DELETE FROM volumes WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO volumes (book_id, idx, title, theme) VALUES (?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -274,11 +274,11 @@ class AppDatabase {
     tx()
   }
 
-  getVolumes(bookId) {
+  getVolumes(bookId: string) {
     return this.database.prepare('SELECT * FROM volumes WHERE book_id = ? ORDER BY idx').all(bookId)
   }
 
-  saveArcs(bookId, arcs) {
+  saveArcs(bookId: string, arcs: any[]) {
     const del = this.database.prepare('DELETE FROM arcs WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO arcs (book_id, volume_idx, idx, title, goal, estimated_chapters, expanded) VALUES (?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -288,11 +288,11 @@ class AppDatabase {
     tx()
   }
 
-  getArcs(bookId) {
+  getArcs(bookId: string) {
     return this.database.prepare('SELECT * FROM arcs WHERE book_id = ? ORDER BY volume_idx, idx').all(bookId)
   }
 
-  saveArcChapters(bookId, arcChapters) {
+  saveArcChapters(bookId: string, arcChapters: any[]) {
     const del = this.database.prepare('DELETE FROM arc_chapters WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO arc_chapters (book_id, volume_idx, arc_idx, chapter, title, core_event, hook, scenes) VALUES (?,?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -304,18 +304,18 @@ class AppDatabase {
     tx()
   }
 
-  getArcChapters(bookId) {
+  getArcChapters(bookId: string) {
     const rows = this.database.prepare('SELECT * FROM arc_chapters WHERE book_id = ? ORDER BY volume_idx, arc_idx, chapter').all(bookId)
-    return rows.map(r => ({ ...r, scenes: typeof r.scenes === 'string' ? JSON.parse(r.scenes) : r.scenes }))
+    return rows.map((r: any) => ({ ...r, scenes: typeof r.scenes === 'string' ? JSON.parse(r.scenes) : r.scenes }))
   }
 
-  saveCompass(bookId, compass) {
+  saveCompass(bookId: string, compass: any) {
     if (!compass) { this.database.prepare('DELETE FROM compass WHERE book_id = ?').run(bookId); return }
     this.database.prepare('INSERT OR REPLACE INTO compass (book_id, ending_direction, open_threads, estimated_scale, last_updated) VALUES (?,?,?,?,?)')
       .run(bookId, compass.endingDirection || compass.ending_direction || '', JSON.stringify(compass.openThreads || compass.open_threads || []), compass.estimatedScale || compass.estimated_scale || '', compass.lastUpdated || compass.last_updated || 0)
   }
 
-  getCompass(bookId) {
+  getCompass(bookId: string) {
     const row = this.database.prepare('SELECT * FROM compass WHERE book_id = ?').get(bookId)
     if (!row) return null
     return {
@@ -328,7 +328,7 @@ class AppDatabase {
 
   // ── 章节管理 ──
 
-  saveChapter(bookId, num, content, title) {
+  saveChapter(bookId: string, num: number, content: string, title: string) {
     const now = new Date().toISOString()
     const existing = this.database.prepare('SELECT id FROM chapters WHERE book_id = ? AND num = ?').get(bookId, num)
     if (existing) {
@@ -340,15 +340,15 @@ class AppDatabase {
     }
   }
 
-  getChapter(bookId, num) {
+  getChapter(bookId: string, num: number) {
     return this.database.prepare('SELECT * FROM chapters WHERE book_id = ? AND num = ?').get(bookId, num)
   }
 
-  listChapters(bookId) {
+  listChapters(bookId: string) {
     return this.database.prepare('SELECT num, title, content, word_count, status FROM chapters WHERE book_id = ? ORDER BY num').all(bookId)
   }
 
-  saveDraft(bookId, num, content) {
+  saveDraft(bookId: string, num: number, content: string) {
     const existing = this.database.prepare('SELECT id FROM drafts WHERE book_id = ? AND num = ?').get(bookId, num)
     if (existing) {
       this.database.prepare('UPDATE drafts SET content = ? WHERE id = ?').run(content || '', existing.id)
@@ -357,12 +357,12 @@ class AppDatabase {
     }
   }
 
-  getDraft(bookId, num) {
+  getDraft(bookId: string, num: number) {
     const row = this.database.prepare('SELECT content FROM drafts WHERE book_id = ? AND num = ?').get(bookId, num)
     return row ? row.content : null
   }
 
-  saveChapterPlan(bookId, chapter, plan) {
+  saveChapterPlan(bookId: string, chapter: number, plan: any) {
     const existing = this.database.prepare('SELECT id FROM chapter_plans WHERE book_id = ? AND chapter = ?').get(bookId, chapter)
     if (existing) {
       this.database.prepare('UPDATE chapter_plans SET title=?, goal=?, conflict=?, hook=?, emotion_arc=?, notes=?, contract=? WHERE id=?')
@@ -373,7 +373,7 @@ class AppDatabase {
     }
   }
 
-  getChapterPlan(bookId, chapter) {
+  getChapterPlan(bookId: string, chapter: number) {
     const row = this.database.prepare('SELECT * FROM chapter_plans WHERE book_id = ? AND chapter = ?').get(bookId, chapter)
     if (!row) return null
     return { ...row, contract: typeof row.contract === 'string' ? JSON.parse(row.contract) : row.contract }
@@ -381,7 +381,7 @@ class AppDatabase {
 
   // ── 角色管理 ──
 
-  saveCharacters(bookId, chars) {
+  saveCharacters(bookId: string, chars: any[]) {
     const del = this.database.prepare('DELETE FROM characters_t WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO characters_t (book_id, name, aliases, role, tier, description, arc, traits) VALUES (?,?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -393,14 +393,14 @@ class AppDatabase {
     tx()
   }
 
-  getCharacters(bookId) {
+  getCharacters(bookId: string) {
     const rows = this.database.prepare('SELECT * FROM characters_t WHERE book_id = ? ORDER BY name').all(bookId)
-    return rows.map(r => ({ ...r, aliases: typeof r.aliases === 'string' ? JSON.parse(r.aliases) : r.aliases, traits: typeof r.traits === 'string' ? JSON.parse(r.traits) : r.traits }))
+    return rows.map((r: any) => ({ ...r, aliases: typeof r.aliases === 'string' ? JSON.parse(r.aliases) : r.aliases, traits: typeof r.traits === 'string' ? JSON.parse(r.traits) : r.traits }))
   }
 
   // ── 时间线管理 ──
 
-  saveTimelineEvents(bookId, events) {
+  saveTimelineEvents(bookId: string, events: any[]) {
     const del = this.database.prepare('DELETE FROM timeline_events WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO timeline_events (book_id, chapter, time, event, characters) VALUES (?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -410,12 +410,12 @@ class AppDatabase {
     tx()
   }
 
-  getTimelineEvents(bookId) {
+  getTimelineEvents(bookId: string) {
     const rows = this.database.prepare('SELECT * FROM timeline_events WHERE book_id = ? ORDER BY chapter').all(bookId)
-    return rows.map(r => ({ ...r, characters: typeof r.characters === 'string' ? JSON.parse(r.characters) : r.characters }))
+    return rows.map((r: any) => ({ ...r, characters: typeof r.characters === 'string' ? JSON.parse(r.characters) : r.characters }))
   }
 
-  saveForeshadowEntries(bookId, entries) {
+  saveForeshadowEntries(bookId: string, entries: any[]) {
     const del = this.database.prepare('DELETE FROM foreshadow_entries WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO foreshadow_entries (id, book_id, description, planted_at, status, resolved_at) VALUES (?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -425,11 +425,11 @@ class AppDatabase {
     tx()
   }
 
-  getForeshadowEntries(bookId) {
+  getForeshadowEntries(bookId: string) {
     return this.database.prepare('SELECT * FROM foreshadow_entries WHERE book_id = ? ORDER BY planted_at').all(bookId)
   }
 
-  saveRelationshipEntries(bookId, entries) {
+  saveRelationshipEntries(bookId: string, entries: any[]) {
     const del = this.database.prepare('DELETE FROM relationship_entries WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO relationship_entries (book_id, character_a, character_b, relation, chapter) VALUES (?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -439,11 +439,11 @@ class AppDatabase {
     tx()
   }
 
-  getRelationshipEntries(bookId) {
+  getRelationshipEntries(bookId: string) {
     return this.database.prepare('SELECT * FROM relationship_entries WHERE book_id = ? ORDER BY chapter').all(bookId)
   }
 
-  saveStateChanges(bookId, changes) {
+  saveStateChanges(bookId: string, changes: any[]) {
     const del = this.database.prepare('DELETE FROM state_changes WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO state_changes (book_id, chapter, entity, field, old_value, new_value, reason) VALUES (?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -453,13 +453,13 @@ class AppDatabase {
     tx()
   }
 
-  getStateChanges(bookId) {
+  getStateChanges(bookId: string) {
     return this.database.prepare('SELECT * FROM state_changes WHERE book_id = ? ORDER BY chapter').all(bookId)
   }
 
   // ── 评审管理 ──
 
-  saveReviews(bookId, reviews) {
+  saveReviews(bookId: string, reviews: any[]) {
     const del = this.database.prepare('DELETE FROM reviews WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO reviews (book_id, chapter, scope, issues, dimensions, contract_status, contract_misses, contract_notes, verdict, summary, affected_chapters) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -471,9 +471,9 @@ class AppDatabase {
     tx()
   }
 
-  getReviews(bookId) {
+  getReviews(bookId: string) {
     const rows = this.database.prepare('SELECT * FROM reviews WHERE book_id = ? ORDER BY chapter').all(bookId)
-    return rows.map(r => ({
+    return rows.map((r: any) => ({
       ...r,
       issues: typeof r.issues === 'string' ? JSON.parse(r.issues) : r.issues,
       dimensions: typeof r.dimensions === 'string' ? JSON.parse(r.dimensions) : r.dimensions,
@@ -484,7 +484,7 @@ class AppDatabase {
 
   // ── 配角名册 ──
 
-  saveCastEntries(bookId, entries) {
+  saveCastEntries(bookId: string, entries: any[]) {
     const del = this.database.prepare('DELETE FROM cast_entries WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO cast_entries (book_id, name, aliases, brief_role, first_seen, last_seen, appearance_count, appearance_chapters, promoted) VALUES (?,?,?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -496,9 +496,9 @@ class AppDatabase {
     tx()
   }
 
-  getCastEntries(bookId) {
+  getCastEntries(bookId: string) {
     const rows = this.database.prepare('SELECT * FROM cast_entries WHERE book_id = ? ORDER BY appearance_count DESC').all(bookId)
-    return rows.map(r => ({
+    return rows.map((r: any) => ({
       name: r.name,
       aliases: typeof r.aliases === 'string' ? JSON.parse(r.aliases) : (r.aliases || []),
       briefRole: r.brief_role || '',
@@ -512,7 +512,7 @@ class AppDatabase {
 
   // ── 世界观规则 ──
 
-  saveWorldRules(bookId, rules) {
+  saveWorldRules(bookId: string, rules: any[]) {
     const del = this.database.prepare('DELETE FROM world_rules WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO world_rules (book_id, category, rule_text, boundary) VALUES (?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -522,16 +522,16 @@ class AppDatabase {
     tx()
   }
 
-  getWorldRules(bookId) {
+  getWorldRules(bookId: string) {
     return this.database.prepare('SELECT * FROM world_rules WHERE book_id = ? ORDER BY category, id').all(bookId)
   }
 
-  saveStyleRules(bookId, rules) {
+  saveStyleRules(bookId: string, rules: any) {
     this.database.prepare('INSERT OR REPLACE INTO style_rules (book_id, volume, arc, prose, dialogue, taboos, updated_at) VALUES (?,?,?,?,?,?,?)')
       .run(bookId, rules.volume || 0, rules.arc || 0, JSON.stringify(rules.prose || []), JSON.stringify(rules.dialogue || []), JSON.stringify(rules.taboos || []), new Date().toISOString())
   }
 
-  getStyleRules(bookId) {
+  getStyleRules(bookId: string) {
     const row = this.database.prepare('SELECT * FROM style_rules WHERE book_id = ?').get(bookId)
     if (!row) return null
     return { ...row, prose: typeof row.prose === 'string' ? JSON.parse(row.prose) : row.prose, dialogue: typeof row.dialogue === 'string' ? JSON.parse(row.dialogue) : row.dialogue, taboos: typeof row.taboos === 'string' ? JSON.parse(row.taboos) : row.taboos }
@@ -539,12 +539,12 @@ class AppDatabase {
 
   // ── 运行元信息 ──
 
-  saveRunMeta(bookId, meta) {
+  saveRunMeta(bookId: string, meta: any) {
     this.database.prepare('INSERT OR REPLACE INTO run_meta (book_id, started_at, provider, style, model, planning_tier, steer_history, pending_steer) VALUES (?,?,?,?,?,?,?,?)')
       .run(bookId, meta.startedAt || meta.started_at || '', meta.provider || '', meta.style || '', meta.model || '', meta.planningTier || meta.planning_tier || '', JSON.stringify(meta.steerHistory || meta.steer_history || []), meta.pendingSteer || meta.pending_steer || '')
   }
 
-  getRunMeta(bookId) {
+  getRunMeta(bookId: string) {
     const row = this.database.prepare('SELECT * FROM run_meta WHERE book_id = ?').get(bookId)
     if (!row) return null
     return { ...row, steerHistory: typeof row.steer_history === 'string' ? JSON.parse(row.steer_history) : row.steer_history }
@@ -552,12 +552,12 @@ class AppDatabase {
 
   // ── 用量统计 ──
 
-  saveUsageStats(bookId, stats) {
+  saveUsageStats(bookId: string, stats: any) {
     this.database.prepare('INSERT OR REPLACE INTO usage_stats (book_id, total_input, total_output, total_cost, total_saved, cache_read, cache_write, per_agent, per_model) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(bookId, stats.total_input || stats.totalInput || 0, stats.total_output || stats.totalOutput || 0, stats.total_cost || stats.totalCost || 0, stats.total_saved || stats.totalSaved || 0, stats.cache_read || stats.cacheRead || 0, stats.cache_write || stats.cacheWrite || 0, JSON.stringify(stats.per_agent || stats.perAgent || {}), JSON.stringify(stats.per_model || stats.perModel || {}))
   }
 
-  getUsageStats(bookId) {
+  getUsageStats(bookId: string) {
     const row = this.database.prepare('SELECT * FROM usage_stats WHERE book_id = ?').get(bookId)
     if (!row) return null
     return { ...row, per_agent: typeof row.per_agent === 'string' ? JSON.parse(row.per_agent) : row.per_agent, per_model: typeof row.per_model === 'string' ? JSON.parse(row.per_model) : row.per_model }
@@ -565,7 +565,7 @@ class AppDatabase {
 
   // ── 书籍编辑 ──
 
-  updateBook(id, fields) {
+  updateBook(id: string, fields: Record<string, any>) {
     const sets = []
     const params = []
     if (fields.name !== undefined) { sets.push('name = ?'); params.push(fields.name) }
@@ -581,7 +581,7 @@ class AppDatabase {
 
   // ── 摘要管理 ──
 
-  saveSummaries(bookId, summaries) {
+  saveSummaries(bookId: string, summaries: any[]) {
     const del = this.database.prepare('DELETE FROM summaries WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO summaries (book_id, type, ref_key, summary, characters, key_events) VALUES (?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -593,17 +593,17 @@ class AppDatabase {
     tx()
   }
 
-  getSummaries(bookId) {
+  getSummaries(bookId: string) {
     const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ?').all(bookId)
     // 按数字排序：ref_key 是数字（章节）则按数值排序，否则按字符串排序
-    rows.sort((a, b) => {
+    rows.sort((a: any, b: any) => {
       if (a.type !== b.type) return a.type.localeCompare(b.type)
       const na = parseInt(a.ref_key, 10)
       const nb = parseInt(b.ref_key, 10)
       if (!isNaN(na) && !isNaN(nb)) return na - nb
       return a.ref_key.localeCompare(b.ref_key)
     })
-    return rows.map(r => ({
+    return rows.map((r: any) => ({
       id: r.id,
       type: r.type,
       refKey: r.ref_key,
@@ -613,9 +613,9 @@ class AppDatabase {
     }))
   }
 
-  getSummariesByType(bookId, type) {
+  getSummariesByType(bookId: string, type: string) {
     const rows = this.database.prepare('SELECT * FROM summaries WHERE book_id = ? AND type = ? ORDER BY ref_key').all(bookId, type)
-    return rows.map(r => ({
+    return rows.map((r: any) => ({
       id: r.id,
       type: r.type,
       refKey: r.ref_key,
@@ -627,7 +627,7 @@ class AppDatabase {
 
   // ── 用户指令 ──
 
-  saveUserDirectives(bookId, directives) {
+  saveUserDirectives(bookId: string, directives: any[]) {
     const del = this.database.prepare('DELETE FROM user_directives WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO user_directives (book_id, text, chapter, total_chapters, created_at) VALUES (?,?,?,?,?)')
     const tx = this.database.transaction(() => {
@@ -639,7 +639,7 @@ class AppDatabase {
     tx()
   }
 
-  getUserDirectives(bookId) {
+  getUserDirectives(bookId: string) {
     return this.database.prepare('SELECT * FROM user_directives WHERE book_id = ? ORDER BY chapter').all(bookId)
   }
 
