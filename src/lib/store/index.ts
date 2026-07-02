@@ -8,6 +8,7 @@ import type {
   Checkpoint, CheckpointScope, CommitResult, ReviewScope,
   RunMeta, SteerEntry, UsageState, UserRulesSnapshot, Book,
   SimulationProfile, ArcSummary, VolumeSummary, RuntimeQueueItem,
+  StyleType,
 } from '@/lib/models'
 
 // ── IO 工具 ──
@@ -260,10 +261,10 @@ export class BookManager {
     return books.find(b => b.id === id) || null
   }
 
-  async createBook(name: string, style: string = 'default'): Promise<{ book: Book; store: Store }> {
+  async createBook(name: string, style: StyleType = 'default'): Promise<{ book: Book; store: Store }> {
     const id = crypto.randomUUID()
     const book: Book = {
-      id, name, premise: '', style: style as any,
+      id, name, premise: '', style,
       planningTier: 'short', phase: 'init', flow: 'writing',
       layered: false, totalWordCount: 0,
       createdAt: new Date().toISOString(),

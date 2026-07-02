@@ -8,6 +8,15 @@ interface ProviderItem {
   baseUrl: string; apiKey: string; models: string[]; selectedModel: string
 }
 
+interface ProviderConfig {
+  name?: string
+  type?: ProtocolType
+  base_url?: string
+  api_key?: string
+  models?: string[]
+  model?: string
+}
+
 const PRESETS: ProviderItem[] = [
   { key: 'openai', name: 'OpenAI', type: 'openai', baseUrl: 'https://api.openai.com/v1', apiKey: '', models: [], selectedModel: '' },
   { key: 'anthropic', name: 'Anthropic', type: 'anthropic', baseUrl: 'https://api.anthropic.com', apiKey: '', models: [], selectedModel: '' },
@@ -54,7 +63,7 @@ export default function ModelsPage() {
           return saved ? { ...p, apiKey: saved.api_key || '', baseUrl: saved.base_url || p.baseUrl, models: saved.models || [] } : p
         }))
         const extra: ProviderItem[] = []
-        for (const [k, v] of Object.entries(cfg.providers) as any) {
+        for (const [k, v] of Object.entries(cfg.providers) as [string, ProviderConfig][]) {
           if (!PRESETS.find(p => p.key === k)) {
             extra.push({ key: k, name: v.name || k, type: v.type || 'openai', baseUrl: v.base_url || '', apiKey: v.api_key || '', models: v.models || [], selectedModel: v.model || '' })
           }

@@ -13,24 +13,18 @@ interface SimulationSourceReport {
   reusableTechniques: string[]; warnings: string[]
 }
 
+type SynthesisKey = 'style' | 'lexicon' | 'plotDesign' | 'hookDesign' | 'pacingDensity' | 'readerEngagement' | 'roleGuidance'
+
 interface SimulationProfile {
   version: string; createdAt: string; updatedAt: string
   corpus: { sourceDir: string; sources: SimulationSource[] }
   sourceReports: SimulationSourceReport[]
-  synthesis?: {
-    style: Record<string, string[]>
-    lexicon: Record<string, string[]>
-    plotDesign: Record<string, string[]>
-    hookDesign: Record<string, string[]>
-    pacingDensity: Record<string, string[]>
-    readerEngagement: Record<string, string[]>
-    roleGuidance: Record<string, string[]>
-  }
+  synthesis?: Record<SynthesisKey, Record<string, string[]>>
 }
 
 // ── 分类元数据 ──
 
-const SYNTHESIS_TABS = [
+const SYNTHESIS_TABS: ReadonlyArray<{ key: SynthesisKey; label: string; color: string }> = [
   { key: 'style', label: '风格', color: '#7ec5d8' },
   { key: 'lexicon', label: '词汇', color: '#7ec488' },
   { key: 'plotDesign', label: '情节设计', color: '#e09b5a' },
@@ -38,7 +32,7 @@ const SYNTHESIS_TABS = [
   { key: 'pacingDensity', label: '节奏密度', color: '#a890d8' },
   { key: 'readerEngagement', label: '读者互动', color: '#e07060' },
   { key: 'roleGuidance', label: 'Agent 指南', color: '#5fb8a3' },
-] as const
+]
 
 const FIELD_LABELS: Record<string, Record<string, string>> = {
   style: { narrativeVoice: '叙事视角', sentenceRhythm: '句子节奏', proseTexture: '描写质感', perspective: '视点', mood: '情绪基调', doNotCopy: '禁止模仿' },
@@ -189,7 +183,7 @@ export default function SimulationPage() {
                 {profile.synthesis && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
                     {SYNTHESIS_TABS.map(({ key, label, color }) => {
-                      const data = (profile.synthesis as any)[key] || {}
+                      const data = profile.synthesis?.[key] || {}
                       const fields = Object.keys(data)
                       return (
                         <div key={key} style={{
@@ -332,7 +326,7 @@ export default function SimulationPage() {
                 {profile.synthesis ? (
                   <div>
                     {SYNTHESIS_TABS.filter(t => t.key === synthTab).map(({ key, label, color }) => {
-                      const data = (profile.synthesis as any)[key] || {}
+                      const data = profile.synthesis?.[key] || {}
                       const fields = Object.keys(data)
                       return (
                         <div key={key}>
