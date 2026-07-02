@@ -8,6 +8,7 @@
  *   node scripts/release.js --dry-run    # 干跑，显示会做什么但不执行
  *   node scripts/release.js --skip-mac   # 跳过 macOS 编译
  *   node scripts/release.js --skip-win   # 跳过 Windows 编译
+ *   node scripts/release.js --skip-build # 跳过编译，直接发布已有产物
  *
  * 前置条件:
  *   - git (已配置 remote origin)
@@ -21,7 +22,8 @@
  */
 
 const { execSync } = require('child_process')
-const { existsSync, mkdirSync, readFileSync, writeFileSync, createHash, statSync } = require('fs')
+const { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } = require('fs')
+const { createHash } = require('crypto')
 const { join, basename } = require('path')
 const os = require('os')
 
@@ -45,6 +47,8 @@ const DRY_RUN = args.includes('--dry-run')
 const BUILD_ONLY = args.includes('--build-only')
 const SKIP_MAC = args.includes('--skip-mac')
 const SKIP_WIN = args.includes('--skip-win')
+const SKIP_BUILD = args.includes('--skip-build')
+const DIRTY = args.includes('--dirty')
 
 // ===================== 工具函数 =====================
 
@@ -171,7 +175,7 @@ async function buildAll() {
   if (!SKIP_WIN) {
     header('编译 Windows (x64)')
     log('正在打包 Windows NSIS + zip...')
-    run('npx electron-builder --win', { timeout: 600000 })
+    run('npx electron-builder --win', { timeout: 1800000 })
     ok('Windows 编译完成')
   } else {
     info('跳过 Windows 编译 (--skip-win)')
@@ -386,11 +390,19 @@ async function main() {
     console.log('')
   }
 
+  if (SKIP_BUILD) {
+    info('跳过编译步骤 (--skip-build)，直接使用 release/ 目录已有产物')
+  }
+
   // 1. 前置检查
-  checkPrerequisites()
+  if (!SKIP_BUILD) {
+    checkPrerequisites()
+  }
 
   // 2. 编译
-  await buildAll()
+  if (!SKIP_BUILD) {
+    await buildAll()
+  }
 
   // 3. 收集产物
   const artifacts = collectArtifacts()
