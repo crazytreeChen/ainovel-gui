@@ -19,6 +19,7 @@ export default function Workspace() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const mode = useAppStore(s => s.mode)
+  const setMode = useAppStore(s => s.setMode)
   const showHelp = useAppStore(s => s.showHelp)
   const showDiagnostics = useAppStore(s => s.showDiagnostics)
   const showModelSwitch = useAppStore(s => s.showModelSwitch)
@@ -27,6 +28,7 @@ export default function Workspace() {
   const snapshot = useAppStore(s => s.snapshot)
   const resumeWriting = useAppStore(s => s.resumeWriting)
   const pauseWriting = useAppStore(s => s.pauseWriting)
+  const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [book, setBook] = useState<{ name: string; completedCount: number } | null>(null)
 
@@ -38,6 +40,17 @@ export default function Workspace() {
     }).catch(() => {})
   }, [id])
 
+  // 组件挂载时同步运行状态（处理跨页面导航后状态丢失）
+  useEffect(() => {
+    if (!window.electronAPI) return
+    refreshSnapshot().then(() => {
+      const snap = useAppStore.getState().snapshot
+      if (snap.isRunning && mode !== 'running') {
+        setMode('running')
+      }
+    })
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleResume = async () => {
     if (!id) return
     console.log('resumeWriting called for bookId:', id)
@@ -46,7 +59,8 @@ export default function Workspace() {
     if (!ok) alert('恢复失败，请检查控制台错误信息')
   }
 
-  const isRunning = mode === 'running'
+  const processAlive = snapshot.runtimeState === 'running'
+  const isRunning = mode === 'running' || processAlive
   const isComplete = snapshot.phase === 'complete'
 
   return (
