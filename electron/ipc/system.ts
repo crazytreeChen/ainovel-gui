@@ -17,18 +17,18 @@ const log = createLogger('ipc:system')
 const CONFIG_PATH = join(home, '.ainovel', 'config.json')
 const coverExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
 
-function runCli(binary, args, opts: ExecFileSyncOptions = {}) {
-  return new Promise((resolve, reject) => {
+function runCli(binary: string, args: string[], opts: ExecFileSyncOptions = {}) {
+  return new Promise<string>((resolve, reject) => {
     const { cwd, timeout } = opts
     const child = spawn(binary, args, { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
-    const outChunks = []
-    const errChunks = []
+    const outChunks: Buffer[] = []
+    const errChunks: Buffer[] = []
     let killedByTimeout = false
-    const timer = timeout ? setTimeout(() => { killedByTimeout = true; child.kill('SIGTERM') }, timeout) : null
-    child.stdout.on('data', d => outChunks.push(d))
-    child.stderr.on('data', d => errChunks.push(d))
-    child.on('error', err => { if (timer) clearTimeout(timer); reject(err) })
-    child.on('close', code => {
+    const timer: ReturnType<typeof setTimeout> | null = timeout ? setTimeout(() => { killedByTimeout = true; child.kill('SIGTERM') }, timeout) : null
+    child.stdout.on('data', (d: Buffer) => outChunks.push(d))
+    child.stderr.on('data', (d: Buffer) => errChunks.push(d))
+    child.on('error', (err: Error) => { if (timer) clearTimeout(timer); reject(err) })
+    child.on('close', (code: number | null) => {
       if (timer) clearTimeout(timer)
       const stdout = Buffer.concat(outChunks).toString('utf8')
       const stderr = Buffer.concat(errChunks).toString('utf8')
@@ -47,7 +47,7 @@ function runCli(binary, args, opts: ExecFileSyncOptions = {}) {
 const ALLOWED_DOWNLOAD_HOST = 'github.com'
 const ALLOWED_DOWNLOAD_PATH_PREFIX = '/crazytreeChen/ainovel-gui/releases/download/'
 
-function validateDownloadUrl(url) {
+function validateDownloadUrl(url: string) {
   try {
     const parsed = new URL(url)
     return parsed.protocol === 'https:' &&
@@ -57,7 +57,7 @@ function validateDownloadUrl(url) {
 }
 
 const ALLOWED_INSTALL_EXTS = ['.dmg', '.exe', '.appimage', '.deb']
-function validateInstallPath(filePath) {
+function validateInstallPath(filePath: string) {
   if (typeof filePath !== 'string' || !filePath) return false
   const downloadsDir = require('electron').app.getPath('downloads')
   const resolved = resolve(filePath)
@@ -69,7 +69,7 @@ function validateInstallPath(filePath) {
   return true
 }
 
-function register(ipcMain) {
+function register(ipcMain: Electron.IpcMain) {
   // ── 目录管理 ──
   ipcMain.handle('select-directory', async () => {
     const { dialog } = require('electron')
@@ -79,7 +79,7 @@ function register(ipcMain) {
     return state.outputDir
   })
 
-  ipcMain.handle('set-directory', async (_e, dir) => {
+  ipcMain.handle('set-directory', async (_e: Electron.IpcMainInvokeEvent, dir: string) => {
     const safeDir = validatePath(dir)
     state.outputDir = safeDir
     if (!existsSync(safeDir)) mkdirSync(safeDir, { recursive: true })
@@ -87,7 +87,7 @@ function register(ipcMain) {
   })
 
   ipcMain.handle('get-directory', async () => state.outputDir)
-  ipcMain.handle('open-directory', async (_e, dir) => { require('electron').shell.openPath(validatePath(dir)) })
+  ipcMain.handle('open-directory', async (_e: Electron.IpcMainInvokeEvent, dir: string) => { require('electron').shell.openPath(validatePath(dir)) })
 
   // ── CLI 二进制检查 ──
   ipcMain.handle('check-binary', async () => {
@@ -96,7 +96,7 @@ function register(ipcMain) {
       if (!existsSync(binary)) return { available: false, version: '', path: binary }
       const version = execFileSync(binary, ['--version'], { encoding: 'utf8', shell: false }).trim()
       return { available: true, version, path: binary }
-    } catch (e) { log.warn('check-binary', e?.message || e); return { available: false, version: '', path: '' } }
+    } catch (e: any) { log.warn('check-binary', e?.message || e); return { available: false, version: '', path: '' } }
   })
 
   // ── 诊断 ──
@@ -104,7 +104,7 @@ function register(ipcMain) {
     const binary = getAinovelBinary()
     const cwd = state.outputDir || require('electron').app.getPath('documents')
     try { return await runCli(binary, ['--headless', '--diag'], { cwd, timeout: 60000 }) }
-    catch (e) { return e.stdout || e.stderr || e.message || '诊断执行失败' }
+    catch (e: any) { return e.stdout || e.stderr || e.message || '诊断执行失败' }
   })
 
   ipcMain.handle('read-diag-report', async () => {
@@ -114,54 +114,54 @@ function register(ipcMain) {
     return readFileSync(f, 'utf8')
   })
 
-  ipcMain.handle('run-simulate', async (_e, bookId) => {
+  ipcMain.handle('run-simulate', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
     const binary = getAinovelBinary()
     let cwd = state.outputDir || require('electron').app.getPath('documents')
-    if (bookId) { try { const book = getDB().getBook(bookId); if (book?.workspace_dir) cwd = book.workspace_dir } catch (e) { log.error('run-simulate:getBook', e) } }
+    if (bookId) { try { const book = getDB().getBook(bookId); if (book?.workspace_dir) cwd = book.workspace_dir } catch (e: any) { log.error('run-simulate:getBook', e) } }
     try { return await runCli(binary, ['--headless', '--prompt', '/simulate'], { cwd, timeout: 120000 }) }
-    catch (e) { return e.stdout || e.stderr || e.message || '仿写分析执行失败' }
+    catch (e: any) { return e.stdout || e.stderr || e.message || '仿写分析执行失败' }
   })
 
-  ipcMain.handle('run-export', async (_e, args) => {
+  ipcMain.handle('run-export', async (_e: Electron.IpcMainInvokeEvent, args: string) => {
     const binary = getAinovelBinary()
     const cwd = state.outputDir || require('electron').app.getPath('documents')
     const argv = ['--headless', '/export', ...args.split(' ').filter(Boolean)]
     try { return await runCli(binary, argv, { cwd, timeout: 60000 }) }
-    catch (e) { return e.stdout || e.stderr || e.message || '导出失败' }
+    catch (e: any) { return e.stdout || e.stderr || e.message || '导出失败' }
   })
 
   // ── 配置管理 ──
-  ipcMain.handle('save-config-value', async (_e, key, value) => { getDB().setConfig(key, value); return true })
-  ipcMain.handle('load-config-value', async (_e, key) => { return getDB().getConfig(key) })
+  ipcMain.handle('save-config-value', async (_e: Electron.IpcMainInvokeEvent, key: string, value: any) => { getDB().setConfig(key, value); return true })
+  ipcMain.handle('load-config-value', async (_e: Electron.IpcMainInvokeEvent, key: string) => { return getDB().getConfig(key) })
 
   // ── 模型管理 ──
-  ipcMain.handle('fetch-models', async (_e, baseUrl, apiKey, protocol) => {
+  ipcMain.handle('fetch-models', async (_e: Electron.IpcMainInvokeEvent, baseUrl: string, apiKey: string, protocol: string) => {
     try {
       const url = protocol === 'openai' ? baseUrl.replace(/\/+$/, '') + '/models' : baseUrl.replace(/\/+$/, '') + '/v1/models'
       const headers = { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' }
       const resp = await fetch(url, { headers, signal: AbortSignal.timeout(10000) })
       if (!resp.ok) return { error: 'HTTP ' + resp.status + ': ' + resp.statusText }
       const data = await resp.json()
-      const models = (data.data || data.models || []).map(m => m.id || m.name).filter(Boolean)
+      const models = (data.data || data.models || []).map((m: any) => m.id || m.name).filter(Boolean)
       return { models }
-    } catch (e) { return { error: e.message || '请求失败' } }
+    } catch (e: any) { return { error: e.message || '请求失败' } }
   })
 
   ipcMain.handle('load-provider-config', async () => {
     try {
       const config = getDB().getConfig('provider_config')
       if (config) return config
-    } catch (e) { log.error('load-provider-config:db', e) }
+    } catch (e: any) { log.error('load-provider-config:db', e) }
     if (!existsSync(CONFIG_PATH)) return null
     try {
       const jsonConfig = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))
       getDB().setConfig('provider_config', jsonConfig)
       return jsonConfig
-    } catch (e) { log.error('load-provider-config:file', e); return null }
+    } catch (e: any) { log.error('load-provider-config:file', e); return null }
   })
 
-  ipcMain.handle('save-provider-config', async (_e, config) => {
-    try { getDB().setConfig('provider_config', config) } catch (e) { log.error('save-provider-config:db', e) }
+  ipcMain.handle('save-provider-config', async (_e: Electron.IpcMainInvokeEvent, config: any) => {
+    try { getDB().setConfig('provider_config', config) } catch (e: any) { log.error('save-provider-config:db', e) }
     const dir = dirname(CONFIG_PATH)
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
@@ -176,7 +176,7 @@ function register(ipcMain) {
     return result.filePaths[0]
   })
 
-  ipcMain.handle('save-book-cover', async (_e, id, imagePath) => {
+  ipcMain.handle('save-book-cover', async (_e: Electron.IpcMainInvokeEvent, id: string, imagePath: string) => {
     const { join: pJoin } = require('path')
     const safeImagePath = validatePath(imagePath)
     const dir = pJoin(GUI_DATA_DIR, 'books', id)
@@ -184,11 +184,11 @@ function register(ipcMain) {
     if (!existsSync(safeImagePath)) { log.error('save-cover: image not found:', safeImagePath); return false }
     const ext = coverExts.find(e => safeImagePath.toLowerCase().endsWith(e)) || '.png'
     const dest = pJoin(dir, 'cover' + ext)
-    for (const e of coverExts) { const old = pJoin(dir, 'cover' + e); if (old !== dest && existsSync(old)) try { unlinkSync(old) } catch (e) { log.error('save-cover:unlink', e) } }
-    try { copyFileSync(safeImagePath, dest); return true } catch (e) { log.error('save-cover:copy', e); return e.message }
+    for (const e of coverExts) { const old = pJoin(dir, 'cover' + e); if (old !== dest && existsSync(old)) try { unlinkSync(old) } catch (e: any) { log.error('save-cover:unlink', e) } }
+    try { copyFileSync(safeImagePath, dest); return true } catch (e: any) { log.error('save-cover:copy', e); return e.message }
   })
 
-  ipcMain.handle('get-book-cover', async (_e, id) => {
+  ipcMain.handle('get-book-cover', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
     const { join: pJoin } = require('path')
     const dir = validatePath(pJoin(GUI_DATA_DIR, 'books', id))
     if (!existsSync(dir)) return null
@@ -219,10 +219,10 @@ function register(ipcMain) {
       const download = manifest.downloads?.[platform]
       const available = semverGt(latestVersion, APP_VERSION)
       return { available, currentVersion: APP_VERSION, latestVersion, url: download?.url || '', notes: manifest.release_notes || '', releaseDate: manifest.release_date || '', size: download?.size || 0, sha256: download?.sha256 || '' }
-    } catch (e) { return { available: false, error: e.message || '检查更新失败' } }
+    } catch (e: any) { return { available: false, error: e.message || '检查更新失败' } }
   })
 
-  ipcMain.handle('download-update', async (_e, url, expectedSha256) => {
+  ipcMain.handle('download-update', async (_e: Electron.IpcMainInvokeEvent, url: string, expectedSha256: string) => {
     try {
       if (!validateDownloadUrl(url)) return { success: false, error: 'URL 不在白名单内，仅允许 https://github.com/crazytreeChen/ainovel-gui/releases/download/ 路径' }
       const crypto = require('crypto')
@@ -231,9 +231,11 @@ function register(ipcMain) {
       const destPath = join(destDir, filename)
       const response = await fetch(url, { signal: AbortSignal.timeout(600000) })
       if (!response.ok) return { success: false, error: 'HTTP ' + response.status }
+      if (!response.body) return { success: false, error: '下载响应无内容' }
       const totalSize = parseInt(response.headers.get('content-length') || '0')
-      const chunks = []; let downloaded = 0
-      for await (const chunk of response.body) { chunks.push(Buffer.from(chunk)); downloaded += chunk.length; if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('download-progress', { percent: totalSize > 0 ? Math.round((downloaded / totalSize) * 100) : 0, bytesPerSecond: 0, downloaded, total: totalSize }) }
+      const chunks: Buffer[] = []; let downloaded = 0
+      const body = response.body as any
+      for await (const chunk of body) { chunks.push(Buffer.from(chunk)); downloaded += chunk.length; if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('download-progress', { percent: totalSize > 0 ? Math.round((downloaded / totalSize) * 100) : 0, bytesPerSecond: 0, downloaded, total: totalSize }) }
       const fileBuffer = Buffer.concat(chunks)
       writeFileSync(destPath, fileBuffer)
       if (expectedSha256) {
@@ -241,20 +243,20 @@ function register(ipcMain) {
         if (actualHash !== expectedSha256.toLowerCase()) { unlinkSync(destPath); return { success: false, error: 'SHA256 校验失败' } }
       }
       return { success: true, path: destPath, size: fileBuffer.length }
-    } catch (e) { return { success: false, error: e.message || '下载失败' } }
+    } catch (e: any) { return { success: false, error: e.message || '下载失败' } }
   })
 
-  ipcMain.handle('install-update', async (_e, filePath) => {
+  ipcMain.handle('install-update', async (_e: Electron.IpcMainInvokeEvent, filePath: string) => {
     try {
       if (!validateInstallPath(filePath)) return { success: false, error: '非法的安装包路径：仅允许 downloads 目录下的 .dmg/.exe/.AppImage/.deb 文件' }
       if (os.platform() === 'win32') { require('child_process').spawn(filePath, ['/S'], { detached: true, stdio: 'ignore' }); return { success: true } }
       else { require('electron').shell.openPath(filePath); return { success: true } }
-    } catch (e) { return { success: false, error: e.message || '启动安装失败' } }
+    } catch (e: any) { return { success: false, error: e.message || '启动安装失败' } }
   })
 }
 
 const APP_VERSION = '0.2.0'
-function semverGt(a, b) {
+function semverGt(a: string, b: string) {
   const pa = a.replace(/^v/, '').split('.').map(Number)
   const pb = b.replace(/^v/, '').split('.').map(Number)
   for (let i = 0; i < 3; i++) { if ((pa[i] || 0) > (pb[i] || 0)) return true; if ((pa[i] || 0) < (pb[i] || 0)) return false }

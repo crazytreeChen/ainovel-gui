@@ -1,4 +1,5 @@
-// @ts-nocheck — CJS IPC 模块
+export {}
+
 /**
  * 书籍管理 IPC 处理器
  */
@@ -11,13 +12,13 @@ const os = require('os')
 
 const log = createLogger('ipc:books')
 
-function register(ipcMain) {
+function register(ipcMain: Electron.IpcMain) {
   ipcMain.handle('list-books', async () => {
     try { return getDB().listBooks() }
-    catch (e) { log.error('list-books', e); return [] }
+    catch (e: any) { log.error('list-books', e); return [] }
   })
 
-  ipcMain.handle('create-book', async (_e, name, style, phase, premise, tags) => {
+  ipcMain.handle('create-book', async (_e: Electron.IpcMainInvokeEvent, name: string, style: string, phase: string, premise: string, tags: string) => {
     const crypto = require('crypto')
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
@@ -28,22 +29,22 @@ function register(ipcMain) {
     return { ...book, completedCount: 0 }
   })
 
-  ipcMain.handle('delete-book', async (_e, id) => {
+  ipcMain.handle('delete-book', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
     getDB().deleteBook(id)
     return true
   })
 
-  ipcMain.handle('get-book', async (_e, id) => {
+  ipcMain.handle('get-book', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
     return getDB().getBook(id)
   })
 
-  ipcMain.handle('update-book', async (_e, id, fields) => {
+  ipcMain.handle('update-book', async (_e: Electron.IpcMainInvokeEvent, id: string, fields: Record<string, any>) => {
     try { getDB().updateBook(id, fields); return true }
-    catch (e) { log.error('update-book', e); return false }
+    catch (e: any) { log.error('update-book', e); return false }
   })
 
-  ipcMain.handle('get-book-dir', async (_e, id) => {
-    const book = (state.index?.books || []).find(b => b.id === id)
+  ipcMain.handle('get-book-dir', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
+    const book = (state.index?.books || []).find((b: any) => b.id === id)
     if (!book) return null
     const fallback = join(GUI_DATA_DIR, 'books', id)
     const candidate = book.workspaceDir || fallback
@@ -61,13 +62,13 @@ function register(ipcMain) {
       const exists = existsSync(dbPath)
       const size = exists ? readFileSync(dbPath).length : 0
       return { path: dbPath, exists, size, bookCount, home }
-    } catch (e) {
+    } catch (e: any) {
       return { error: e.message || String(e) }
     }
   })
 
   // ── 扫描/导入工作目录 ──
-  ipcMain.handle('scan-workspace', async (_e, dir) => {
+  ipcMain.handle('scan-workspace', async (_e: Electron.IpcMainInvokeEvent, dir: string) => {
     try {
       dir = validatePath(dir)
       const outputDirCheck = join(dir, 'output')
@@ -77,7 +78,7 @@ function register(ipcMain) {
       const bookJson = readStoreJSON(dir, 'book.json')
       let chapterCount = 0
       const chDir = join(dir, 'chapters')
-      if (existsSync(chDir)) chapterCount = readdirSync(chDir).filter(f => f.endsWith('.md')).length
+      if (existsSync(chDir)) chapterCount = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).length
       return {
         name: progress?.novelName || bookJson?.name || '',
         style: bookJson?.style || progress?.style || 'default',
@@ -88,10 +89,10 @@ function register(ipcMain) {
         hasCharacters: existsSync(join(dir, 'characters.json')),
         hasOutline: existsSync(join(dir, 'outline.json')),
       }
-    } catch (e) { log.error('scan-workspace', e); return null }
+    } catch (e: any) { log.error('scan-workspace', e); return null }
   })
 
-  ipcMain.handle('import-workspace', async (_e, dir) => {
+  ipcMain.handle('import-workspace', async (_e: Electron.IpcMainInvokeEvent, dir: string) => {
     // Full import logic - preserved from original main.ts
     try {
       dir = validatePath(dir)
@@ -150,28 +151,28 @@ function register(ipcMain) {
         if (userRules) db.saveUserRules(id, userRules)
         const userDirPath = join(dir, 'meta', 'user_directives.json')
         if (existsSync(userDirPath)) {
-          try { const d = JSON.parse(readFileSync(userDirPath, 'utf8')); if (d.length) db.saveUserDirectives(id, d) } catch { }
+          try { const d: any = JSON.parse(readFileSync(userDirPath, 'utf8')); if (d.length) db.saveUserDirectives(id, d) } catch { }
         }
-      } catch (e) { log.error('import-workspace:sync', e) }
+      } catch (e: any) { log.error('import-workspace:sync', e) }
       return { ...book, completedCount: progress?.completedChapters?.length || 0 }
-    } catch (e) { log.error('import-workspace', e); return null }
+    } catch (e: any) { log.error('import-workspace', e); return null }
   })
 }
 
-function readStoreJSON(baseDir, relativePath) {
+function readStoreJSON(baseDir: string, relativePath: string): any {
   const fullPath = join(baseDir, relativePath)
   if (!existsSync(fullPath)) return null
   try { return JSON.parse(readFileSync(fullPath, 'utf8')) } catch { return null }
 }
 
-function readStoreText(baseDir, relativePath) {
+function readStoreText(baseDir: string, relativePath: string): string | null {
   const fullPath = join(baseDir, relativePath)
   if (!existsSync(fullPath)) return null
   try { return readFileSync(fullPath, 'utf8') } catch { return null }
 }
 
-function syncArcs(db, id, volumes) {
-  const allArcs = []; const allArcChapters = []
+function syncArcs(db: any, id: string, volumes: any[]) {
+  const allArcs: any[] = []; const allArcChapters: any[] = []
   for (const v of volumes) {
     for (const a of (v.arcs || [])) {
       allArcs.push({ volume_idx: v.index || v.idx || 0, idx: a.index || a.idx || 0, title: a.title, goal: a.goal, estimated_chapters: a.estimatedChapters || 0 })
@@ -182,10 +183,10 @@ function syncArcs(db, id, volumes) {
   if (allArcChapters.length) db.saveArcChapters(id, allArcChapters)
 }
 
-function syncChapters(db, id, dir) {
+function syncChapters(db: any, id: string, dir: string) {
   const chDir = join(dir, 'chapters')
   if (!existsSync(chDir)) return
-  for (const file of readdirSync(chDir).filter(f => f.endsWith('.md')).sort()) {
+  for (const file of readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()) {
     const num = parseInt(file.replace('.md', ''), 10)
     if (!isNaN(num)) {
       const content = readFileSync(join(chDir, file), 'utf8')
@@ -195,23 +196,23 @@ function syncChapters(db, id, dir) {
   }
 }
 
-function syncReviews(db, id, dir) {
+function syncReviews(db: any, id: string, dir: string) {
   const reviewDir = join(dir, 'reviews')
   if (!existsSync(reviewDir)) return
-  const revFiles = readdirSync(reviewDir).filter(f => f.endsWith('.json'))
-  const reviews = revFiles.map(f => {
+  const revFiles = readdirSync(reviewDir).filter((f: string) => f.endsWith('.json'))
+  const reviews = revFiles.map((f: string) => {
     try { return JSON.parse(readFileSync(join(reviewDir, f), 'utf8')) } catch { return null }
   }).filter(Boolean)
   if (reviews.length) db.saveReviews(id, reviews)
 }
 
-function syncSummaries(db, id, dir) {
+function syncSummaries(db: any, id: string, dir: string) {
   const summaryDir = join(dir, 'summaries')
   if (!existsSync(summaryDir)) return
-  const files = readdirSync(summaryDir).filter(f => f.endsWith('.json'))
-  const summaries = files.map(f => {
+  const files = readdirSync(summaryDir).filter((f: string) => f.endsWith('.json'))
+  const summaries = files.map((f: string) => {
     try {
-      const s = JSON.parse(readFileSync(join(summaryDir, f), 'utf8'))
+      const s: any = JSON.parse(readFileSync(join(summaryDir, f), 'utf8'))
       if (s.chapter) return { type: 'chapter', ref_key: String(s.chapter), summary: s.summary || '', characters: s.characters || [], key_events: s.keyEvents || s.key_events || [] }
       if (s.arc !== undefined) return { type: 'arc', ref_key: `arc-v${String(s.volume).padStart(2,'0')}a${String(s.arc).padStart(2,'0')}`, summary: s.summary || '', characters: [], key_events: s.keyEvents || s.key_events || [] }
       if (s.volume && s.arc === undefined) return { type: 'volume', ref_key: `vol-v${String(s.volume).padStart(2,'0')}`, summary: s.summary || '', characters: [], key_events: s.keyEvents || s.key_events || [] }
