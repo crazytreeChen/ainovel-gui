@@ -71,7 +71,7 @@ export default function StatusSidebar() {
           <>
             <Field label="已完成" value={`${snapshot.completedCount} 章`} />
             {snapshot.outline.length > 0 && (
-              <Field label="已规划" value={`${snapshot.outline.length} 章`} />
+              <Field label="已规划" value={`${snapshot.totalOutlineCount || snapshot.outline.length} 章`} />
             )}
           </>
         ) : snapshot.totalChapters > 0 ? (

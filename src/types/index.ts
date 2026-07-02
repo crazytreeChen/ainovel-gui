@@ -20,6 +20,7 @@ export interface UISnapshot {
   currentVolumeArc: string
   premise: string
   outline: OutlineItem[]
+  totalOutlineCount: number  // 实际大纲条目总数（outline 可能被截断）
   characters: string[]
   compassDirection: string
   compassScale: string

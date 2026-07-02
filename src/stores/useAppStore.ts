@@ -115,6 +115,7 @@ const emptySnapshot: UISnapshot = {
   currentVolumeArc: '',
   premise: '',
   outline: [],
+  totalOutlineCount: 0,
   characters: [],
   compassDirection: '',
   compassScale: '',

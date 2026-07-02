@@ -261,7 +261,7 @@ function fillDbSnapshot(snap) {
     const bookId = books[0].id
     try { const fullBook = getDB().getBook(bookId); if (fullBook?.premise) snap.premise = fullBook.premise.slice(0, 200) } catch (e) { log.error('snapshot:premise', e) }
     try { const chars = getDB().getCharacters(bookId); if (chars?.length) snap.characters = chars.map(c => c.name + (c.role ? `（${c.role}）` : '')) } catch (e) { log.error('snapshot:chars', e) }
-    try { const entries = getDB().getOutlineEntries(bookId); if (entries?.length) snap.outline = entries.slice(-30).map(e => ({ chapter: e.chapter || 0, title: e.title || '', coreEvent: e.core_event || '' })) } catch (e) { log.error('snapshot:outline', e) }
+    try { const entries = getDB().getOutlineEntries(bookId); if (entries?.length) { snap.totalOutlineCount = entries.length; snap.outline = entries.slice(-30).map(e => ({ chapter: e.chapter || 0, title: e.title || '', coreEvent: e.core_event || '' })) } } catch (e) { log.error('snapshot:outline', e) }
     try { const compass = getDB().getCompass(bookId); if (compass) { snap.compassDirection = compass.endingDirection || ''; snap.compassScale = compass.estimatedScale || '' } } catch (e) { log.error('snapshot:compass', e) }
     try { const reviews = getDB().getReviews(bookId); if (reviews?.length) { const last = reviews[reviews.length - 1]; snap.lastReviewSummary = last.summary ? `第${last.chapter}章: ${last.summary.slice(0, 80)}` : '' } } catch (e) { log.error('snapshot:reviews', e) }
     try { const usage = getDB().getUsageStats(bookId); if (usage) { snap.totalInputTokens = usage.total_input || 0; snap.totalOutputTokens = usage.total_output || 0; snap.totalCostUSD = usage.total_cost || 0; snap.totalSavedUSD = usage.total_saved || 0; snap.cacheReadTokens = usage.cache_read || 0; snap.cacheWriteTokens = usage.cache_write || 0 } } catch (e) { log.error('snapshot:usage', e) }
@@ -277,7 +277,7 @@ function fillFallbackData(snap) {
     const bookId = books[0].id
     try { const fullBook = getDB().getBook(bookId); if (fullBook?.premise && !snap.premise) snap.premise = fullBook.premise.slice(0, 200) } catch (e) { log.error('snapshot:fallback-premise', e) }
     try { const chars = getDB().getCharacters(bookId); if (chars?.length && !snap.characters.length) snap.characters = chars.map(c => c.name + (c.role ? `（${c.role}）` : '')) } catch (e) { log.error('snapshot:fallback-chars', e) }
-    try { if (!snap.outline.length) { const entries = getDB().getOutlineEntries(bookId); if (entries?.length) snap.outline = entries.slice(-30).map(e => ({ chapter: e.chapter || 0, title: e.title || '', coreEvent: e.core_event || '' })) } } catch (e) { log.error('snapshot:fallback-outline', e) }
+    try { if (!snap.outline.length) { const entries = getDB().getOutlineEntries(bookId); if (entries?.length) { snap.totalOutlineCount = entries.length; snap.outline = entries.slice(-30).map(e => ({ chapter: e.chapter || 0, title: e.title || '', coreEvent: e.core_event || '' })) } } } catch (e) { log.error('snapshot:fallback-outline', e) }
     try { if (!snap.compassDirection) { const compass = getDB().getCompass(bookId); if (compass) { snap.compassDirection = compass.endingDirection || ''; snap.compassScale = compass.estimatedScale || '' } } } catch (e) { log.error('snapshot:fallback-compass', e) }
     try { if (!snap.lastReviewSummary) { const reviews = getDB().getReviews(bookId); if (reviews?.length) { const last = reviews[reviews.length - 1]; snap.lastReviewSummary = last.summary ? `第${last.chapter}章: ${last.summary.slice(0, 80)}` : '' } } } catch (e) { log.error('snapshot:fallback-review', e) }
     try { const usage = getDB().getUsageStats(bookId); if (usage) { if (!snap.totalInputTokens) snap.totalInputTokens = usage.total_input || 0; if (!snap.totalOutputTokens) snap.totalOutputTokens = usage.total_output || 0; if (!snap.totalCostUSD) snap.totalCostUSD = usage.total_cost || 0; if (!snap.totalSavedUSD) snap.totalSavedUSD = usage.total_saved || 0; if (!snap.cacheReadTokens) snap.cacheReadTokens = usage.cache_read || 0; if (!snap.cacheWriteTokens) snap.cacheWriteTokens = usage.cache_write || 0 } } catch (e) { log.error('snapshot:fallback-usage', e) }
@@ -290,7 +290,7 @@ function createEmptySnapshot() {
     novelName: '', provider: '', modelName: '', style: '', phase: '', flow: '', runtimeState: 'idle',
     isRunning: false, completedCount: 0, totalChapters: 0, totalWordCount: 0, inProgressChapter: 0,
     currentChapter: 0, pendingRewrites: [], rewriteReason: '', layered: false, currentVolumeArc: '',
-    premise: '', outline: [], characters: [], compassDirection: '', compassScale: '',
+    premise: '', outline: [], totalOutlineCount: 0, characters: [], compassDirection: '', compassScale: '',
     totalInputTokens: 0, totalOutputTokens: 0, totalCostUSD: 0, totalSavedUSD: 0,
     cacheReadTokens: 0, cacheWriteTokens: 0, contextPercent: 0, contextTokens: 0, contextWindow: 0,
     lastCommitSummary: '', lastReviewSummary: '', pendingSteer: '',
