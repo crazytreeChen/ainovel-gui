@@ -3,8 +3,9 @@
  * 系统 IPC（模型/配置/更新/诊断/目录/封面）
  */
 const { state, getDB, getAinovelBinary, GUI_DATA_DIR, home } = require('../context')
+const { validatePath } = require('../path-validator')
 const { createLogger } = require('../logger')
-const { join, dirname } = require('path')
+const { join, dirname, resolve, extname, sep } = require('path')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
 const { execFileSync, spawn } = require('child_process')
 const os = require('os')
@@ -53,6 +54,19 @@ function validateDownloadUrl(url) {
   } catch { return false }
 }
 
+const ALLOWED_INSTALL_EXTS = ['.dmg', '.exe', '.appimage', '.deb']
+function validateInstallPath(filePath) {
+  if (typeof filePath !== 'string' || !filePath) return false
+  const downloadsDir = require('electron').app.getPath('downloads')
+  const resolved = resolve(filePath)
+  const downloadsPrefix = downloadsDir.endsWith(sep) ? downloadsDir : downloadsDir + sep
+  if (!resolved.startsWith(downloadsPrefix)) return false
+  const ext = extname(resolved).toLowerCase()
+  if (!ALLOWED_INSTALL_EXTS.includes(ext)) return false
+  if (!existsSync(resolved)) return false
+  return true
+}
+
 function register(ipcMain) {
   // ── 目录管理 ──
   ipcMain.handle('select-directory', async () => {
@@ -64,13 +78,14 @@ function register(ipcMain) {
   })
 
   ipcMain.handle('set-directory', async (_e, dir) => {
-    state.outputDir = dir
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    const safeDir = validatePath(dir)
+    state.outputDir = safeDir
+    if (!existsSync(safeDir)) mkdirSync(safeDir, { recursive: true })
     return true
   })
 
   ipcMain.handle('get-directory', async () => state.outputDir)
-  ipcMain.handle('open-directory', async (_e, dir) => { require('electron').shell.openPath(dir) })
+  ipcMain.handle('open-directory', async (_e, dir) => { require('electron').shell.openPath(validatePath(dir)) })
 
   // ── CLI 二进制检查 ──
   ipcMain.handle('check-binary', async () => {
@@ -161,18 +176,19 @@ function register(ipcMain) {
 
   ipcMain.handle('save-book-cover', async (_e, id, imagePath) => {
     const { join: pJoin } = require('path')
+    const safeImagePath = validatePath(imagePath)
     const dir = pJoin(GUI_DATA_DIR, 'books', id)
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    if (!existsSync(imagePath)) { log.error('save-cover: image not found:', imagePath); return false }
-    const ext = coverExts.find(e => imagePath.toLowerCase().endsWith(e)) || '.png'
+    if (!existsSync(safeImagePath)) { log.error('save-cover: image not found:', safeImagePath); return false }
+    const ext = coverExts.find(e => safeImagePath.toLowerCase().endsWith(e)) || '.png'
     const dest = pJoin(dir, 'cover' + ext)
     for (const e of coverExts) { const old = pJoin(dir, 'cover' + e); if (old !== dest && existsSync(old)) try { unlinkSync(old) } catch (e) { log.error('save-cover:unlink', e) } }
-    try { copyFileSync(imagePath, dest); return true } catch (e) { log.error('save-cover:copy', e); return e.message }
+    try { copyFileSync(safeImagePath, dest); return true } catch (e) { log.error('save-cover:copy', e); return e.message }
   })
 
   ipcMain.handle('get-book-cover', async (_e, id) => {
     const { join: pJoin } = require('path')
-    const dir = pJoin(GUI_DATA_DIR, 'books', id)
+    const dir = validatePath(pJoin(GUI_DATA_DIR, 'books', id))
     if (!existsSync(dir)) return null
     for (const ext of coverExts) {
       const coverFile = pJoin(dir, 'cover' + ext)
@@ -228,6 +244,7 @@ function register(ipcMain) {
 
   ipcMain.handle('install-update', async (_e, filePath) => {
     try {
+      if (!validateInstallPath(filePath)) return { success: false, error: '非法的安装包路径：仅允许 downloads 目录下的 .dmg/.exe/.AppImage/.deb 文件' }
       if (os.platform() === 'win32') { require('child_process').spawn(filePath, ['/S'], { detached: true, stdio: 'ignore' }); return { success: true } }
       else { require('electron').shell.openPath(filePath); return { success: true } }
     } catch (e) { return { success: false, error: e.message || '启动安装失败' } }
