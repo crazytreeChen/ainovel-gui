@@ -11,6 +11,7 @@ interface BookItem {
   completedCount: number
   totalWordCount: number
   premise?: string
+  tags?: string
   createdAt: string
   lastOpenedAt: string
   workspaceDir?: string
@@ -68,8 +69,8 @@ export default function BookList() {
     setEditName(book.name)
     setEditStyle(book.style || 'default')
     setEditPhase(book.phase || 'writing')
-    setEditTags((book as any).tags || '')
-    setEditPremise((book as any).premise || '')
+    setEditTags(book.tags || '')
+    setEditPremise(book.premise || '')
   }
 
   async function handleEditSave() {
@@ -206,7 +207,7 @@ export default function BookList() {
                       whiteSpace: viewMode === 'detail' ? 'nowrap' : undefined,
                       display: viewMode === 'card' ? '-webkit-box' : undefined,
                       WebkitLineClamp: viewMode === 'card' ? 3 : undefined,
-                      WebkitBoxOrient: viewMode === 'card' ? 'vertical' as any : undefined,
+                      WebkitBoxOrient: viewMode === 'card' ? 'vertical' : undefined,
                     }}>{book.premise}</div>
                   )}
                 </div>
