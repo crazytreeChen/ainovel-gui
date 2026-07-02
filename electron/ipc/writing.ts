@@ -309,11 +309,36 @@ function deriveStatusLabel(snap) {
 function stopAinovelProcess() {
   return new Promise((resolve) => {
     if (!state.ainovelProcess || state.ainovelProcess.exitCode !== null) { resolve(); return }
+    const proc = state.ainovelProcess
+    let sigtermTimer = null
+    let sigkillTimer = null
+    let settled = false
+
+    const onExit = () => {
+      if (settled) return
+      settled = true
+      if (sigtermTimer) clearTimeout(sigtermTimer)
+      if (sigkillTimer) clearTimeout(sigkillTimer)
+      resolve()
+    }
+
     try {
-      state.ainovelProcess.kill('SIGTERM')
-      const timeout = setTimeout(() => resolve(), 5000)
-      state.ainovelProcess.on('exit', () => { clearTimeout(timeout); resolve() })
-    } catch { log.warn('stopAinovelProcess: process may have already exited'); resolve() }
+      proc.kill('SIGTERM')
+      proc.on('exit', onExit)
+      sigtermTimer = setTimeout(() => {
+        if (settled) return
+        try {
+          proc.kill('SIGKILL')
+          sigkillTimer = setTimeout(onExit, 1000)
+        } catch {
+          log.warn('stopAinovelProcess: SIGKILL failed, process may have already exited')
+          onExit()
+        }
+      }, 5000)
+    } catch {
+      log.warn('stopAinovelProcess: process may have already exited')
+      onExit()
+    }
   }).then(() => {
     state.ainovelProcess = null
     state.engineEvents.length = 0
