@@ -259,3 +259,5 @@ npm run generate-icons   # 从 SVG 生成多尺寸图标
 ## 许可证
 
 MIT © 2026 crazytree
+
+本项目积极参与并认可[linux.do 社区](https://linux.do/)。
