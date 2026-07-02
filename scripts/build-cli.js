@@ -137,7 +137,8 @@ function upxCompress() {
     log(`${GREEN}✅ UPX compressed: ${(beforeSize / 1024 / 1024).toFixed(1)} MB → ${(afterSize / 1024 / 1024).toFixed(1)} MB (saved ${saved} MB)${RESET}`)
     return true
   } catch (e) {
-    warn('UPX compression failed: ' + e.message)
+    // macOS 不支持 UPX，非致命错误
+    warn(`UPX compression failed: ${e.message}`)
     warn('  Binary remains uncompressed at ' + OUTPUT_BIN)
     return false
   }

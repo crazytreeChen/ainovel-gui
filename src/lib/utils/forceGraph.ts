@@ -28,7 +28,9 @@ export interface ForceGraphOptions {
   initialRadius?: number
 }
 
-export const DEFAULT_OPTIONS: Required<Omit<ForceGraphOptions, 'width' | 'height'>> = {
+export const DEFAULT_OPTIONS: Required<ForceGraphOptions> = {
+  width: 800,
+  height: 600,
   iterations: 100,
   repulsion: 4000,
   linkStrength: 0.01,
@@ -37,7 +39,9 @@ export const DEFAULT_OPTIONS: Required<Omit<ForceGraphOptions, 'width' | 'height
   initialRadius: 200,
 }
 
-export const DRAG_OPTIONS: Required<Omit<ForceGraphOptions, 'width' | 'height'>> = {
+export const DRAG_OPTIONS: Required<ForceGraphOptions> = {
+  width: 800,
+  height: 600,
   iterations: 3,
   repulsion: 5000,
   linkStrength: 0.012,

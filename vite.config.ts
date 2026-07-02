@@ -20,11 +20,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-router': ['react-router-dom'],
-          'vendor-state': ['zustand'],
-          'vendor-icons': ['lucide-react'],
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react-dom')) return 'vendor-react'
+          if (id.includes('node_modules/react')) return 'vendor-react'
+          if (id.includes('node_modules/react-router-dom')) return 'vendor-router'
+          if (id.includes('node_modules/zustand')) return 'vendor-state'
+          if (id.includes('node_modules/lucide-react')) return 'vendor-icons'
         },
       },
     },

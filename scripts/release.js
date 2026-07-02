@@ -49,6 +49,7 @@ const SKIP_MAC = args.includes('--skip-mac')
 const SKIP_WIN = args.includes('--skip-win')
 const SKIP_BUILD = args.includes('--skip-build')
 const DIRTY = args.includes('--dirty')
+const AUTO_BUMP = args.includes('--auto-bump')
 
 // ===================== 工具函数 =====================
 
@@ -392,6 +393,24 @@ async function main() {
 
   if (SKIP_BUILD) {
     info('跳过编译步骤 (--skip-build)，直接使用 release/ 目录已有产物')
+  }
+
+  // 0. 自动 bump 版本号（如果指定 --auto-bump）
+  if (AUTO_BUMP) {
+    header('自动迭代版本号')
+    log('根据 commit 记录自动判断 bump 级别...')
+    try {
+      execSync('node scripts/bump-version.js', {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: 'inherit',
+      })
+      ok(`版本号已自动迭代: ${getVersion()}`)
+      info('请确保 commit 版本号变更后再继续发布')
+    } catch (e) {
+      err(`自动 bump 失败: ${e.message}`)
+      process.exit(1)
+    }
   }
 
   // 1. 前置检查

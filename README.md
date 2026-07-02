@@ -95,34 +95,6 @@ npm run dist:all
 
 构建产物位于 `release/` 目录。
 
-### 一键发布到 GitHub Release
-
-```bash
-# 完整发布流程（编译 mac + win → 计算 SHA256 → 创建 Release → 上传产物）
-npm run release
-
-# 仅编译，不上传
-npm run release:build-only
-
-# 跳过 macOS / Windows 编译
-npm run release -- --skip-mac
-npm run release -- --skip-win
-
-# 草稿模式（Release 标记为 draft）
-npm run release -- --draft
-
-# 预览模式（不执行实际操作）
-npm run release:dry-run
-```
-
-> **前置条件**：需要安装 [GitHub CLI](https://cli.github.com/) 并登录：
-> ```bash
-> brew install gh
-> gh auth login
-> ```
-
----
-
 ## 项目结构
 
 ```
