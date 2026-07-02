@@ -28,6 +28,9 @@
     "release:build-only": "node scripts/release.js --build-only",
     "release:dry-run": "node scripts/release.js --dry-run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "coverage": "vitest run --coverage",
     "generate-icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
