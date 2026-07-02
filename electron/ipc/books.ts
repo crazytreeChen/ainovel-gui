@@ -6,7 +6,6 @@ const { state, getDB, getAinovelBinary, GUI_DATA_DIR, home } = require('../conte
 const { createLogger } = require('../logger')
 const { join, dirname } = require('path')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
-const { execSync } = require('child_process')
 const os = require('os')
 
 const log = createLogger('ipc:books')
