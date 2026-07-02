@@ -193,7 +193,7 @@ export default function UserRulesPage() {
           ['directives', `指令 (${directives.length})`],
         ] as const).map(([k, label]) => (
           <button key={k} className={`welcome-mode-btn ${tab === k ? 'active' : ''}`}
-            onClick={() => setTab(k as any)} style={{ fontSize: 11 }}>{label}</button>
+            onClick={() => setTab(k)} style={{ fontSize: 11 }}>{label}</button>
         ))}
       </div>
 

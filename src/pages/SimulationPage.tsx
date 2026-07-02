@@ -163,7 +163,7 @@ export default function SimulationPage() {
               ['synthesis', '综合画像'],
             ] as const).map(([k, label]) => (
               <button key={k} className={`welcome-mode-btn ${tab === k ? 'active' : ''}`}
-                onClick={() => setTab(k as any)} style={{ fontSize: 11 }}>{label}</button>
+                onClick={() => setTab(k)} style={{ fontSize: 11 }}>{label}</button>
             ))}
           </div>
 

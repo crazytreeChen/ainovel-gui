@@ -59,7 +59,7 @@ export default function SummaryPage() {
             ['volume', '卷摘要'],
           ] as const).map(([k, label]) => (
             <button key={k} className={`welcome-mode-btn ${tab === k ? 'active' : ''}`}
-              onClick={() => setTab(k as any)} style={{ fontSize: 11 }}>
+              onClick={() => setTab(k)} style={{ fontSize: 11 }}>
               {label} ({(grouped[k] || []).length})
             </button>
           ))}

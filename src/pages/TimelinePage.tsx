@@ -49,7 +49,7 @@ export default function TimelinePage() {
             ['relations', `关系图谱 (${relations.length})`],
           ] as const).map(([k, label]) => (
             <button key={k} className={`welcome-mode-btn ${tab === k ? 'active' : ''}`}
-              onClick={() => setTab(k as any)} style={{ fontSize: 11 }}>{label}</button>
+              onClick={() => setTab(k)} style={{ fontSize: 11 }}>{label}</button>
           ))}
         </div>
       </div>
