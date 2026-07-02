@@ -12,6 +12,9 @@ const COMMANDS = [
   { name: 'importsim', usage: '/importsim <file>', desc: '导入仿写画像' },
 ]
 
+/** 默认系统提示词：要求 AI 用中文思考和输出 */
+const SYSTEM_PROMPT = '请始终使用中文思考和回复。请用中文进行所有思考和创作输出。'
+
 export default function InputBox() {
   const mode = useAppStore((s) => s.mode)
   const startupMode = useAppStore((s) => s.startupMode)
@@ -80,8 +83,8 @@ export default function InputBox() {
     setInputValue('')
 
     if (mode === 'welcome') {
-      // 欢迎模式: 直接开始创作
-      await startWriting(text)
+      // 欢迎模式: 添加默认系统提示词后开始创作
+      await startWriting(SYSTEM_PROMPT + '\n\n' + text)
       return
     }
 
