@@ -1,4 +1,3 @@
-// @ts-nocheck — CJS 工具模块，类型由运行时保证
 /**
  * ainovel-gui Electron 主进程日志工具
  *
@@ -15,40 +14,47 @@ function timestamp() {
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`
 }
 
-const logCreator = function(module) {
+interface Logger {
+  debug(...args: any[]): void
+  info(...args: any[]): void
+  warn(...args: any[]): void
+  error(...args: any[]): void
+}
+
+const logCreator = function(module: string): Logger {
   const prefix = `[${module}]`
 
-  function log(level, ...args) {
+  function log(level: string, ...args: any[]) {
     if (level === 'debug' && !DEBUG) return
-    const fn = level === 'error' ? console.error
+    const fn: (...a: any[]) => void = level === 'error' ? console.error
       : level === 'warn' ? console.warn
       : console.log
     fn(`${timestamp()} ${prefix}[${level.toUpperCase()}]`, ...args)
   }
 
   return {
-    debug: (...args) => log('debug', ...args),
-    info: (...args) => log('info', ...args),
-    warn: (...args) => log('warn', ...args),
-    error: (...args) => log('error', ...args),
+    debug: (...args: any[]) => log('debug', ...args),
+    info: (...args: any[]) => log('info', ...args),
+    warn: (...args: any[]) => log('warn', ...args),
+    error: (...args: any[]) => log('error', ...args),
   }
 }
 
 /** 安全执行一个可能会失败的操作，自动错误日志 */
-const safeRun = function(logger, label, fn, fallback) {
+const safeRun = function<T>(logger: Logger, label: string, fn: () => T, fallback: T): T {
   try {
     return fn()
-  } catch (e) {
+  } catch (e: any) {
     logger.error(`${label}: ${e?.message || e}`)
     return fallback
   }
 }
 
 /** 安全执行异步操作，自动错误日志 */
-const safeRunAsync = async function(logger, label, fn, fallback) {
+const safeRunAsync = async function<T>(logger: Logger, label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
     return await fn()
-  } catch (e) {
+  } catch (e: any) {
     logger.error(`${label}: ${e?.message || e}`)
     return fallback
   }

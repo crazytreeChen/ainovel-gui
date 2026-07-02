@@ -1,4 +1,5 @@
-// @ts-nocheck — CJS 路径校验工具
+export {}
+
 /**
  * IPC 路径校验工具
  *
@@ -18,7 +19,7 @@ function getAllowedBases() {
   return bases
 }
 
-function isUnder(child, parent) {
+function isUnder(child: string, parent: string) {
   const c = resolve(child)
   const p = resolve(parent)
   if (process.platform === 'win32') {
@@ -37,7 +38,7 @@ function isUnder(child, parent) {
  * @returns {string} 规范化后的绝对路径
  * @throws {Error} 路径为空、包含 `..` 段或不在白名单内
  */
-function validatePath(input) {
+function validatePath(input: string) {
   if (typeof input !== 'string' || input.length === 0) {
     throw new Error('路径不能为空')
   }
