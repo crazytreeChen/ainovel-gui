@@ -1,5 +1,4 @@
 {
-  "type": "module",
   "name": "ainovel-gui",
   "version": "0.5.0",
   "description": "AINovel - AI Novel Writing Desktop GUI (ainovel-cli 可视化界面)",

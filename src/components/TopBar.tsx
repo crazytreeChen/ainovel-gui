@@ -1,11 +1,12 @@
 import { useAppStore } from '@/stores/useAppStore'
 import { STATUS_CONFIG } from '@/types'
+import { version as appVersion } from '../../package.json'
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 export default function TopBar({ bookName }: { bookName?: string }) {
   const snapshot = useAppStore((s) => s.snapshot)
-  const version = '0.2.0'
+  const version = appVersion
 
   const spinnerClass = snapshot.isRunning ? 'status-spinner' : ''
 
