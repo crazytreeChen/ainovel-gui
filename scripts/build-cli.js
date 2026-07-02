@@ -112,6 +112,14 @@ function upxCompress() {
     warn('Binary not found, skipping UPX: ' + OUTPUT_BIN)
     return false
   }
+
+  // UPX 5.0+ 不再支持 macOS，直接跳过
+  if (os.platform() === 'darwin') {
+    warn('UPX no longer supports macOS. Skipping compression.')
+    warn(`  Binary size: ${(statSync(OUTPUT_BIN).size / 1024 / 1024).toFixed(1)} MB (uncompressed)`)
+    return true
+  }
+
   // 检查 UPX 是否可用
   let hasUPX = false
   try {
@@ -137,7 +145,6 @@ function upxCompress() {
     log(`${GREEN}✅ UPX compressed: ${(beforeSize / 1024 / 1024).toFixed(1)} MB → ${(afterSize / 1024 / 1024).toFixed(1)} MB (saved ${saved} MB)${RESET}`)
     return true
   } catch (e) {
-    // macOS 不支持 UPX，非致命错误
     warn(`UPX compression failed: ${e.message}`)
     warn('  Binary remains uncompressed at ' + OUTPUT_BIN)
     return false

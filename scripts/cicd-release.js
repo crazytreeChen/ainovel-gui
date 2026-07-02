@@ -15,6 +15,7 @@
  * 可选参数:
  *   --skip-mac    跳过 macOS 编译
  *   --skip-win    跳过 Windows 编译
+ *   --no-sign     跳过 macOS 代码签名（解决 timestamp 错误）
  *   --dirty       允许工作区有未提交内容
  *   --draft       发布为草稿 Release
  *   --dry-run     预览模式（不实际操作）
@@ -63,6 +64,7 @@ const FORCE_MINOR = args.includes('--minor')
 const FORCE_PATCH = args.includes('--patch')
 const SKIP_MAC = args.includes('--skip-mac')
 const SKIP_WIN = args.includes('--skip-win')
+const NO_SIGN = args.includes('--no-sign')
 const DIRTY = args.includes('--dirty')
 const DRAFT = args.includes('--draft')
 
@@ -230,6 +232,10 @@ function build() {
 
   // macOS
   if (!SKIP_MAC) {
+    if (NO_SIGN) {
+      info('跳过 macOS 代码签名 (--no-sign)')
+      process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
+    }
     log('打包 macOS (arm64)...')
     run('npx electron-builder --mac', { timeout: 600000 })
     ok('macOS 编译完成')
