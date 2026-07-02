@@ -30,7 +30,7 @@ const PLACEHOLDER_FACES = ['👤', '👥', '🧑', '👩', '👨', '🧔', '👵
 export default function CharactersPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'chars' | 'cast' | 'relations'>('chars')
+  const [tab, setTab] = useState<'chars' | 'cast' | 'relations' | 'eco'>('chars')
   // 角色
   const [chars, setChars] = useState<Character[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,6 +91,10 @@ export default function CharactersPage() {
           <button className={`welcome-mode-btn ${tab === 'relations' ? 'active' : ''}`}
             onClick={() => setTab('relations')} style={{ fontSize: 11 }}>
             关系图谱 ({relations.length})
+          </button>
+          <button className={`welcome-mode-btn ${tab === 'eco' ? 'active' : ''}`}
+            onClick={() => setTab('eco')} style={{ fontSize: 11 }}>
+            配角生态 ({cast.length})
           </button>
         </div>
       </div>
@@ -226,7 +230,151 @@ export default function CharactersPage() {
         </div>
       )}
 
+      {/* ── 配角生态 ── */}
+      {tab === 'eco' && (
+        <CastEcosystem chars={chars} cast={cast} relations={relations} />
+      )}
+
       </div>
+    </div>
+  )
+}
+
+function CastEcosystem({ chars, cast, relations }: { chars: Character[]; cast: CastEntry[]; relations: Relation[] }) {
+  const castMap = new Map(cast.map(c => [c.name, c]))
+  const charNames = new Set(chars.map(c => c.name))
+
+  if (cast.length === 0) {
+    return (
+      <div className="text-dim" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.3 }}>🌿</div>
+        <div style={{ fontSize: 14 }}>暂无配角生态数据</div>
+        <div style={{ fontSize: 12, marginTop: 4 }}>配角由创作引擎在写作过程中自动记录</div>
+      </div>
+    )
+  }
+
+  // 同章关联统计
+  const chapterGroups: Record<number, string[]> = {}
+  for (const c of cast) {
+    for (const ch of (c.appearanceChapters || [])) {
+      if (!chapterGroups[ch]) chapterGroups[ch] = []
+      chapterGroups[ch].push(c.name)
+    }
+  }
+  const pairCount = new Map<string, number>()
+  for (const [ch, names] of Object.entries(chapterGroups)) {
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        const key = [names[i], names[j]].sort().join('||')
+        pairCount.set(key, (pairCount.get(key) || 0) + 1)
+      }
+    }
+  }
+  const topPairs = [...pairCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30)
+
+  // 角色关系网络
+  const charRels: Record<string, { target: string; count: number }[]> = {}
+  for (const r of relations) {
+    if (!charRels[r.character_a]) charRels[r.character_a] = []
+    if (!charRels[r.character_b]) charRels[r.character_b] = []
+    const e1 = charRels[r.character_a].find(e => e.target === r.character_b)
+    if (e1) e1.count++; else charRels[r.character_a].push({ target: r.character_b, count: 1 })
+    const e2 = charRels[r.character_b].find(e => e.target === r.character_a)
+    if (e2) e2.count++; else charRels[r.character_b].push({ target: r.character_a, count: 1 })
+  }
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto' }}>
+      {/* 生态总览 */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        <div className="panel-surface" style={{ flex: 1, textAlign: 'center' }}>
+          <div className="text-accent mono" style={{ fontSize: 24 }}>{cast.length}</div>
+          <div className="text-dim" style={{ fontSize: 11 }}>配角总数</div>
+        </div>
+        <div className="panel-surface" style={{ flex: 1, textAlign: 'center' }}>
+          <div className="text-accent mono" style={{ fontSize: 24 }}>{cast.filter(c => c.promoted).length}</div>
+          <div className="text-dim" style={{ fontSize: 11 }}>已晋级</div>
+        </div>
+        <div className="panel-surface" style={{ flex: 1, textAlign: 'center' }}>
+          <div className="text-accent mono" style={{ fontSize: 24 }}>{topPairs.length}</div>
+          <div className="text-dim" style={{ fontSize: 11 }}>关联对</div>
+        </div>
+      </div>
+
+      {/* 出场频次 TOP 10 */}
+      <div style={{ marginBottom: 16 }}>
+        <div className="sidebar-section-header" style={{ marginBottom: 8 }}>🥇 出场频次 TOP 10</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {[...cast].sort((a, b) => b.appearanceCount - a.appearanceCount).slice(0, 10).map((c, i) => {
+            const maxCount = Math.max(...cast.map(x => x.appearanceCount), 1)
+            return (
+              <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="text-dim mono" style={{ width: 20, fontSize: 11 }}>#{i + 1}</span>
+                <span style={{ width: 120, fontSize: 12, fontWeight: 'bold' }}>{c.name}</span>
+                <div style={{ flex: 1, height: 14, background: 'var(--color-surface-2)', borderRadius: 7, overflow: 'hidden' }}>
+                  <div style={{ width: `${(c.appearanceCount / maxCount) * 100}%`, height: '100%', background: c.promoted ? 'var(--color-accent)' : 'var(--color-accent2)', borderRadius: 7, transition: 'width 0.3s' }} />
+                </div>
+                <span className="text-dim mono" style={{ width: 40, textAlign: 'right', fontSize: 11 }}>{c.appearanceCount}次</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 同章关联网络 */}
+      {topPairs.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div className="sidebar-section-header" style={{ marginBottom: 8 }}>🔗 同章关联网络</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {topPairs.map(([key, count]) => {
+              const [a, b] = key.split('||')
+              const aData = castMap.get(a); const bData = castMap.get(b)
+              return (
+                <div key={key} className="panel-surface-2" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ color: aData?.promoted ? 'var(--color-accent)' : 'var(--color-text)', fontWeight: 'bold' }}>{a}</span>
+                  <span className="text-dim">↔</span>
+                  <span style={{ color: bData?.promoted ? 'var(--color-accent)' : 'var(--color-text)', fontWeight: 'bold' }}>{b}</span>
+                  <span className="text-dim" style={{ fontSize: 10 }}>{count}章</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 配角关联关系 */}
+      {relations.length > 0 && (
+        <div>
+          <div className="sidebar-section-header" style={{ marginBottom: 8 }}>🕸️ 配角关联关系</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {cast.map(c => {
+              const rels = charRels[c.name] || []
+              if (rels.length === 0) return null
+              const filtered = rels.filter(r => charNames.has(r.target) || castMap.has(r.target)).slice(0, 5)
+              if (filtered.length === 0) return null
+              return (
+                <div key={c.name} className="panel-surface" style={{ fontSize: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 'bold', color: c.promoted ? 'var(--color-accent)' : 'var(--color-text)' }}>{c.name}</span>
+                    <span className="text-dim" style={{ fontSize: 11 }}>出场 {c.appearanceCount} 次</span>
+                    {c.promoted && <span className="text-accent" style={{ fontSize: 10, padding: '1px 4px', border: '1px solid var(--color-accent)', borderRadius: 3 }}>晋级</span>}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {filtered.map(rel => (
+                      <span key={rel.target} className="text-dim" style={{ padding: '2px 8px', background: 'var(--color-surface-2)', borderRadius: 10, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {rel.target}
+                        <span className="mono" style={{ color: 'var(--color-muted)', fontSize: 9 }}>×{rel.count}</span>
+                      </span>
+                    ))}
+                    {rels.length > 5 && <span className="text-dim" style={{ fontSize: 10 }}>+{rels.length - 5}...</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
