@@ -4,9 +4,9 @@
   "release_date": "2026-07-02",
   "downloads": {
     "mac-arm64": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.2.0/AINovel-0.2.0-mac-arm64.dmg",
-      "size": 97968775,
-      "sha256": "fc5390daeee02ce7491269be621a58483737a4d3952ad5f8ca77b18a1aedbe6e"
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.0/AINovel-0.6.0-mac-arm64.dmg",
+      "size": 119084199,
+      "sha256": "89ea056d4ec03e281fa58d53a6e208271d50dad72f6ce5d551a6d0c0d177b74b"
     },
     "win-x64": {
       "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.2.0/AINovel-0.2.0-win-x64.zip",
@@ -14,9 +14,9 @@
       "sha256": ""
     },
     "mac-arm64-zip": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.2.0/AINovel-0.2.0-mac-arm64.zip",
-      "size": 103460785,
-      "sha256": "1748e35e8dc766d1d32c30c23784d69fda87ab77eb6ad05b9b396b73eaeb4aa2"
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.0/AINovel-0.6.0-mac-arm64.zip",
+      "size": 125983354,
+      "sha256": "0daf08f07a3fd1c3207e4f45ac84f25548230375b788752e1715460e19946275"
     }
   }
 }
