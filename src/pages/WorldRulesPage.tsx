@@ -128,10 +128,10 @@ export default function WorldRulesPage() {
               Object.entries(groupedRules).map(([cat, rules]) => (
                 <div key={cat} style={{ marginBottom: 12 }}>
                   <div className="sidebar-section-header" style={{ fontSize: 12, marginBottom: 6, color: 'var(--color-accent2)' }}>{cat}</div>
-                  {rules.map((r, i) => {
+                  {rules.map((r) => {
                     const globalIdx = worldRules.indexOf(r)
                     return (
-                      <div key={i} style={{
+                      <div key={r.id ?? `${r.category}-${r.ruleText}-${r.boundary}`} style={{
                         padding: '8px 12px', marginBottom: 4, borderRadius: 'var(--radius-sm)',
                         background: 'var(--color-surface)', border: '1px solid var(--color-border)',
                         display: 'flex', gap: 8, alignItems: 'flex-start',
@@ -165,10 +165,10 @@ export default function WorldRulesPage() {
                 <button className="welcome-mode-btn" onClick={() => { if (newProse.trim()) { setStyleRules(prev => ({ ...prev, prose: [...prev.prose, newProse.trim()] })); setNewProse('') } }}>添加</button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {styleRules.prose.map((item, i) => (
-                  <span key={i} style={{ padding: '2px 8px', background: 'rgba(126,197,216,0.15)', color: '#7ec5d8', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                {styleRules.prose.map((item) => (
+                  <span key={item} style={{ padding: '2px 8px', background: 'rgba(126,197,216,0.15)', color: '#7ec5d8', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
                     {item}
-                    <button onClick={() => setStyleRules(prev => ({ ...prev, prose: prev.prose.filter((_, j) => j !== i) }))} style={{ background: 'none', border: 'none', color: '#7ec5d8', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
+                    <button onClick={() => setStyleRules(prev => ({ ...prev, prose: prev.prose.filter(p => p !== item) }))} style={{ background: 'none', border: 'none', color: '#7ec5d8', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
                   </span>
                 ))}
               </div>
@@ -186,15 +186,15 @@ export default function WorldRulesPage() {
                 <button className="welcome-mode-btn" onClick={() => { if (newDialogue.trim()) { setStyleRules(prev => ({ ...prev, dialogue: [...prev.dialogue, newDialogue.trim()] })); setNewDialogue('') } }}>添加</button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {styleRules.dialogue.map((item, i) => {
+                {styleRules.dialogue.map((item) => {
                   if (typeof item === 'string') {
-                    return <span key={i} style={{ padding: '2px 8px', background: 'rgba(94,184,163,0.15)', color: '#5fb8a3', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>{item}
-                      <button onClick={() => setStyleRules(prev => ({ ...prev, dialogue: prev.dialogue.filter((_, j) => j !== i) }))} style={{ background: 'none', border: 'none', color: '#5fb8a3', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
+                    return <span key={item} style={{ padding: '2px 8px', background: 'rgba(94,184,163,0.15)', color: '#5fb8a3', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>{item}
+                      <button onClick={() => setStyleRules(prev => ({ ...prev, dialogue: prev.dialogue.filter(d => d !== item) }))} style={{ background: 'none', border: 'none', color: '#5fb8a3', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
                     </span>
                   }
-                  return <span key={i} style={{ padding: '4px 10px', background: 'rgba(94,184,163,0.1)', color: '#5fb8a3', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'inline-block', marginBottom: 4 }}>
+                  return <span key={item.name} style={{ padding: '4px 10px', background: 'rgba(94,184,163,0.1)', color: '#5fb8a3', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'inline-block', marginBottom: 4 }}>
                     <strong>{item.name}</strong>: {(item.rules || []).join('；')}
-                    <button onClick={() => setStyleRules(prev => ({ ...prev, dialogue: prev.dialogue.filter((_, j) => j !== i) }))} style={{ background: 'none', border: 'none', color: '#5fb8a3', cursor: 'pointer', padding: 0, fontSize: 12, marginLeft: 4 }}>✕</button>
+                    <button onClick={() => setStyleRules(prev => ({ ...prev, dialogue: prev.dialogue.filter(d => typeof d === 'string' || d.name !== item.name) }))} style={{ background: 'none', border: 'none', color: '#5fb8a3', cursor: 'pointer', padding: 0, fontSize: 12, marginLeft: 4 }}>✕</button>
                   </span>
                 })}
               </div>
@@ -212,10 +212,10 @@ export default function WorldRulesPage() {
                 <button className="welcome-mode-btn" onClick={() => { if (newTaboo.trim()) { setStyleRules(prev => ({ ...prev, taboos: [...prev.taboos, newTaboo.trim()] })); setNewTaboo('') } }}>添加</button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {styleRules.taboos.map((item, i) => (
-                  <span key={i} style={{ padding: '2px 8px', background: 'rgba(224,112,96,0.15)', color: '#e07060', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                {styleRules.taboos.map((item) => (
+                  <span key={item} style={{ padding: '2px 8px', background: 'rgba(224,112,96,0.15)', color: '#e07060', borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
                     {item}
-                    <button onClick={() => setStyleRules(prev => ({ ...prev, taboos: prev.taboos.filter((_, j) => j !== i) }))} style={{ background: 'none', border: 'none', color: '#e07060', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
+                    <button onClick={() => setStyleRules(prev => ({ ...prev, taboos: prev.taboos.filter(t => t !== item) }))} style={{ background: 'none', border: 'none', color: '#e07060', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
                   </span>
                 ))}
               </div>

@@ -221,7 +221,7 @@ export default function UserRulesPage() {
               {rules.sources.length > 0 ? (
                 <div style={{ fontSize: 12, lineHeight: 1.8 }}>
                   {rules.sources.map((s, i) => (
-                    <div key={i} className="text-dim" style={{ padding: '2px 0', display: 'flex', gap: 8 }}>
+                    <div key={s} className="text-dim" style={{ padding: '2px 0', display: 'flex', gap: 8 }}>
                       <span className="text-accent2">{i + 1}.</span>
                       <span>{s}</span>
                       <button onClick={() => removeItem('sources', i)}
@@ -240,7 +240,7 @@ export default function UserRulesPage() {
               {rules.uncertain.length > 0 ? (
                 <div style={{ fontSize: 12, lineHeight: 1.8 }}>
                   {rules.uncertain.map((u, i) => (
-                    <div key={i} className="text-dim" style={{ padding: '2px 0', display: 'flex', gap: 8 }}>
+                    <div key={u} className="text-dim" style={{ padding: '2px 0', display: 'flex', gap: 8 }}>
                       <span style={{ color: '#e09b5a' }}>⚠</span>
                       <span>{u}</span>
                       <button onClick={() => removeItem('uncertain', i)}
@@ -307,7 +307,7 @@ export default function UserRulesPage() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {rules.structured.forbiddenChars.map((c, i) => (
-                  <span key={i} style={{
+                  <span key={c} style={{
                     padding: '2px 8px', background: 'rgba(224,112,96,0.15)', color: '#e07060',
                     borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
                   }}>
@@ -332,7 +332,7 @@ export default function UserRulesPage() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {rules.structured.forbiddenPhrases.map((p, i) => (
-                  <span key={i} style={{
+                  <span key={p} style={{
                     padding: '2px 8px', background: 'rgba(224,112,96,0.15)', color: '#e07060',
                     borderRadius: 'var(--radius-sm)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
                   }}>
@@ -439,7 +439,7 @@ export default function UserRulesPage() {
               <div className="text-dim" style={{ textAlign: 'center', marginTop: 40 }}>暂无指令</div>
             ) : (
               directives.map((d, i) => (
-                <div key={i} style={{
+                <div key={d.id ?? d.createdAt} style={{
                   padding: '10px 14px', marginBottom: 6, borderRadius: 'var(--radius)',
                   background: 'var(--color-surface)', border: '1px solid var(--color-border)',
                   borderLeft: '3px solid var(--color-accent2)',

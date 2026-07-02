@@ -50,8 +50,8 @@ function TagList({ items, color }: { items: string[]; color: string }) {
   if (!items || items.length === 0) return <span className="text-dim" style={{ fontSize: 12 }}>（无）</span>
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {items.map((item, i) => (
-        <span key={i} style={{
+      {items.map((item) => (
+        <span key={item} style={{
           padding: '2px 8px', background: `${color}15`, color,
           borderRadius: 'var(--radius-sm)', fontSize: 12, lineHeight: 1.6,
         }}>{item}</span>
@@ -168,8 +168,8 @@ export default function SimulationPage() {
                 {/* 来源概览 */}
                 <SectionCard title="语料来源">
                   <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-                    {(profile.corpus?.sources || []).map((src, i) => (
-                      <div key={i} className="text-dim" style={{ padding: '2px 0' }}>
+                    {(profile.corpus?.sources || []).map((src) => (
+                      <div key={src.relativePath} className="text-dim" style={{ padding: '2px 0' }}>
                         <span className="text-accent" style={{ fontWeight: 'bold' }}>{src.title || src.relativePath}</span>
                         <span style={{ marginLeft: 8, fontSize: 11 }}>
                           {src.sizeBytes ? `${(src.sizeBytes / 1024).toFixed(0)}KB` : ''}
@@ -201,8 +201,8 @@ export default function SimulationPage() {
                                 {FIELD_LABELS[key]?.[f] || f}
                               </div>
                               <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-                                {(data[f] || []).slice(0, 4).map((item: string, i: number) => (
-                                  <span key={i} style={{
+                                {(data[f] || []).slice(0, 4).map((item: string) => (
+                                  <span key={item} style={{
                                     display: 'inline-block', padding: '1px 6px', margin: 1,
                                     background: `${color}10`, color, borderRadius: 3, fontSize: 11,
                                   }}>{item}</span>
@@ -224,7 +224,7 @@ export default function SimulationPage() {
             {tab === 'sources' && (
               <div>
                 {(profile.sourceReports || []).map((report, i) => (
-                  <div key={i} style={{
+                  <div key={report.relativePath} style={{
                     background: 'var(--color-surface)', border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius)', marginBottom: 8, overflow: 'hidden',
                   }}>

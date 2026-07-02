@@ -59,6 +59,7 @@ export default function TimelinePage() {
           {tab === 'timeline' && (
             <div>
               {events.map((ev, i) => (
+                /* index acceptable: read-only event list, no UI reorder/delete */
                 <div key={i} style={{ display: 'flex', gap: 12, padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
                   <span className="text-accent" style={{ minWidth: 40, fontWeight: 'bold' }}>#{ev.chapter}</span>
                   <span className="text-dim" style={{ minWidth: 70 }}>{ev.time || '-'}</span>
@@ -79,8 +80,8 @@ export default function TimelinePage() {
                   </span>
                 ))}
               </div>
-              {foreshadows.map((f, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--color-border)', alignItems: 'center' }}>
+              {foreshadows.map((f) => (
+                <div key={f.id} style={{ display: 'flex', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--color-border)', alignItems: 'center' }}>
                   <span style={{ color: FS_COLORS[f.status], fontSize: 10 }}>●</span>
                   <span className="text-accent" style={{ minWidth: 40, fontWeight: 'bold' }}>#{f.plantedAt}</span>
                   <span style={{ flex: 1 }}>{f.description}</span>
@@ -95,6 +96,7 @@ export default function TimelinePage() {
           {tab === 'relations' && (
             <div>
               {relations.map((r, i) => (
+                /* index acceptable: read-only relation list, no UI reorder/delete */
                 <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
                   <span className="text-accent" style={{ fontWeight: 'bold' }}>{r.characterA}</span>
                   <span className="text-dim"> —[{r.relation}]— </span>

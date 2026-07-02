@@ -96,8 +96,8 @@ export default function DetailPanel() {
       {snapshot.characters.length > 0 && (
         <div className="sidebar-section">
           <div className="sidebar-section-header">角色</div>
-          {snapshot.characters.slice(0, 10).map((c, i) => (
-            <div key={i} className="text-dim" style={{ fontSize: 12, margin: '2px 0' }}>
+          {snapshot.characters.slice(0, 10).map((c) => (
+            <div key={c} className="text-dim" style={{ fontSize: 12, margin: '2px 0' }}>
               · {c}
             </div>
           ))}

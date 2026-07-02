@@ -84,6 +84,7 @@ export default function EventFlow() {
         }
 
         return (
+          /* index acceptable: sliding-window event log, items lack stable IDs */
           <div
             key={i}
             className="event-line"

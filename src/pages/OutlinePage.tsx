@@ -71,8 +71,8 @@ export default function OutlinePage() {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {mode === 'flat' && (
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-            {outline.map((entry, i) => (
-              <div key={i} style={{
+            {outline.map((entry) => (
+              <div key={entry.chapter} style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0',
                 borderBottom: '1px solid var(--color-border)',
               }}>
@@ -88,7 +88,7 @@ export default function OutlinePage() {
         {mode === 'layered' && (
           <div>
             {layered.map((vol, vi) => (
-              <div key={vi} style={{ marginBottom: 8 }}>
+              <div key={vol.index} style={{ marginBottom: 8 }}>
                 <div
                   className="cursor-clickable"
                   onClick={() => toggleVolume(vi)}
@@ -106,8 +106,8 @@ export default function OutlinePage() {
                 </div>
                 {expandedVols.has(vi) && (
                   <div style={{ marginLeft: 28, marginTop: 4 }}>
-                    {vol.arcs.map((arc, ai) => (
-                      <div key={ai} style={{ marginBottom: 4, padding: '6px 8px', borderLeft: '2px solid var(--color-accent2)', marginLeft: 8 }}>
+                    {vol.arcs.map((arc) => (
+                      <div key={arc.index} style={{ marginBottom: 4, padding: '6px 8px', borderLeft: '2px solid var(--color-accent2)', marginLeft: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span className="text-accent2 mono" style={{ fontWeight: 'bold', fontSize: 12 }}>
                             弧{arc.index}: {arc.title}
@@ -119,8 +119,8 @@ export default function OutlinePage() {
                           )}
                         </div>
                         {arc.goal && <div className="text-dim" style={{ fontSize: 11, marginTop: 2 }}>目标: {arc.goal}</div>}
-                        {arc.chapters?.map((ch, ci) => (
-                          <div key={ci} className="text-dim" style={{ fontSize: 12, marginLeft: 16, marginTop: 2 }}>
+                        {arc.chapters?.map((ch) => (
+                          <div key={ch.chapter} className="text-dim" style={{ fontSize: 12, marginLeft: 16, marginTop: 2 }}>
                             · {ch.title}
                           </div>
                         ))}

@@ -31,6 +31,7 @@ export default function StreamOutput() {
         {streamOutput.map((entry, i) => {
           const isNewBlock = i > 0 && streamOutput[i-1].type !== entry.type
           return (
+            /* index acceptable: append-only stream log, no UI reorder/delete */
             <span key={i}>
               {isNewBlock && <span style={{ display: 'block', height: 8 }} />}
               <span style={{

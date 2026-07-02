@@ -58,7 +58,7 @@ export default function ReviewsPage() {
           {/* 评审列表 */}
           <div style={{ width: 180, overflow: 'auto', borderRight: '1px solid var(--color-border)', paddingRight: 8, flexShrink: 0 }}>
             {reviews.map((r, i) => (
-              <div key={i} className="cursor-clickable" onClick={() => setSelectedIdx(i)}
+              <div key={r.chapter} className="cursor-clickable" onClick={() => setSelectedIdx(i)}
                 style={{
                   padding: '6px 8px', borderRadius: 'var(--radius-sm)', marginBottom: 2,
                   background: selectedIdx === i ? 'var(--color-surface-2)' : 'transparent',
@@ -122,6 +122,7 @@ export default function ReviewsPage() {
                 <div>
                   <div className="sidebar-section-header" style={{ fontSize: 11, marginBottom: 8 }}>问题清单 ({review.issues.length})</div>
                   {review.issues.map((issue, i) => (
+                    /* index acceptable: static issue list within a review, no UI reorder/delete */
                     <div key={i} style={{
                       padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius-sm)',
                       background: 'var(--color-surface)', borderLeft: `3px solid ${

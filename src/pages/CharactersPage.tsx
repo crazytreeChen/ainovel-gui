@@ -114,8 +114,8 @@ export default function CharactersPage() {
           {loading ? <div className="text-dim">加载中...</div> : (
             <div style={{ flex: 1, display: 'flex', gap: 16, overflow: 'hidden' }}>
               <div style={{ width: '40%', overflow: 'auto', borderRight: '1px solid var(--color-border)', paddingRight: 12 }}>
-                {filtered.map((c, i) => (
-                  <div key={i} className="cursor-clickable" onClick={() => setSelected(c)}
+                {filtered.map((c) => (
+                  <div key={c.name} className="cursor-clickable" onClick={() => setSelected(c)}
                     style={{
                       padding: '10px 12px', marginBottom: 4, borderRadius: 'var(--radius)',
                       background: selected?.name === c.name ? 'var(--color-surface-2)' : 'transparent',
@@ -185,7 +185,7 @@ export default function CharactersPage() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8 }}>
               {cast.map((c, i) => (
-                <div key={i} className="cursor-clickable" onClick={() => setSelectedCast(selectedCast?.name === c.name ? null : c)}
+                <div key={c.name} className="cursor-clickable" onClick={() => setSelectedCast(selectedCast?.name === c.name ? null : c)}
                   style={{
                     padding: 12, borderRadius: 'var(--radius)',
                     background: selectedCast?.name === c.name ? 'var(--color-surface-2)' : 'var(--color-surface)',
@@ -563,7 +563,7 @@ function RelationGraph({ relations, chars, cast }: { relations: Relation[]; char
               if (!a || !b) return null
               const isVisible = !focusName || (visibleSet.has(r.character_a) && visibleSet.has(r.character_b))
               const isHighlighted = selectedRel === r
-              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              return <line key={`${r.character_a}-${r.character_b}-${r.relation}-${r.chapter}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                 stroke={isVisible ? (RELATION_COLORS[r.relation] || 'var(--color-dim)') : 'var(--color-border)'}
                 strokeWidth={isHighlighted ? 3 : isVisible ? 1.5 : 0.5}
                 strokeOpacity={isVisible ? (isHighlighted ? 0.9 : 0.5) : 0.15}
