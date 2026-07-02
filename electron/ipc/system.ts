@@ -6,13 +6,39 @@ const { state, getDB, getAinovelBinary, GUI_DATA_DIR, home } = require('../conte
 const { createLogger } = require('../logger')
 const { join, dirname } = require('path')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
-const { execSync } = require('child_process')
+const { execFileSync, spawn } = require('child_process')
 const os = require('os')
 
 const log = createLogger('ipc:system')
 
 const CONFIG_PATH = join(home, '.ainovel', 'config.json')
 const coverExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
+
+function runCli(binary, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const { cwd, timeout } = opts
+    const child = spawn(binary, args, { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
+    const outChunks = []
+    const errChunks = []
+    let killedByTimeout = false
+    const timer = timeout ? setTimeout(() => { killedByTimeout = true; child.kill('SIGTERM') }, timeout) : null
+    child.stdout.on('data', d => outChunks.push(d))
+    child.stderr.on('data', d => errChunks.push(d))
+    child.on('error', err => { if (timer) clearTimeout(timer); reject(err) })
+    child.on('close', code => {
+      if (timer) clearTimeout(timer)
+      const stdout = Buffer.concat(outChunks).toString('utf8')
+      const stderr = Buffer.concat(errChunks).toString('utf8')
+      const e = killedByTimeout
+        ? new Error(`CLI 超时 (${timeout}ms)`)
+        : new Error(`CLI exit ${code}`)
+      e.stdout = stdout
+      e.stderr = stderr
+      if (killedByTimeout || code !== 0) return reject(e)
+      resolve(stdout)
+    })
+  })
+}
 
 // download-update URL 白名单：仅允许 GitHub 官方 releases 路径，防止 SSRF
 const ALLOWED_DOWNLOAD_HOST = 'github.com'
@@ -51,7 +77,7 @@ function register(ipcMain) {
     try {
       const binary = getAinovelBinary()
       if (!existsSync(binary)) return { available: false, version: '', path: binary }
-      const version = execSync(`"${binary}" --version 2>&1`, { encoding: 'utf8' }).trim()
+      const version = execFileSync(binary, ['--version'], { encoding: 'utf8', shell: false }).trim()
       return { available: true, version, path: binary }
     } catch (e) { log.warn('check-binary', e?.message || e); return { available: false, version: '', path: '' } }
   })
@@ -60,7 +86,7 @@ function register(ipcMain) {
   ipcMain.handle('run-diag', async () => {
     const binary = getAinovelBinary()
     const cwd = state.outputDir || require('electron').app.getPath('documents')
-    try { return execSync(`"${binary}" --headless --diag 2>&1`, { cwd, encoding: 'utf8', timeout: 60000 }) }
+    try { return await runCli(binary, ['--headless', '--diag'], { cwd, timeout: 60000 }) }
     catch (e) { return e.stdout || e.stderr || e.message || '诊断执行失败' }
   })
 
@@ -75,14 +101,15 @@ function register(ipcMain) {
     const binary = getAinovelBinary()
     let cwd = state.outputDir || require('electron').app.getPath('documents')
     if (bookId) { try { const book = getDB().getBook(bookId); if (book?.workspace_dir) cwd = book.workspace_dir } catch (e) { log.error('run-simulate:getBook', e) } }
-    try { return execSync(`"${binary}" --headless --prompt "/simulate" 2>&1`, { cwd, encoding: 'utf8', timeout: 120000 }) }
+    try { return await runCli(binary, ['--headless', '--prompt', '/simulate'], { cwd, timeout: 120000 }) }
     catch (e) { return e.stdout || e.stderr || e.message || '仿写分析执行失败' }
   })
 
   ipcMain.handle('run-export', async (_e, args) => {
     const binary = getAinovelBinary()
     const cwd = state.outputDir || require('electron').app.getPath('documents')
-    try { return execSync(`"${binary}" --headless /export ${args} 2>&1`, { cwd, encoding: 'utf8', timeout: 60000 }) }
+    const argv = ['--headless', '/export', ...args.split(' ').filter(Boolean)]
+    try { return await runCli(binary, argv, { cwd, timeout: 60000 }) }
     catch (e) { return e.stdout || e.stderr || e.message || '导出失败' }
   })
 
