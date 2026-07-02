@@ -4,6 +4,7 @@
  */
 const { state, getDB, getAinovelBinary, GUI_DATA_DIR, home } = require('../context')
 const { createLogger } = require('../logger')
+const { validatePath } = require('../path-validator')
 const { join, dirname } = require('path')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
 const os = require('os')
@@ -44,7 +45,10 @@ function register(ipcMain) {
   ipcMain.handle('get-book-dir', async (_e, id) => {
     const book = (state.index?.books || []).find(b => b.id === id)
     if (!book) return null
-    return book.workspaceDir || join(GUI_DATA_DIR, 'books', id)
+    const fallback = join(GUI_DATA_DIR, 'books', id)
+    const candidate = book.workspaceDir || fallback
+    try { return validatePath(candidate) }
+    catch { return fallback }
   })
 
   ipcMain.handle('get-gui-data-dir', async () => GUI_DATA_DIR)
@@ -65,6 +69,7 @@ function register(ipcMain) {
   // ── 扫描/导入工作目录 ──
   ipcMain.handle('scan-workspace', async (_e, dir) => {
     try {
+      dir = validatePath(dir)
       const outputDirCheck = join(dir, 'output')
       if (!existsSync(outputDirCheck)) return null
       const progress = readStoreJSON(dir, 'meta/progress.json')
@@ -89,6 +94,7 @@ function register(ipcMain) {
   ipcMain.handle('import-workspace', async (_e, dir) => {
     // Full import logic - preserved from original main.ts
     try {
+      dir = validatePath(dir)
       const crypto = require('crypto')
       const id = crypto.randomUUID()
       const now = new Date().toISOString()
