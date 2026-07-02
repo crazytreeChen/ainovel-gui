@@ -14,6 +14,19 @@ const log = createLogger('ipc:system')
 const CONFIG_PATH = join(home, '.ainovel', 'config.json')
 const coverExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
 
+// download-update URL 白名单：仅允许 GitHub 官方 releases 路径，防止 SSRF
+const ALLOWED_DOWNLOAD_HOST = 'github.com'
+const ALLOWED_DOWNLOAD_PATH_PREFIX = '/crazytreeChen/ainovel-gui/releases/download/'
+
+function validateDownloadUrl(url) {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' &&
+           parsed.hostname === ALLOWED_DOWNLOAD_HOST &&
+           parsed.pathname.startsWith(ALLOWED_DOWNLOAD_PATH_PREFIX)
+  } catch { return false }
+}
+
 function register(ipcMain) {
   // ── 目录管理 ──
   ipcMain.handle('select-directory', async () => {
@@ -166,6 +179,7 @@ function register(ipcMain) {
 
   ipcMain.handle('download-update', async (_e, url, expectedSha256) => {
     try {
+      if (!validateDownloadUrl(url)) return { success: false, error: 'URL 不在白名单内，仅允许 https://github.com/crazytreeChen/ainovel-gui/releases/download/ 路径' }
       const crypto = require('crypto')
       const destDir = require('electron').app.getPath('downloads')
       const filename = url.split('/').pop() || 'ainovel-update'
