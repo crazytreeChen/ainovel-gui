@@ -115,10 +115,10 @@ export const FLOW_LABELS: Record<string, string> = {
 }
 
 export const AGENT_DISPLAY: Record<string, string> = {
-  architect: 'ARCHITECT',
-  coordinator: 'COORDINATOR',
-  writer: 'WRITER',
-  editor: 'EDITOR',
+  architect: '架构师',
+  coordinator: '协调器',
+  writer: '写手',
+  editor: '编辑',
 }
 
 export const AGENT_COLORS: Record<string, string> = {
@@ -152,4 +152,51 @@ export const CATEGORY_COLORS: Record<string, string> = {
   AGENT: '#b8b09c',
   CONTEXT: '#a890d8',
   COMPACT: '#a890d8',
+}
+
+/** 事件摘要中英文 → 中文映射 */
+export const EVENT_SUMMARY_LABELS: Record<string, string> = {
+  // 工具调用
+  edit_chapter: '编辑章节',
+  read_chapter: '读取章节',
+  commit_chapter: '提交章节',
+  check_consistency: '一致性检查',
+  novel_context: '小说上下文',
+  save_user_rules: '保存用户规则',
+  load_user_rules: '加载用户规则',
+  update_outline: '更新大纲',
+  update_characters: '更新角色',
+  update_timeline: '更新时间线',
+  update_compass: '更新指南针',
+  get_premise: '读取前提',
+  get_outline: '读取大纲',
+  get_characters: '读取角色',
+  get_chapter: '读取章节',
+  list_chapters: '章节列表',
+  search_memory: '搜索记忆',
+  // 策略
+  tool_result_microcompact: '工具结果微压缩',
+  tool_result_truncate: '工具结果截断',
+  context_compact: '上下文压缩',
+  // Agent
+  subagent: '子代理',
+  writer: '写手',
+  editor: '编辑',
+  architect: '架构师',
+  coordinator: '协调器',
+  // 其他
+  '恢复创作': '恢复创作',
+  '写作': '写作',
+  '评审': '评审',
+  '重写': '重写',
+}
+
+/** 翻译事件摘要中的英文关键词为中文 */
+export function translateEventSummary(summary: string): string {
+  for (const [en, zh] of Object.entries(EVENT_SUMMARY_LABELS)) {
+    if (summary.includes(en)) {
+      return summary.replace(new RegExp(en, 'g'), zh)
+    }
+  }
+  return summary
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
-import { CATEGORY_COLORS, AGENT_COLORS, AGENT_DISPLAY } from '@/types'
+import { CATEGORY_COLORS, AGENT_COLORS, AGENT_DISPLAY, translateEventSummary } from '@/types'
 
 function formatTime(ts: string): string {
   if (!ts) return ''
@@ -44,7 +44,7 @@ export default function EventFlow() {
         const color = CATEGORY_COLORS[ev.category] || '#8a8175'
 
         let icon = '·'
-        let summary = ev.summary
+        let summary = translateEventSummary(ev.summary)
         let agentName = ev.agent || ''
         let lineColor = color
 
@@ -54,7 +54,7 @@ export default function EventFlow() {
             // 用 tui 风格：agent 名称加粗 + 斜体任务描述
             if (agentName) {
               const agentColor = AGENT_COLORS[agentName] || color
-              summary = `${AGENT_DISPLAY[agentName] || agentName.toUpperCase()} ${ev.summary.replace(agentName, '').trim()}`
+              summary = `${AGENT_DISPLAY[agentName] || 'AGENT'} ${ev.summary.replace(agentName, '').trim()}`
             }
             break
           case 'TOOL':
