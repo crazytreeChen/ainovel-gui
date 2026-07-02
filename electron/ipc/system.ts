@@ -1,4 +1,5 @@
-// @ts-nocheck — CJS IPC 模块
+export {}
+
 /**
  * 系统 IPC（模型/配置/更新/诊断/目录/封面）
  */
@@ -8,6 +9,7 @@ const { createLogger } = require('../logger')
 const { join, dirname, resolve, extname, sep } = require('path')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
 const { execFileSync, spawn } = require('child_process')
+import { ExecFileSyncOptions } from 'child_process'
 const os = require('os')
 
 const log = createLogger('ipc:system')
@@ -15,7 +17,7 @@ const log = createLogger('ipc:system')
 const CONFIG_PATH = join(home, '.ainovel', 'config.json')
 const coverExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
 
-function runCli(binary, args, opts = {}) {
+function runCli(binary, args, opts: ExecFileSyncOptions = {}) {
   return new Promise((resolve, reject) => {
     const { cwd, timeout } = opts
     const child = spawn(binary, args, { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -30,9 +32,9 @@ function runCli(binary, args, opts = {}) {
       if (timer) clearTimeout(timer)
       const stdout = Buffer.concat(outChunks).toString('utf8')
       const stderr = Buffer.concat(errChunks).toString('utf8')
-      const e = killedByTimeout
+      const e = (killedByTimeout
         ? new Error(`CLI 超时 (${timeout}ms)`)
-        : new Error(`CLI exit ${code}`)
+        : new Error(`CLI exit ${code}`)) as Error & { stdout: string; stderr: string }
       e.stdout = stdout
       e.stderr = stderr
       if (killedByTimeout || code !== 0) return reject(e)
