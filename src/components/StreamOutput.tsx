@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
+import { translateEventSummary } from '@/types'
 
 export default function StreamOutput() {
   const streamOutput = useAppStore((s) => s.streamOutput)
@@ -37,7 +38,7 @@ export default function StreamOutput() {
                 fontSize: entry.type === 'thinking' ? 12 : 13,
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
-              }}>{entry.text}</span>
+              }}>{translateEventSummary(entry.text)}</span>
             </span>
           )
         })}
