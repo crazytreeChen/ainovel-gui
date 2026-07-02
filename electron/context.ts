@@ -1,4 +1,4 @@
-// @ts-nocheck — CJS 上下文模块
+export {}
 /**
  * Electron 主进程共享上下文
  *
