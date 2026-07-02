@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import BookCover from '@/components/BookCover'
-import { getPhaseLabel } from '@/lib/utils/phaseLabel'
+import BookCard from '@/components/BookCard'
+import BookEditModal from '@/components/BookEditModal'
+import BookFilters from '@/components/BookFilters'
 
 interface BookItem {
   id: string
@@ -92,14 +93,12 @@ export default function BookList() {
     const dir = await window.electronAPI.selectDirectory()
     if (!dir) return
 
-    // 扫描工作目录
     const info = await window.electronAPI.scanWorkspace(dir)
     if (!info) {
       alert('所选目录不是有效的 ainovel-cli 工作目录（缺少 output/ 子目录）')
       return
     }
 
-    // 确认导入
     const msg = `检测到作品：${info.name || '未命名'}\n` +
       `阶段: ${info.phase || 'init'}\n` +
       `章节: ${info.chapterCount || 0}\n` +
@@ -125,16 +124,12 @@ export default function BookList() {
           </h1>
           <div className="text-dim" style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>AI小说创作管理平台</div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
-            <button className={`welcome-mode-btn ${viewMode === 'card' ? 'active' : ''}`}
-              onClick={() => setViewMode('card')} style={{ fontSize: 11, padding: '4px 10px' }}>▦ 卡片</button>
-            <button className={`welcome-mode-btn ${viewMode === 'detail' ? 'active' : ''}`}
-              onClick={() => setViewMode('detail')} style={{ fontSize: 11, padding: '4px 10px' }}>☰ 详情</button>
-          </div>
-          <button className="welcome-mode-btn" onClick={() => navigate('/books/new')}>+ 新建书籍</button>
-          <button className="welcome-mode-btn" onClick={handleImport}>📂 打开目录</button>
-        </div>
+        <BookFilters
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          onNewBook={() => navigate('/books/new')}
+          onImport={handleImport}
+        />
       </div>
 
       {/* 书籍列表 */}
@@ -161,53 +156,14 @@ export default function BookList() {
             gap: viewMode === 'card' ? 16 : 6,
           }}>
             {books.map(book => (
-              <div
+              <BookCard
                 key={book.id}
-                className="cursor-clickable"
-                style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius)',
-                  padding: viewMode === 'card' ? 16 : '10px 14px',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s',
-                  display: 'flex',
-                  gap: viewMode === 'card' ? 16 : 10,
-                  alignItems: viewMode === 'detail' ? 'center' : undefined,
-                }}
+                book={book}
+                viewMode={viewMode}
                 onClick={() => navigate(`/books/${book.id}/workspace?mode=writing`)}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-accent)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-border)'}
-              >
-                <BookCover bookId={book.id} size="small" />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: viewMode === 'card' ? 8 : 2 }}>
-                    <div style={{ fontWeight: 'bold', fontSize: viewMode === 'card' ? 15 : 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.name}</div>
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      <button onClick={(e) => handleEditClick(book, e)}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-dim)', cursor: 'pointer', fontSize: viewMode === 'card' ? 12 : 10, padding: '0 4px' }} title="编辑">✎</button>
-                      <button onClick={(e) => handleDelete(book.id, e)}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-dim)', cursor: 'pointer', fontSize: viewMode === 'card' ? 14 : 10, padding: '0 4px' }} title="删除">✕</button>
-                    </div>
-                  </div>
-                  <div className="mono text-dim" style={{ fontSize: viewMode === 'card' ? 11 : 10, lineHeight: viewMode === 'card' ? 1.7 : 1.5 }}>
-                    <div>状态: {getPhaseLabel(book.phase)} · {book.completedCount || 0} 章 · {(book.totalWordCount || 0).toLocaleString()} 字 · {book.style || 'default'}</div>
-                  </div>
-                  {book.premise && (
-                    <div className="text-dim" style={{
-                      fontSize: viewMode === 'card' ? 11 : 10,
-                      marginTop: viewMode === 'card' ? 6 : 2,
-                      lineHeight: 1.5,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: viewMode === 'detail' ? 'nowrap' : undefined,
-                      display: viewMode === 'card' ? '-webkit-box' : undefined,
-                      WebkitLineClamp: viewMode === 'card' ? 3 : undefined,
-                      WebkitBoxOrient: viewMode === 'card' ? 'vertical' : undefined,
-                    }}>{book.premise}</div>
-                  )}
-                </div>
-              </div>
+                onEdit={(e) => handleEditClick(book, e)}
+                onDelete={(e) => handleDelete(book.id, e)}
+              />
             ))}
           </div>
         )}
@@ -222,88 +178,22 @@ export default function BookList() {
 
       {/* 编辑书籍弹窗 */}
       {editBook && (
-        <div className="modal-overlay" onClick={() => setEditBook(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ minWidth: 400, maxWidth: 450 }}>
-            <button className="modal-close" onClick={() => setEditBook(null)}>✕</button>
-            <div className="modal-title">编辑书籍</div>
-
-            {/* 封面 */}
-            <div style={{ display: 'flex', gap: 16, marginBottom: 14, alignItems: 'center' }}>
-              <BookCover bookId={editBook.id} size="medium" editable />
-              <div className="text-dim" style={{ fontSize: 11 }}>点击封面更换图片</div>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>书名</label>
-              <input value={editName} onChange={e => setEditName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleEditSave()}
-                style={{ width: '100%', padding: '8px 12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 13 }}
-                autoFocus
-              />
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>写作风格</label>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {[
-                  { key: 'default', label: '通用' },
-                  { key: 'fantasy', label: '仙侠/玄幻' },
-                  { key: 'suspense', label: '悬疑推理' },
-                  { key: 'romance', label: '言情' },
-                ].map(s => (
-                  <button key={s.key}
-                    className={`welcome-mode-btn ${editStyle === s.key ? 'active' : ''}`}
-                    onClick={() => setEditStyle(s.key)}
-                    style={{ fontSize: 12 }}
-                  >{s.label}</button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>写作阶段</label>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {[
-                  { key: 'init', label: getPhaseLabel('init') },
-                  { key: 'premise', label: getPhaseLabel('premise') },
-                  { key: 'outline', label: getPhaseLabel('outline') },
-                  { key: 'writing', label: getPhaseLabel('writing') },
-                  { key: 'complete', label: getPhaseLabel('complete') },
-                ].map(s => (
-                  <button key={s.key}
-                    className={`welcome-mode-btn ${editPhase === s.key ? 'active' : ''}`}
-                    onClick={() => setEditPhase(s.key)}
-                    style={{ fontSize: 12 }}
-                  >{s.label}</button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>标签</label>
-              <input value={editTags} onChange={e => setEditTags(e.target.value)}
-                placeholder="用逗号分隔，如: 玄幻, 后宫, 末日"
-                style={{ width: '100%', padding: '8px 12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 13 }}
-              />
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label className="text-muted" style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>内容简介</label>
-              <textarea value={editPremise} onChange={e => setEditPremise(e.target.value)}
-                placeholder="输入书籍内容简介..."
-                rows={3}
-                style={{ width: '100%', padding: '8px 12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', outline: 'none', fontSize: 13, resize: 'vertical', fontFamily: 'var(--font-mono)' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="welcome-mode-btn" onClick={() => setEditBook(null)}>取消</button>
-              <button className="welcome-mode-btn active" onClick={handleEditSave} disabled={editSaving}>
-                {editSaving ? '保存中...' : '保存'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <BookEditModal
+          book={editBook}
+          editName={editName}
+          setEditName={setEditName}
+          editStyle={editStyle}
+          setEditStyle={setEditStyle}
+          editPhase={editPhase}
+          setEditPhase={setEditPhase}
+          editTags={editTags}
+          setEditTags={setEditTags}
+          editPremise={editPremise}
+          setEditPremise={setEditPremise}
+          editSaving={editSaving}
+          onSave={handleEditSave}
+          onClose={() => setEditBook(null)}
+        />
       )}
 
       {/* 删除确认弹窗 */}
