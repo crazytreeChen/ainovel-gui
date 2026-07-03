@@ -72,11 +72,12 @@ export default function SummaryPage() {
             </div>
           ) : (
             currentList.map((entry) => {
-              const key = entry.refKey || String(currentList.indexOf(entry))
+              const refKey = entry.refKey || ''
+              const key = refKey || String(currentList.indexOf(entry))
               const isOpen = expanded.has(key)
-              const label = tab === 'chapter' ? `第${entry.refKey}章` :
-                tab === 'arc' ? entry.refKey.replace('arc-', '弧 ').replace('v', '第').replace('a', '弧') :
-                entry.refKey.replace('vol-', '第').replace('v', '卷 ')
+              const label = tab === 'chapter' ? `第${refKey}章` :
+                tab === 'arc' ? refKey.replace('arc-', '弧 ').replace('v', '第').replace('a', '弧') :
+                refKey.replace('vol-', '第').replace('v', '卷 ')
               return (
                 <div key={key} className="mb-8">
                   <div className="cursor-clickable flex-row items-center gap-8 card"
