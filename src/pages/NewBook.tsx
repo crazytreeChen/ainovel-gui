@@ -94,7 +94,7 @@ export default function NewBook() {
                   border: selectedImage ? '1px solid var(--color-border)' : '2px dashed var(--color-dim)',
                   background: 'var(--color-surface-2)', cursor: selectedImage ? 'zoom-in' : 'pointer', gap: 6 }}>
                 {selectedImage ? (
-                  <img src={selectedImage} alt="封面预览" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 3 }} />
+                  <img loading="lazy" src={selectedImage} alt="封面预览" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 3 }} />
                 ) : (
                   <>
                     <span style={{ fontSize: 28, opacity: 0.4 }}>📖</span>

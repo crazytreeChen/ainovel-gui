@@ -107,7 +107,7 @@ export default function CharacterEditor({ character, onSave, onDelete, onClose }
                 flexShrink: 0, cursor: avatar ? 'zoom-in' : 'pointer',
               }}>
               {avatar ? (
-                <img src={avatar} alt="角色头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img loading="lazy" src={avatar} alt="角色头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <span style={{ fontSize: 32, opacity: 0.3 }}>👤</span>
               )}

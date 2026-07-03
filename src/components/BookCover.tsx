@@ -75,7 +75,7 @@ export default function BookCover({ bookId, size = 'medium', editable, onCoverCh
         }}
       >
         {coverData ? (
-          <img src={coverData} alt="封面" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img loading="lazy" src={coverData} alt="封面" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <span className="text-dim" style={{ fontSize: size === 'small' ? 18 : 28, opacity: 0.4 }}>📖</span>
         )}

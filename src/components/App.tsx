@@ -9,6 +9,7 @@ import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, Se
 import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
 import SearchModal from './SearchModal'
+import ShortcutHelpModal from './ShortcutHelpModal'
 import { useIPCListeners } from '@/hooks/useIPCListeners'
 
 function resolveTheme(theme: ThemeMode): string {
@@ -40,6 +41,7 @@ function AppRoutes() {
   useThemeEffect()
   useIPCListeners()
   const [showSearch, setShowSearch] = useState(false)
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const showHelp = useAppStore((s) => s.showHelp)
   const showDiagnostics = useAppStore((s) => s.showDiagnostics)
   const showModelSwitch = useAppStore((s) => s.showModelSwitch)
@@ -54,8 +56,14 @@ function AppRoutes() {
         setShowSearch(s => !s)
         return
       }
+      // ? 快捷键帮助
+      if (e.key === '?' && !showSearch) {
+        setShowShortcutHelp(s => !s)
+        return
+      }
       if (e.key === 'Escape') {
         if (showSearch) { setShowSearch(false); return }
+        if (showShortcutHelp) { setShowShortcutHelp(false); return }
         if (showHelp) useAppStore.getState().toggleHelp()
         if (showDiagnostics) useAppStore.getState().toggleDiagnostics()
         if (showModelSwitch) useAppStore.getState().toggleModelSwitch()
@@ -64,7 +72,7 @@ function AppRoutes() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSearch, showHelp, showDiagnostics, showModelSwitch, showCoCreate])
+  }, [showSearch, showShortcutHelp, showHelp, showDiagnostics, showModelSwitch, showCoCreate])
 
   return (
     <>
@@ -88,6 +96,7 @@ function AppRoutes() {
       <Route path="/settings/models" element={<ModelsPage />} />
     </Routes>
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+      {showShortcutHelp && <ShortcutHelpModal />}
     </>
   )
 }

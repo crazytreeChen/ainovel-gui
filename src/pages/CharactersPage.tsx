@@ -139,7 +139,7 @@ export default function CharactersPage() {
                       }}
                         onClick={e => { if (c.avatar) { e.stopPropagation(); setViewerSrc(c.avatar!) } }}>
                         {c.avatar ? (
-                          <img src={c.avatar} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img loading="lazy" src={c.avatar} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <span style={{ fontSize: 16, opacity: 0.4 }}>{PLACEHOLDER_FACES[chars.indexOf(c) % PLACEHOLDER_FACES.length]}</span>
                         )}
@@ -166,7 +166,7 @@ export default function CharactersPage() {
                             border: '1px solid var(--color-border)', cursor: 'zoom-in',
                           }}
                             onClick={() => setViewerSrc(selected.avatar!)}>
-                            <img src={selected.avatar} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img loading="lazy" src={selected.avatar} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         )}
                         <div>
