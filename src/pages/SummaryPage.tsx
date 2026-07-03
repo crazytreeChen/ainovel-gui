@@ -72,7 +72,7 @@ export default function SummaryPage() {
             </div>
           ) : (
             currentList.map((entry) => {
-              const refKey = entry.refKey || ''
+              const refKey = String(entry.refKey ?? '')
               const key = refKey || String(currentList.indexOf(entry))
               const isOpen = expanded.has(key)
               const label = tab === 'chapter' ? `第${refKey}章` :

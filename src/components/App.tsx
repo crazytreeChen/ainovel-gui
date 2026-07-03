@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import { useAppStore } from '@/stores/useAppStore'
 import type { ThemeMode } from '@/stores/useAppStore'
 import BookList from '@/pages/BookList'
@@ -39,7 +39,6 @@ function useThemeEffect() {
 function AppRoutes() {
   useThemeEffect()
   useIPCListeners()
-  const navigate = useNavigate()
   const [showSearch, setShowSearch] = useState(false)
   const showHelp = useAppStore((s) => s.showHelp)
   const showDiagnostics = useAppStore((s) => s.showDiagnostics)
