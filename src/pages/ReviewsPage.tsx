@@ -4,6 +4,8 @@ import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
 import BackButton from '@/components/BackButton'
 import RadarChart from '@/components/RadarChart'
+import { useWritingStore } from '@/stores/useWritingStore'
+import { showToast } from '@/components/Toast'
 
 interface DimensionScore {
   dimension: string; score: number; verdict: 'pass' | 'warning' | 'fail'; comment: string
@@ -44,6 +46,19 @@ export default function ReviewsPage() {
 
   const reviewList = reviews
   const review = reviewList[selectedIdx]
+  const resumeWriting = useWritingStore((s) => s.resumeWriting)
+
+  async function handleAutoPolish() {
+    if (!id || !window.electronAPI) return
+    showToast('正在启动打磨流程...', 'info')
+    const ok = await resumeWriting(id)
+    if (ok) {
+      showToast('打磨流程已启动，AI 将自动处理待修改章节', 'success')
+      navigate(`/books/${id}/workspace?mode=writing`)
+    } else {
+      showToast('启动失败，请前往工作台手动操作', 'error')
+    }
+  }
 
   return (
     <div className="flex-row p-24" style={{ height: '100vh', gap: 24 }}>
@@ -141,8 +156,12 @@ export default function ReviewsPage() {
                       {review.verdict === 'rewrite' ? '需重写' : '需打磨'} — 共 {review.affectedChapters?.length || 1} 章受影响
                     </div>
                     <button className="welcome-mode-btn active text-sm"
+                      onClick={handleAutoPolish}>
+                      ✏️ 自动打磨
+                    </button>
+                    <button className="welcome-mode-btn text-sm"
                       onClick={() => navigate(`/books/${id}/workspace?mode=writing`)}>
-                      ✏️ 前往工作台{review.verdict === 'rewrite' ? '重写' : '打磨'}
+                      前往工作台
                     </button>
                     <div className="text-dim text-xs mt-4">
                       进入工作台后点击「继续创作」，AI 将自动处理待修改的章节
