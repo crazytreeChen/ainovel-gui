@@ -8,9 +8,11 @@ interface ChapterInfo {
 }
 
 interface UsageData {
-  totalInputTokens?: number; totalOutputTokens?: number
-  totalCostUSD?: number; totalSavedUSD?: number
-  cacheReadTokens?: number; cacheWriteTokens?: number
+  total_input?: number; total_output?: number
+  total_cost?: number; total_saved?: number
+  cache_read?: number; cache_write?: number
+  per_model?: Record<string, { input: number; output: number; cost: number }>
+  per_agent?: Record<string, { input: number; output: number }>
 }
 
 export default function DashboardPage() {
@@ -69,28 +71,42 @@ export default function DashboardPage() {
 
         {/* Token & 成本 */}
         {usage && (
+          <>
           <div className="flex-row gap-8 mb-12 flex-wrap">
             <div className="card" style={{ padding: '8px 10px', flex: '1 1 120px' }}>
               <div className="text-dim text-xs mb-4">输入 Tokens</div>
-              <div className="text-accent2 fw-bold" style={{ fontSize: 13 }}>{(usage.totalInputTokens ?? 0).toLocaleString()}</div>
+              <div className="text-accent2 fw-bold" style={{ fontSize: 13 }}>{(usage.total_input || 0).toLocaleString()}</div>
             </div>
             <div className="card" style={{ padding: '8px 10px', flex: '1 1 120px' }}>
               <div className="text-dim text-xs mb-4">输出 Tokens</div>
-              <div className="text-accent2 fw-bold" style={{ fontSize: 13 }}>{(usage.totalOutputTokens ?? 0).toLocaleString()}</div>
+              <div className="text-accent2 fw-bold" style={{ fontSize: 13 }}>{(usage.total_output || 0).toLocaleString()}</div>
             </div>
             <div className="card" style={{ padding: '8px 10px', flex: '1 1 100px' }}>
               <div className="text-dim text-xs mb-4">费用</div>
-              <div className="text-accent fw-bold" style={{ fontSize: 13 }}>${(usage.totalCostUSD ?? 0).toFixed(2)}</div>
+              <div className="text-accent fw-bold" style={{ fontSize: 13 }}>${(usage.total_cost || 0).toFixed(4)}</div>
             </div>
-            {usage.totalSavedUSD ? (
+            {usage.total_saved ? (
               <div className="card" style={{ padding: '8px 10px', flex: '1 1 100px' }}>
                 <div className="text-dim text-xs mb-4">节省</div>
-                <div className="text-success fw-bold" style={{ fontSize: 13 }}>${usage.totalSavedUSD.toFixed(2)}</div>
+                <div className="text-success fw-bold" style={{ fontSize: 13 }}>${usage.total_saved.toFixed(4)}</div>
               </div>
             ) : null}
           </div>
-        )}
 
+          {/* 按模型消耗 */}
+          {usage.per_model && Object.keys(usage.per_model).length > 0 && (
+            <div className="card mb-12" style={{ padding: '10px 12px' }}>
+              <div className="sidebar-section-header mb-8" style={{ fontSize: 11 }}>各模型消耗</div>
+              {Object.entries(usage.per_model).slice(0, 8).map(([model, stats]) => (
+                <div key={model} className="flex-row items-center gap-8 mb-4" style={{ fontSize: 11 }}>
+                  <span className="text-dim flex-1 truncate">{model.split('/').pop()}</span>
+                  <span className="text-dim mono">{(stats.input || 0).toLocaleString()} / {(stats.output || 0).toLocaleString()}</span>
+                  {stats.cost ? <span className="text-accent mono">${stats.cost.toFixed(4)}</span> : null}
+                </div>
+              ))}
+            </div>
+          )}
+          </>)}
         {/* 章节字数分布 */}
         {chapters.length > 0 && (
           <div className="card" style={{ padding: '10px 12px' }}>
