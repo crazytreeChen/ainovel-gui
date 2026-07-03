@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
+import { useBookId } from '@/hooks/useBookId'
+import { useBookData } from '@/hooks/useBookData'
 
 interface SummaryEntry {
   id?: number; type: string; refKey: string
@@ -8,24 +10,18 @@ interface SummaryEntry {
 }
 
 export default function SummaryPage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
-  const [summaries, setSummaries] = useState<SummaryEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: summaries, loading } = useBookData<SummaryEntry[]>(
+    async (bid) => (await window.electronAPI?.getBookSummaries(bid)) ?? [],
+    [],
+  )
   const [tab, setTab] = useState<'chapter' | 'arc' | 'volume'>('chapter')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  useEffect(() => { loadData() }, [id])
+  const list = summaries ?? []
 
-  async function loadData() {
-    if (!id || !window.electronAPI) return
-    setLoading(true)
-    const data = await window.electronAPI.getBookSummaries(id)
-    setSummaries(data || [])
-    setLoading(false)
-  }
-
-  const grouped = summaries.reduce<Record<string, SummaryEntry[]>>((acc, s) => {
+  const grouped = list.reduce<Record<string, SummaryEntry[]>>((acc, s) => {
     const key = s.type || 'chapter'
     if (!acc[key]) acc[key] = []
     acc[key].push(s)
@@ -49,7 +45,7 @@ export default function SummaryPage() {
         <div className="flex-row items-center gap-12 mb-16 flex-shrink-0">
           <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
           <h2 className="mono text-accent m-0 text-lg">摘要管理</h2>
-          <span className="text-dim text-sm">{summaries.length} 条</span>
+          <span className="text-dim text-sm">{list.length} 条</span>
         </div>
 
         <div className="flex-row gap-8 mb-12 flex-shrink-0">
@@ -94,7 +90,7 @@ export default function SummaryPage() {
                       {entry.keyEvents?.length > 0 && (
                         <div>
                           <div className="sidebar-section-header text-xs mb-8">关键事件 ({entry.keyEvents.length})</div>
-                          <div className="flex-col" style={{ gap: 3 }}>
+                          <div className="flex-col gap-3">
                             {entry.keyEvents.map((ev, ei) => (
                               <div key={ei} className="text-sm card-sm flex-row" style={{ gap: 6, alignItems: 'flex-start' }}>
                                 <span className="text-accent2" style={{ fontWeight: 'bold', flexShrink: 0 }}>#{ei + 1}</span>

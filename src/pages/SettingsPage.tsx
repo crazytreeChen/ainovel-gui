@@ -125,7 +125,7 @@ export default function SettingsPage() {
               ['🔍', '诊断', !!binaryInfo?.available] as const,
               ['📦', '导出', !!binaryInfo?.available] as const,
             ]).map(([icon, label, ok]) => (
-              <span key={label} className="flex-row items-center" style={{ gap: 3 }}>
+              <span key={label} className="flex-row items-center gap-3">
                 <span style={{ color: ok ? '#7ec488' : '#e07060' }}>{ok ? '●' : '○'}</span>
                 <span className="text-dim">{icon} {label}</span>
               </span>
@@ -205,7 +205,7 @@ export default function SettingsPage() {
 
       <div className="card mb-12">
         <div className="sidebar-section-header mb-8">快捷导航</div>
-        <div className="flex-col" style={{ gap: 4 }}>
+        <div className="flex-col gap-4">
           <Link to="/settings/models" style={{ color: 'var(--color-accent2)', textDecoration: 'none', fontSize: 13 }}>→ 模型管理（配置 Provider）</Link>
         </div>
       </div>

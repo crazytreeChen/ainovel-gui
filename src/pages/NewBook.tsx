@@ -71,7 +71,7 @@ export default function NewBook() {
 
           <div className="flex-1">
             <div className="mb-16">
-              <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>书名</label>
+              <label className="text-muted text-sm mb-8 d-block">书名</label>
               <input value={name} onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
                 className="input-field text-sm" style={{ padding: '10px 14px', fontSize: 14 }}
@@ -85,7 +85,7 @@ export default function NewBook() {
         </div>
 
         <div className="mb-16">
-          <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>写作风格</label>
+          <label className="text-muted text-sm mb-8 d-block">写作风格</label>
           <div className="flex-row flex-wrap" style={{ gap: 6 }}>
             {[
               { key: 'default', label: '通用' },
@@ -101,7 +101,7 @@ export default function NewBook() {
         </div>
 
         <div className="mb-16">
-          <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>写作阶段</label>
+          <label className="text-muted text-sm mb-8 d-block">写作阶段</label>
           <div className="flex-row flex-wrap" style={{ gap: 6 }}>
             {[
               { key: 'init', label: getPhaseLabel('init') },
@@ -118,7 +118,7 @@ export default function NewBook() {
         </div>
 
         <div className="mb-16">
-          <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>标签</label>
+          <label className="text-muted text-sm mb-8 d-block">标签</label>
           <input value={tags} onChange={e => setTags(e.target.value)}
             placeholder="用逗号分隔，如: 玄幻, 后宫, 末日"
             className="input-field" />

@@ -86,7 +86,7 @@ export default function DetailPanel() {
           <div className="sidebar-section-header">配角生态</div>
           <div className="text-sm" style={{ lineHeight: 1.8 }}>
             <div className="text-dim mb-8">共 {cast.length} 个配角 · {cast.filter(c => c.promoted).length} 个已晋级</div>
-            <div className="flex-row flex-wrap" style={{ gap: 3 }}>
+            <div className="flex-row flex-wrap gap-3">
               {[...cast].sort((a, b) => b.appearanceCount - a.appearanceCount).slice(0, 12).map((c) => (
                 <span key={c.name} className="text-dim text-xs" style={{ padding: '1px 6px', background: 'var(--color-surface-2)', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 4, border: c.promoted ? '1px solid var(--color-accent)' : 'none', color: c.promoted ? 'var(--color-accent)' : 'var(--color-dim)' }}>
                   {c.name}

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
+import { useBookId } from '@/hooks/useBookId'
 
 interface WorldRule {
   id?: number; category: string; ruleText: string; rule_text?: string; boundary: string
 }
 
 export default function WorldRulesPage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'world' | 'style'>('world')
   const [worldRules, setWorldRules] = useState<WorldRule[]>([])
@@ -149,7 +150,7 @@ export default function WorldRulesPage() {
                   placeholder="添加散文风格描述..." className="input-field text-sm" style={{ flex: 1 }} />
                 <button className="welcome-mode-btn" onClick={() => { if (newProse.trim()) { setStyleRules(prev => ({ ...prev, prose: [...prev.prose, newProse.trim()] })); setNewProse('') } }}>添加</button>
               </div>
-              <div className="flex-row flex-wrap" style={{ gap: 4 }}>
+              <div className="flex-row flex-wrap gap-4">
                 {styleRules.prose.map((item) => (
                   <span key={item} className="tag" style={{ background: 'rgba(126,197,216,0.15)', color: '#7ec5d8' }}>
                     {item}
@@ -168,7 +169,7 @@ export default function WorldRulesPage() {
                   placeholder="添加对白风格描述..." className="input-field text-sm" style={{ flex: 1 }} />
                 <button className="welcome-mode-btn" onClick={() => { if (newDialogue.trim()) { setStyleRules(prev => ({ ...prev, dialogue: [...prev.dialogue, newDialogue.trim()] })); setNewDialogue('') } }}>添加</button>
               </div>
-              <div className="flex-row flex-wrap" style={{ gap: 4 }}>
+              <div className="flex-row flex-wrap gap-4">
                 {styleRules.dialogue.map((item) => {
                   if (typeof item === 'string') {
                     return <span key={item} className="tag" style={{ background: 'rgba(94,184,163,0.15)', color: '#5fb8a3' }}>{item}
@@ -192,7 +193,7 @@ export default function WorldRulesPage() {
                   placeholder="添加禁忌..." className="input-field text-sm" style={{ flex: 1 }} />
                 <button className="welcome-mode-btn" onClick={() => { if (newTaboo.trim()) { setStyleRules(prev => ({ ...prev, taboos: [...prev.taboos, newTaboo.trim()] })); setNewTaboo('') } }}>添加</button>
               </div>
-              <div className="flex-row flex-wrap" style={{ gap: 4 }}>
+              <div className="flex-row flex-wrap gap-4">
                 {styleRules.taboos.map((item) => (
                   <span key={item} className="tag" style={{ background: 'rgba(224,112,96,0.15)', color: '#e07060' }}>
                     {item}

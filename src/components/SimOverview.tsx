@@ -13,7 +13,7 @@ export default function SimOverview({ profile }: SimOverviewProps) {
         <div className="text-sm" style={{ lineHeight: 1.8 }}>
           {(profile.corpus?.sources || []).map((src) => (
             <div key={src.relativePath} className="text-dim" style={{ padding: '2px 0' }}>
-              <span className="text-accent" style={{ fontWeight: 'bold' }}>{src.title || src.relativePath}</span>
+              <span className="text-accent fw-bold">{src.title || src.relativePath}</span>
               <span className="text-xs ml-8">{src.sizeBytes ? `${(src.sizeBytes / 1024).toFixed(0)}KB` : ''}</span>
             </div>
           ))}

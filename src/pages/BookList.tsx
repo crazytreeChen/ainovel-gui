@@ -165,7 +165,7 @@ export default function BookList() {
             </div>
 
             <div className="mb-12">
-              <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>
+              <label className="text-muted text-sm mb-8 d-block">
                 请输入 <strong className="mono text-error">确认删除</strong> 后点击确认
               </label>
               <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)}

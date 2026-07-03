@@ -58,7 +58,7 @@ export default function ModelSwitchModal() {
 
         <div className="mb-16">
           <div className="sidebar-section-header mb-8">推理强度</div>
-          <div className="flex-row flex-wrap" style={{ gap: 4 }}>
+          <div className="flex-row flex-wrap gap-4">
             {THINKING_LEVELS.map((l) => (
               <button key={l.key} className={`welcome-mode-btn text-xs ${thinking === l.key ? 'active' : ''}`}
                 onClick={() => setThinking(l.key)}>{l.label}</button>

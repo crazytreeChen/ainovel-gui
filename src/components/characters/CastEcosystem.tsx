@@ -67,7 +67,7 @@ export default function CastEcosystem({ chars, cast, relations }: CastEcosystemP
 
       <div className="mb-16">
         <div className="sidebar-section-header mb-8">🥇 出场频次 TOP 10</div>
-        <div className="flex-col" style={{ gap: 4 }}>
+        <div className="flex-col gap-4">
           {[...cast].sort((a, b) => b.appearanceCount - a.appearanceCount).slice(0, 10).map((c, i) => {
             const maxCount = Math.max(...cast.map(x => x.appearanceCount), 1)
             return (
@@ -121,7 +121,7 @@ export default function CastEcosystem({ chars, cast, relations }: CastEcosystemP
                     <span className="text-dim text-xs">出场 {c.appearanceCount} 次</span>
                     {c.promoted && <span className="text-accent tag-sm" style={{ border: '1px solid var(--color-accent)' }}>晋级</span>}
                   </div>
-                  <div className="flex-row flex-wrap" style={{ gap: 4 }}>
+                  <div className="flex-row flex-wrap gap-4">
                     {filtered.map(rel => (
                       <span key={rel.target} className="text-dim" style={{ padding: '2px 8px', background: 'var(--color-surface-2)', borderRadius: 10, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
                         {rel.target}

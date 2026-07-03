@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
+import { useBookId } from '@/hooks/useBookId'
 
 export default function ChapterPage() {
-  const { id, num } = useParams<{ id: string; num: string }>()
+  const id = useBookId()
+  const { num } = useParams<{ num: string }>()
   const navigate = useNavigate()
   const chapterNum = parseInt(num || '1', 10)
 
@@ -99,7 +101,7 @@ export default function ChapterPage() {
           background: 'var(--color-surface)', border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius)', padding: 12, marginBottom: 12, flexShrink: 0,
         }}>
-          <div className="sidebar-section-header" style={{ marginBottom: 4 }}>写作构思</div>
+          <div className="sidebar-section-header mb-4">写作构思</div>
           <div className="text-dim" style={{ fontSize: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <span><span className="text-muted">目标:</span> {plan.goal || '-'}</span>
             <span><span className="text-muted">冲突:</span> {plan.conflict || '-'}</span>

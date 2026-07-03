@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import CastEcosystem from '@/components/characters/CastEcosystem'
 import RelationGraph from '@/components/characters/RelationGraph'
 import type { Character, CastEntry, Relation } from '@/types/characters'
 import { TIER_COLORS, TIER_LABELS, PLACEHOLDER_FACES } from '@/types/characters'
+import { useBookId } from '@/hooks/useBookId'
 
 export default function CharactersPage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'chars' | 'cast' | 'relations' | 'eco'>('chars')
   const [chars, setChars] = useState<Character[]>([])
@@ -156,7 +157,7 @@ export default function CharactersPage() {
                     style={{ padding: 12, borderRadius: 'var(--radius)',
                       background: selectedCast?.name === c.name ? 'var(--color-surface-2)' : 'var(--color-surface)',
                       border: `1px solid ${selectedCast?.name === c.name ? 'var(--color-accent)' : 'var(--color-border)'}` }}>
-                    <div className="flex-row items-center gap-8" style={{ marginBottom: 6 }}>
+                    <div className="flex-row items-center gap-8 mb-6">
                       <span style={{ fontSize: 18 }}>{PLACEHOLDER_FACES[i % PLACEHOLDER_FACES.length]}</span>
                       <div style={{ fontWeight: 'bold', fontSize: 14 }}>{c.name}</div>
                       {c.promoted && <span className="text-accent tag-sm" style={{ border: '1px solid var(--color-accent)' }}>晋级</span>}

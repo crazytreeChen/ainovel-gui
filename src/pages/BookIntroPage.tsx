@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import BookCover from '@/components/BookCover'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
+import { useBookId } from '@/hooks/useBookId'
 
 const PAGE_SIZE = 60
 
 export default function BookIntroPage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const [book, setBook] = useState<any>(null)
   const [chapters, setChapters] = useState<{ num: number; title: string; wordCount: number }[]>([])

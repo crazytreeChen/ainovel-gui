@@ -84,9 +84,8 @@ export default function EventFlow() {
         }
 
         return (
-          /* index acceptable: sliding-window event log, items lack stable IDs */
           <div
-            key={i}
+            key={`${ev.time}-${ev.category}-${ev.summary}-${ev.agent}`}
             className="event-line"
             style={{ color: lineColor }}
           >

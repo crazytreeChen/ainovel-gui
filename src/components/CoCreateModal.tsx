@@ -45,7 +45,7 @@ export default function CoCreateModal() {
 
           {/* 建议 */}
           <div style={{ marginTop: 16 }}>
-            <div className="text-muted" style={{ marginBottom: 4 }}>建议方向：</div>
+            <div className="text-muted mb-4">建议方向：</div>
             {suggestions.map((s, i) => (
               /* index acceptable: static constant array, never changes */
               <div

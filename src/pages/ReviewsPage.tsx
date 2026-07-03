@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
+import { useBookId } from '@/hooks/useBookId'
+import { useBookData } from '@/hooks/useBookData'
 
 interface DimensionScore {
   dimension: string; score: number; verdict: 'pass' | 'warning' | 'fail'; comment: string
@@ -23,23 +25,17 @@ const DIM_COLORS: Record<string, string> = {
 }
 
 export default function ReviewsPage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
-  const [reviews, setReviews] = useState<ReviewEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: reviews, loading } = useBookData<ReviewEntry[]>(
+    async (bid) => (await window.electronAPI?.getBookReviews(bid)) ?? [],
+    [],
+  )
+
   const [selectedIdx, setSelectedIdx] = useState(0)
 
-  useEffect(() => { loadReviews() }, [id])
-
-  async function loadReviews() {
-    if (!id || !window.electronAPI) return
-    setLoading(true)
-    const data = await window.electronAPI.getBookReviews(id)
-    setReviews(data || [])
-    setLoading(false)
-  }
-
-  const review = reviews[selectedIdx]
+  const reviewList = reviews ?? []
+  const review = reviewList[selectedIdx]
 
   return (
     <div className="flex-row p-24" style={{ height: '100vh', gap: 24 }}>
@@ -48,19 +44,19 @@ export default function ReviewsPage() {
         <div className="flex-row items-center gap-12 mb-16 flex-shrink-0">
           <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
           <h2 className="mono text-accent m-0 text-lg">评审管理</h2>
-          <span className="text-dim text-sm">{reviews.length} 条记录</span>
+          <span className="text-dim text-sm">{reviewList.length} 条记录</span>
         </div>
 
-        {loading ? <div className="text-dim">加载中...</div> : reviews.length === 0 ? (
+        {loading ? <div className="text-dim">加载中...</div> : reviewList.length === 0 ? (
           <div className="text-dim text-center mt-60">暂无评审记录</div>
         ) : (
           <div className="flex-1 flex-row gap-16 overflow-hidden">
             <div className="scroll-y border-right flex-shrink-0" style={{ width: 180, paddingRight: 8 }}>
-              {reviews.map((r) => (
+              {reviewList.map((r) => (
                 <div key={r.chapter} className="cursor-clickable mono text-sm"
-                  onClick={() => setSelectedIdx(reviews.indexOf(r))}
+                  onClick={() => setSelectedIdx(reviewList.indexOf(r))}
                   style={{ padding: '6px 8px', borderRadius: 'var(--radius-sm)', marginBottom: 2,
-                    background: reviews.indexOf(r) === selectedIdx ? 'var(--color-surface-2)' : 'transparent' }}>
+                    background: reviewList.indexOf(r) === selectedIdx ? 'var(--color-surface-2)' : 'transparent' }}>
                   <span className="text-accent">#{r.chapter}</span>
                   <span className="text-dim" style={{ marginLeft: 4 }}>
                     {r.verdict === 'accept' ? '✅' : r.verdict === 'polish' ? '🔧' : '🔁'}
@@ -73,7 +69,7 @@ export default function ReviewsPage() {
               <div className="flex-1 scroll-y">
                 <div className="flex-row items-center justify-between mb-12">
                   <div>
-                    <span className="mono text-accent text-lg" style={{ fontWeight: 'bold' }}>第{review.chapter}章 评审</span>
+                    <span className="mono text-accent text-lg fw-bold">第{review.chapter}章 评审</span>
                     <span className="text-dim text-sm ml-8">{review.scope}</span>
                   </div>
                   <span className="tag-sm" style={{ padding: '4px 12px', fontWeight: 'bold',
@@ -109,7 +105,7 @@ export default function ReviewsPage() {
                   <div>
                     <div className="sidebar-section-header text-xs mb-8">问题清单 ({review.issues.length})</div>
                     {review.issues.map((issue, i) => (
-                      <div key={i} style={{ padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius-sm)',
+                      <div key={`${issue.type}-${issue.severity}-${i}`} style={{ padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius-sm)',
                         background: 'var(--color-surface)', borderLeft: `3px solid ${issue.severity === 'critical' ? '#e07060' : issue.severity === 'error' ? '#e09b5a' : '#8a8175'}` }}>
                         <div className="flex-row gap-8 text-sm">
                           <span style={{ color: issue.severity === 'critical' ? '#e07060' : issue.severity === 'error' ? '#e09b5a' : '#8a8175', fontWeight: 'bold' }}>

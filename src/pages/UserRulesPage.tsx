@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import RulesEditor from '@/components/rules/RulesEditor'
 import PreferencesEditor from '@/components/rules/PreferencesEditor'
 import SourcesList from '@/components/rules/SourcesList'
 import UncertainList from '@/components/rules/UncertainList'
+import { useBookId } from '@/hooks/useBookId'
 
 interface WordRange { min: number; max: number }
 interface UserRulesStructured {
@@ -22,7 +23,7 @@ interface Directive {
 }
 
 export default function UserRulesPage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -161,7 +162,7 @@ export default function UserRulesPage() {
                 <div className="text-dim" style={{ textAlign: 'center', marginTop: 40 }}>暂无指令</div>
               ) : (
                 directives.map((d, i) => (
-                  <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: 12 }}>
+                  <div key={`${d.chapter}-${d.instruction}-${i}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: 12 }}>
                     <span className="text-accent mono">{d.chapter ? `#${d.chapter}` : '—'}</span>
                     <span className="text-dim" style={{ flex: 1, fontSize: 12 }}>{d.instruction}</span>
                     <span style={{ fontSize: 11, color: d.active ? 'var(--color-success)' : 'var(--color-dim)' }}>

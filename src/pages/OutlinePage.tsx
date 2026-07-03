@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
+import { useBookId } from '@/hooks/useBookId'
 
 interface OutlineEntry { chapter: number; title: string; coreEvent: string; hook: string; scenes: string[] }
 interface ArcOutline { index: number; title: string; goal: string; estimatedChapters?: number; chapters: OutlineEntry[] }
@@ -8,7 +9,7 @@ interface VolumeOutline { index: number; title: string; theme: string; arcs: Arc
 interface StoryCompass { endingDirection: string; openThreads: string[]; estimatedScale: string; lastUpdated: number }
 
 export default function OutlinePage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [layered, setLayered] = useState<VolumeOutline[]>([])
@@ -85,7 +86,7 @@ export default function OutlinePage() {
                     <div className="cursor-clickable flex-row items-center gap-8 card"
                       onClick={() => toggleVolume(vi)}>
                       <span className="text-dim">{expandedVols.has(vi) ? '▼' : '▶'}</span>
-                      <span className="text-accent mono" style={{ fontWeight: 'bold' }}>第{vol.index}卷: {vol.title}</span>
+                      <span className="text-accent mono fw-bold">第{vol.index}卷: {vol.title}</span>
                       <span className="text-dim text-xs">{vol.theme}</span>
                       <span className="text-dim text-xs ml-auto">{vol.arcs.length} 弧</span>
                     </div>
@@ -94,7 +95,7 @@ export default function OutlinePage() {
                         {vol.arcs.map((arc) => (
                           <div key={arc.index} className="mb-8" style={{ padding: '6px 8px', borderLeft: '2px solid var(--color-accent2)', marginLeft: 8 }}>
                             <div className="flex-row items-center gap-8">
-                              <span className="text-accent2 mono text-sm" style={{ fontWeight: 'bold' }}>
+                              <span className="text-accent2 mono text-sm fw-bold">
                                 弧{arc.index}: {arc.title}
                               </span>
                               {arc.estimatedChapters ? (

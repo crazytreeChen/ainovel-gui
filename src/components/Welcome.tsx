@@ -66,7 +66,7 @@ export default function Welcome() {
 
       {/* 示例 */}
       <div className="welcome-examples">
-        <div className="text-dim" style={{ marginBottom: 4 }}>示例：</div>
+        <div className="text-dim mb-4">示例：</div>
         {examples.map((ex, i) => (
           /* index acceptable: static constant array, never changes */
           <div

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
+import { useBookId } from '@/hooks/useBookId'
 import SimOverview from '@/components/SimOverview'
 import SimSources from '@/components/SimSources'
 import SimSynthesis from '@/components/SimSynthesis'
 import type { SimulationProfile } from '@/types/simulation'
 
 export default function SimulationPage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<SimulationProfile | null>(null)
   const [loading, setLoading] = useState(true)

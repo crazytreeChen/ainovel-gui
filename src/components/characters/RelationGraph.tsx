@@ -199,7 +199,7 @@ export default function RelationGraph({ relations, chars, cast }: RelationGraphP
         {Object.entries(RELATION_COLORS).map(([rel, color]) => {
           const count = filtered.filter(r => r.relation === rel).length
           if (count === 0) return null
-          return <span key={rel} className="flex-row items-center text-xs" style={{ gap: 4 }}>
+          return <span key={rel} className="flex-row items-center text-xs gap-4">
             <span style={{ width: 10, height: 3, background: color, display: 'inline-block', borderRadius: 2 }} />
             <span className="text-dim">{rel} ({count})</span>
           </span>

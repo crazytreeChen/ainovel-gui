@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
+import { useBookId } from '@/hooks/useBookId'
 
 interface TimelineEvent { chapter: number; time: string; event: string; characters: string[] }
 interface ForeshadowEntry { id: string; description: string; plantedAt: number; status: string; resolvedAt?: number }
@@ -11,7 +12,7 @@ const FS_COLORS: Record<string, string> = { planted: '#e5b449', advanced: '#7ec5
 const FS_LABELS: Record<string, string> = { planted: '已埋设', advanced: '推进中', resolved: '已回收' }
 
 export default function TimelinePage() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const [events, setEvents] = useState<TimelineEvent[]>([])
   const [foreshadows, setForeshadows] = useState<ForeshadowEntry[]>([])
@@ -96,9 +97,9 @@ export default function TimelinePage() {
               <div>
                 {relations.map((r) => (
                   <div key={`rel-${r.characterA}-${r.characterB}`} className="border-bottom" style={{ padding: '4px 0' }}>
-                    <span className="text-accent" style={{ fontWeight: 'bold' }}>{r.characterA}</span>
+                    <span className="text-accent fw-bold">{r.characterA}</span>
                     <span className="text-dim"> —[{r.relation}]— </span>
-                    <span className="text-accent2" style={{ fontWeight: 'bold' }}>{r.characterB}</span>
+                    <span className="text-accent2 fw-bold">{r.characterB}</span>
                     <span className="text-dim text-xs ml-8">#{r.chapter}</span>
                   </div>
                 ))}

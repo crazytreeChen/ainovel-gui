@@ -36,14 +36,14 @@ export default function BookEditModal({
             </div>
 
             <div className="mb-12">
-              <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>书名</label>
+              <label className="text-muted text-sm mb-8 d-block">书名</label>
               <input value={editName} onChange={e => setEditName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && onSave()}
                 className="input-field text-sm" autoFocus />
             </div>
 
             <div className="mb-12">
-              <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>写作风格</label>
+              <label className="text-muted text-sm mb-8 d-block">写作风格</label>
               <div className="flex-row flex-wrap" style={{ gap: 6 }}>
                 {[
                   { key: 'default', label: '通用' }, { key: 'fantasy', label: '仙侠/玄幻' },
@@ -56,7 +56,7 @@ export default function BookEditModal({
             </div>
 
             <div className="mb-12">
-              <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>写作阶段</label>
+              <label className="text-muted text-sm mb-8 d-block">写作阶段</label>
               <div className="flex-row flex-wrap" style={{ gap: 6 }}>
                 {['init', 'premise', 'outline', 'writing', 'complete'].map(k => (
                   <button key={k} className={`welcome-mode-btn text-sm ${editPhase === k ? 'active' : ''}`}
@@ -66,7 +66,7 @@ export default function BookEditModal({
             </div>
 
             <div className="mb-12">
-              <label className="text-muted text-sm mb-8" style={{ display: 'block' }}>标签</label>
+              <label className="text-muted text-sm mb-8 d-block">标签</label>
               <input value={editTags} onChange={e => setEditTags(e.target.value)}
                 placeholder="用逗号分隔，如: 玄幻, 后宫, 末日" className="input-field" />
             </div>
@@ -74,7 +74,7 @@ export default function BookEditModal({
 
           {/* 右侧：内容简介 */}
           <div className="flex-1 flex-col">
-            <label className="text-muted text-sm mb-8" style={{ display: 'block', fontWeight: 'bold' }}>内容简介</label>
+            <label className="text-muted text-sm mb-8 d-block fw-bold">内容简介</label>
             <textarea value={editPremise} onChange={e => setEditPremise(e.target.value)}
               placeholder="输入书籍内容简介..."
               className="textarea-field mono"

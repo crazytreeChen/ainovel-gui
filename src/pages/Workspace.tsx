@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import TopBar from '@/components/TopBar'
 import StatusSidebar from '@/components/StatusSidebar'
 import EventFlow from '@/components/EventFlow'
@@ -14,9 +14,10 @@ import ExportModal from '@/components/ExportModal'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useAppStore } from '@/stores/useAppStore'
 import { showToast } from '@/components/Toast'
+import { useBookId } from '@/hooks/useBookId'
 
 export default function Workspace() {
-  const { id } = useParams<{ id: string }>()
+  const id = useBookId()
   const navigate = useNavigate()
   const mode = useAppStore(s => s.mode)
   const setMode = useAppStore(s => s.setMode)
