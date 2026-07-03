@@ -134,7 +134,7 @@ function register(ipcMain: Electron.IpcMain) {
       const dbCh = getDB().getChapter(id, num)
       const dbDraft = getDB().getDraft(id, num)
       const dbPlan = getDB().getChapterPlan(id, num)
-      if (dbCh?.content) return { num, content: dbCh.content || '', draft: dbDraft || '', plan: dbPlan }
+      if (dbCh?.content) return { num, content: dbCh.content || '', draft: dbDraft?.content || '', plan: dbPlan, title: dbCh.title || '' }
     } catch (e: any) { log.error('get-book-chapter:sqlite', e) }
     const chFile = join(dir, 'chapters', `${String(num).padStart(2, '0')}.md`)
     const draftFile = join(dir, 'drafts', `${String(num).padStart(2, '0')}.draft.md`)
@@ -151,10 +151,10 @@ function register(ipcMain: Electron.IpcMain) {
     return { num, content, draft, plan }
   })
 
-  ipcMain.handle('save-book-chapter', async (_e: Electron.IpcMainInvokeEvent, id: string, num: number, content: string) => {
+  ipcMain.handle('save-book-chapter', async (_e: Electron.IpcMainInvokeEvent, id: string, num: number, content: string, title?: string) => {
     const dir = getBookDirById(id)
     if (!dir) return false
-    try { getDB().saveChapter(id, num, content, '') } catch (e: any) { log.error('save-chapter', e) }
+    try { getDB().saveChapter(id, num, content, title || '') } catch (e: any) { log.error('save-chapter', e) }
     // JSON 写（CLI 兼容）
     writeJSON(dir, `${String(num).padStart(2, '0')}.md`, content)
     return true

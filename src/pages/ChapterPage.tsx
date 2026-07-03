@@ -17,6 +17,7 @@ export default function ChapterPage() {
   const [content, setContent] = useState('')
   const [draft, setDraft] = useState('')
   const [plan, setPlan] = useState<any>(null)
+  const [chapterTitle, setChapterTitle] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
@@ -44,6 +45,7 @@ export default function ChapterPage() {
       setContent(data.content || '')
       setDraft(data.draft || '')
       setPlan(data.plan || null)
+      setChapterTitle(data.title || '')
     }
     setLoading(false)
   }
@@ -51,7 +53,7 @@ export default function ChapterPage() {
   async function handleSave() {
     if (!id || !window.electronAPI) return
     setSaving(true)
-    await window.electronAPI.saveBookChapter(id, chapterNum, content)
+    await window.electronAPI.saveBookChapter(id, chapterNum, content, chapterTitle)
     setSaving(false)
     showToast('已保存', 'success')
   }
@@ -103,6 +105,12 @@ export default function ChapterPage() {
           ))}
           {chapterList.length === 0 && <option value={chapterNum}>第{chapterNum}章</option>}
         </select>
+
+        {/* 章节标题编辑 */}
+        <input value={chapterTitle} onChange={e => setChapterTitle(e.target.value)}
+          placeholder="章节标题"
+          className="input-field text-sm"
+          style={{ flex: 1, maxWidth: 300, padding: '4px 10px', fontSize: 13, fontWeight: 'bold' }} />
 
         <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/chapters/${chapterNum + 1}`)}>下一章 →</button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>

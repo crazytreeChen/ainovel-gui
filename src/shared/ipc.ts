@@ -30,7 +30,7 @@ export interface ChapterItem {
 }
 
 export interface ChapterDetail {
-  num: number; content: string; draft: string; plan: any | null
+  num: number; content: string; draft: string; plan: any | null; title: string
 }
 
 // ── 角色 ──
@@ -85,7 +85,7 @@ export interface ElectronAPI {
   // 章节
   getBookChapters: (id: string) => Promise<ChapterItem[]>
   getBookChapter: (id: string, num: number) => Promise<ChapterDetail | null>
-  saveBookChapter: (id: string, num: number, content: string) => Promise<boolean>
+  saveBookChapter: (id: string, num: number, content: string, title?: string) => Promise<boolean>
 
   // 角色
   getBookCharacters: (id: string) => Promise<CharacterItem[]>
