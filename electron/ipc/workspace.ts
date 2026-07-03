@@ -262,9 +262,25 @@ function register(ipcMain: Electron.IpcMain) {
       }
     } catch (e: any) { log.error('get-user-rules', e); return null }
   })
-  ipcMain.handle('save-user-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string, rules: any) => {
-    try { getDB().saveUserRules(bookId, rules); return true }
-    catch (e: any) { log.error('save-user-rules', e); return false }
+  ipcMain.handle('save-user-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string, payload: any) => {
+    try {
+      const r = payload.rules || {}
+      getDB().saveUserRules(bookId, {
+        version: payload.version || 1,
+        status: payload.status || 'ready',
+        structured: {
+          forbiddenCharacters: r.forbiddenCharacters || [],
+          forbiddenPhrases: r.forbiddenPhrases || [],
+          wordCountRange: r.wordCountRange || { min: 0, max: 0 },
+          fatigueWords: r.fatigueWords || [],
+          tabooTopics: r.tabooTopics || [],
+        },
+        preferences: r.stylePreferences || '',
+        sources: r.sources || [],
+        uncertain: r.uncertain || [],
+      })
+      return true
+    } catch (e: any) { log.error('save-user-rules', e); return false }
   })
 
   // ── 配角名册 ──
