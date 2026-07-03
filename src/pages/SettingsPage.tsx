@@ -181,7 +181,7 @@ export default function SettingsPage() {
       {/* 版本更新 */}
       <div className="card mb-12">
         <div className="sidebar-section-header mb-8">版本更新</div>
-        <div className="text-dim mono text-sm mb-8">当前版本: v0.2.0</div>
+        <div className="text-dim mono text-sm mb-8">当前版本: v{__APP_VERSION__}</div>
 
         <button className="welcome-mode-btn active text-sm mb-8"
           onClick={handleCheckUpdate}
@@ -306,7 +306,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="text-dim text-xs mt-16 text-center">
-        <div className="mono">AINovel GUI v0.2.0</div>
+        <div className="mono">AINovel GUI v{__APP_VERSION__}</div>
       </div>
     </div>
   )
