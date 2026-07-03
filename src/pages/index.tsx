@@ -10,6 +10,7 @@ import UserRulesPage_ from './UserRulesPage'
 import WorldRulesPage_ from './WorldRulesPage'
 import SummaryPage_ from './SummaryPage'
 import BookIntroPage_ from './BookIntroPage'
+import DashboardPage_ from './DashboardPage'
 
 export const OutlinePage = OutlinePage_
 export const ChapterPage = ChapterPage_
@@ -23,3 +24,4 @@ export const UserRulesPage = UserRulesPage_
 export const WorldRulesPage = WorldRulesPage_
 export const SummaryPage = SummaryPage_
 export const BookIntroPage = BookIntroPage_
+export const DashboardPage = DashboardPage_

@@ -21,6 +21,7 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
     { path: `/books/${bookId}/rules`, label: '用户规则', icon: '📏' },
     { path: `/books/${bookId}/world`, label: '世界观/风格', icon: '🌍' },
     { path: `/books/${bookId}/summaries`, label: '摘要', icon: '📝' },
+    { path: `/books/${bookId}/dashboard`, label: '写作统计', icon: '📊' },
   ]
 
   return (
