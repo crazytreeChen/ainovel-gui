@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { AppMode, StartupMode, FocusPane, BinaryInfo } from '@/types'
 import type { ElectronAPI } from '@/shared/ipc'
 
-export type ThemeMode = 'light' | 'dark' | 'system'
+export type ThemeMode = 'light' | 'dark' | 'system' | 'warm' | 'cool' | 'eye-care'
 
 export interface ToastItem {
   id: number

@@ -294,7 +294,7 @@ export default function SettingsPage() {
       <div className="card mb-12">
         <div className="sidebar-section-header mb-8">界面主题</div>
         <div className="flex-row gap-8">
-          {([['dark', '暗黑'], ['light', '明亮'], ['system', '跟随系统']] as [ThemeMode, string][]).map(([key, label]) => (
+          {([['dark', '暗黑'], ['light', '明亮'], ['system', '跟随系统'], ['warm', '暖色'], ['cool', '冷色'], ['eye-care', '护眼']] as [ThemeMode, string][]).map(([key, label]) => (
             <button key={key} className={`welcome-mode-btn text-sm ${theme === key ? 'active' : ''}`}
               onClick={() => setTheme(key)}>{label}</button>
           ))}

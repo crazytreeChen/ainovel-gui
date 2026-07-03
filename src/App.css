@@ -46,6 +46,60 @@
   background: rgba(184, 134, 11, 0.1);
 }
 
+/* 暖色主题 */
+[data-theme="warm"] {
+  --color-bg: #f5efe0;
+  --color-surface: #ede4d0;
+  --color-surface-2: #e0d4bc;
+  --color-text: #4a3f35;
+  --color-dim: #9a8b78;
+  --color-muted: #8a7a68;
+  --color-accent: #c8954a;
+  --color-accent2: #5a8a72;
+  --color-success: #5a8a72;
+  --color-error: #c05040;
+  --color-review: #a07030;
+  --color-tool: #4a7a8a;
+  --color-context: #7a5a8a;
+  --color-border: #d4c8b0;
+}
+
+/* 冷色主题 */
+[data-theme="cool"] {
+  --color-bg: #1a1e2e;
+  --color-surface: #222840;
+  --color-surface-2: #2a3050;
+  --color-text: #c8d0e0;
+  --color-dim: #7888a0;
+  --color-muted: #8898b0;
+  --color-accent: #60a8e0;
+  --color-accent2: #50b8a0;
+  --color-success: #60b880;
+  --color-error: #d06070;
+  --color-review: #c09050;
+  --color-tool: #70b0d0;
+  --color-context: #9080c0;
+  --color-border: #303858;
+}
+
+/* 护眼主题 */
+[data-theme="eye-care"] {
+  --color-bg: #c8d8b8;
+  --color-surface: #d0e0c0;
+  --color-surface-2: #d8e8c8;
+  --color-text: #3a4030;
+  --color-dim: #809070;
+  --color-muted: #708060;
+  --color-accent: #7a9a50;
+  --color-accent2: #609080;
+  --color-success: #5a8a50;
+  --color-error: #c06040;
+  --color-review: #a08040;
+  --color-tool: #5090a0;
+  --color-context: #8070a0;
+  --color-border: #b0c0a0;
+}
+
 * {
   margin: 0;
   padding: 0;
