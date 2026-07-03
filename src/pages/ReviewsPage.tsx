@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
 import { useBookData } from '@/hooks/useBookData'
+import RadarChart from '@/components/RadarChart'
 
 interface DimensionScore {
   dimension: string; score: number; verdict: 'pass' | 'warning' | 'fail'; comment: string
@@ -79,19 +80,27 @@ export default function ReviewsPage() {
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 16 }}>
-                  {['consistency', 'character', 'pacing', 'continuity', 'foreshadow', 'hook', 'aesthetic'].map(dim => {
-                    const d = review.dimensions?.find(dd => dd.dimension === dim)
-                    return (
-                      <div key={dim} className="card text-center" style={{ padding: '8px 10px' }}>
-                        <div className="text-dim text-xs mb-8">{DIM_LABELS[dim] || dim}</div>
-                        <div style={{ fontSize: 22, fontWeight: 'bold', color: DIM_COLORS[dim] }}>{d?.score ?? '-'}</div>
-                        <div className="text-2xs" style={{ color: d?.verdict === 'pass' ? '#7ec488' : d?.verdict === 'warning' ? '#e09b5a' : '#e07060' }}>
-                          {d?.verdict === 'pass' ? '通过' : d?.verdict === 'warning' ? '警告' : '失败'}
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'flex-start' }}>
+                  <RadarChart
+                    dimensions={review.dimensions || []}
+                    labels={DIM_LABELS}
+                    colors={DIM_COLORS}
+                    size={180}
+                  />
+                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+                    {['consistency', 'character', 'pacing', 'continuity', 'foreshadow', 'hook', 'aesthetic'].map(dim => {
+                      const d = review.dimensions?.find(dd => dd.dimension === dim)
+                      return (
+                        <div key={dim} className="card text-center" style={{ padding: '8px 10px' }}>
+                          <div className="text-dim text-xs mb-8">{DIM_LABELS[dim] || dim}</div>
+                          <div style={{ fontSize: 22, fontWeight: 'bold', color: DIM_COLORS[dim] }}>{d?.score ?? '-'}</div>
+                          <div className="text-2xs" style={{ color: d?.verdict === 'pass' ? '#7ec488' : d?.verdict === 'warning' ? '#e09b5a' : '#e07060' }}>
+                            {d?.verdict === 'pass' ? '通过' : d?.verdict === 'warning' ? '警告' : '失败'}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
 
                 {review.summary && (
