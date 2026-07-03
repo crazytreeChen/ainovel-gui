@@ -32,6 +32,7 @@ export default function Workspace() {
   const pauseWriting = useAppStore(s => s.pauseWriting)
   const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
   const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [fullscreen, setFullscreen] = useState(false)
   const [book, setBook] = useState<{ name: string; completedCount: number } | null>(null)
 
   useEffect(() => {
@@ -64,15 +65,24 @@ export default function Workspace() {
   const isComplete = snapshot.phase === 'complete'
 
   return (
-    <div className="flex-row p-24" style={{ height: '100vh', gap: 24 }}>
-      <BookNavSidebar bookId={id || ''} />
-      <div className="flex-1 flex-col overflow-hidden" style={{ gap: 24 }}>
+    <div className={`flex-row p-24 ${fullscreen ? '' : ''}`} style={{ height: '100vh', gap: fullscreen ? 0 : 24 }}>
+      {!fullscreen && <BookNavSidebar bookId={id || ''} />}
+      <div className="flex-1 flex-col overflow-hidden" style={{ gap: fullscreen ? 0 : 24 }}>
         {/* 顶栏 */}
-        <div className="top-bar mb-8" style={{ padding: 0 }}><TopBar bookName={book?.name} /></div>
+        <div className="top-bar mb-8" style={{ padding: 0 }}>
+          <div className="flex-row items-center gap-8">
+            <TopBar bookName={book?.name} />
+            <button className="welcome-mode-btn text-xs" onClick={() => setFullscreen(s => !s)}
+              style={{ flexShrink: 0 }}>
+              {fullscreen ? '⊞ 退出全屏' : '⊟ 全屏写作'}
+            </button>
+          </div>
+        </div>
 
         {/* 主体内容 */}
         <div className="flex-1 flex-row overflow-hidden">
-          {/* 状态侧栏 */}
+          {/* 状态侧栏 — 全屏时隐藏 */}
+          {!fullscreen && (<>
           {!isRunning && !isComplete && (
             <div className="state-panel">
               <button onClick={handleResume} className="btn btn-primary btn-block mb-8">
@@ -96,8 +106,9 @@ export default function Workspace() {
             <div className="stream-panel"><StreamOutput /></div>
           </div>
 
-          {/* 右侧详情 */}
-          <div className="detail-panel"><DetailPanel /></div>
+          {/* 右侧详情 — 全屏时隐藏 */}
+          {!fullscreen && <div className="detail-panel"><DetailPanel /></div>}
+          </>)}
         </div>
 
         {/* 底部输入 */}
