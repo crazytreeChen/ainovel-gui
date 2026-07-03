@@ -3,22 +3,21 @@ export {}
 /**
  * 书籍管理 IPC 处理器
  */
-const { state, getDB, getAinovelBinary, GUI_DATA_DIR, home } = require('../context')
+const { state, getDB, GUI_DATA_DIR, home } = require('../context')
 const { createLogger } = require('../logger')
 const { validatePath } = require('../path-validator')
-const { join, dirname } = require('path')
-const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
-const os = require('os')
+const { join } = require('path')
+const { existsSync, mkdirSync, readFileSync, readdirSync, copyFileSync } = require('fs')
 
 const log = createLogger('ipc:books')
 
 function register(ipcMain: Electron.IpcMain) {
-  ipcMain.handle('list-books', async () => {
+  ipcMain.handle('list-books', () => {
     try { return getDB().listBooks() }
     catch (e: any) { log.error('list-books', e); return [] }
   })
 
-  ipcMain.handle('create-book', async (_e: Electron.IpcMainInvokeEvent, name: string, style: string, phase: string, premise: string, tags: string) => {
+  ipcMain.handle('create-book', (_e: Electron.IpcMainInvokeEvent, name: string, style: string, phase: string, premise: string, tags: string) => {
     const crypto = require('crypto')
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
@@ -29,16 +28,16 @@ function register(ipcMain: Electron.IpcMain) {
     return { ...book, completedCount: 0 }
   })
 
-  ipcMain.handle('delete-book', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
+  ipcMain.handle('delete-book', (_e: Electron.IpcMainInvokeEvent, id: string) => {
     getDB().deleteBook(id)
     return true
   })
 
-  ipcMain.handle('get-book', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
+  ipcMain.handle('get-book', (_e: Electron.IpcMainInvokeEvent, id: string) => {
     return getDB().getBook(id)
   })
 
-  ipcMain.handle('update-book', async (_e: Electron.IpcMainInvokeEvent, id: string, fields: Record<string, any>) => {
+  ipcMain.handle('update-book', (_e: Electron.IpcMainInvokeEvent, id: string, fields: Record<string, any>) => {
     try { getDB().updateBook(id, fields); return true }
     catch (e: any) { log.error('update-book', e); return false }
   })

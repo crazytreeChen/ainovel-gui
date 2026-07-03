@@ -11,7 +11,7 @@ export default [
         sourceType: 'module',
         ecmaFeatures: { jsx: true },
         project: './tsconfig.json',
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: new URL('.', import.meta.url).pathname.slice(0, -1),
       },
       globals: {
         browser: true,
@@ -61,13 +61,34 @@ export default [
       'public/**',
       '*.config.{js,cjs,ts,mjs}',
       'scripts/**',
+      'electron/**/*.test.ts',
+      'electron/**/*.spec.ts',
     ],
   },
   {
     files: ['electron/**/*'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'commonjs',
+        ecmaFeatures: { jsx: true },
+        project: './electron/tsconfig.json',
+        tsconfigRootDir: new URL('.', import.meta.url).pathname.slice(0, -1),
+      },
+      globals: { node: true },
+    },
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'off',
+      '@typescript-eslint/require-await': 'off',
     },
   },
   {

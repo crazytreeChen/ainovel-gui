@@ -38,7 +38,7 @@ function getDB() {
 }
 
 function getAinovelBinary() {
-  const { execSync, exec } = require('child_process')
+  const { execSync } = require('child_process')
   const os = require('os')
   const { join: pJoin } = require('path')
   const ext = os.platform() === 'win32' ? '.exe' : ''
@@ -46,7 +46,6 @@ function getAinovelBinary() {
 
   // 1) 打包后的 extraResources（electron-builder 将 build/ainovel-cli/bin/ 复制到 Resources/ainovel-cli/）
   try {
-    const resourcesPath = require('electron').app ? require('electron').app.getAppPath() : ''
     const packaged = pJoin(process.resourcesPath || '', 'ainovel-cli', binName)
     if (existsSync(packaged)) return packaged
   } catch {}
