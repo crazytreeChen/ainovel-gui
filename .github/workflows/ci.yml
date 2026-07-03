@@ -11,6 +11,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: 22.12.0
@@ -23,6 +26,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: 22.12.0
@@ -37,6 +43,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: 22.12.0
@@ -49,11 +58,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: 22.12.0
           cache: 'npm'
-      # 新增Go环境，适配build-cli编译
+      # 安装Go 1.21 国内加速
       - name: Setup Go 1.21
         uses: actions/setup-go@v5
         env:
@@ -61,7 +73,7 @@ jobs:
         with:
           go-version: '1.21'
           cache: true
-      # 注入Go到全局PATH，保证脚本可识别go命令
+      # 全局注入Go环境变量，全步骤生效
       - name: Export Go PATH & Verify
         run: |
           echo "GOROOT=$GOROOT" >> $GITHUB_ENV
