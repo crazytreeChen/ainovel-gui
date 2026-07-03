@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.6.1",
   "release_notes": "## v0.6.0 更新内容\n\n### 🚀 技术升级\n- Electron 31 → 41\n- Vite 5 → 8\n- React Router 7 / Zustand 4 / Lucide React 1.x\n- 状态管理重构：useAppStore 拆分为 4 个领域 store\n- 自定义 hooks 提取：useBookCRUD / useIPCListeners / useKeyboardShortcuts / useCommandPalette\n\n### 🔧 修复\n- TopBar 版本号从 package.json 动态读取\n- forceGraph.ts 类型安全修正\n- scripts/*.js → *.cjs（ESM/CJS 兼容）\n- 构建流程修复（Electron 主进程 + scripts）\n\n### 📦 构建\n- macOS arm64: DMG + zip\n- Windows x64: NSIS 安装包 + zip",
   "release_date": "2026-07-03",
   "downloads": {
