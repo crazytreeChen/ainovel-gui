@@ -40,29 +40,50 @@ function getDB() {
 function getAinovelBinary() {
   const { execSync } = require('child_process')
   const os = require('os')
-  const { join: pJoin } = require('path')
+  const { join: pJoin, resolve } = require('path')
   const ext = os.platform() === 'win32' ? '.exe' : ''
   const binName = 'ainovel-cli' + ext
 
-  // 1) 打包后的 extraResources（electron-builder 将 build/ainovel-cli/bin/ 复制到 Resources/ainovel-cli/）
+  // 白名单路径前缀：仅允许这些目录下的二进制
+  const h = app.getPath('home')
+  const allowedPrefixes = [
+    pJoin(process.resourcesPath || '', 'ainovel-cli'),
+    pJoin(__dirname, '..', 'build', 'ainovel-cli', 'bin'),
+    '/usr/local/bin',
+    '/usr/bin',
+    pJoin(h, 'go', 'bin'),
+    pJoin(h, '.local', 'bin'),
+  ]
+  if (os.platform() === 'win32') {
+    allowedPrefixes.push(
+      pJoin(h, 'AppData', 'Local', 'ainovel-cli'),
+      pJoin(h, 'go', 'bin'),
+    )
+  }
+
+  function isAllowed(absPath: string): boolean {
+    const resolved = resolve(absPath)
+    return allowedPrefixes.some(prefix => resolved.startsWith(prefix))
+  }
+
+  // 1) 打包后的 extraResources
   try {
     const packaged = pJoin(process.resourcesPath || '', 'ainovel-cli', binName)
-    if (existsSync(packaged)) return packaged
+    if (existsSync(packaged) && isAllowed(packaged)) return packaged
   } catch {}
 
-  // 2) 开发构建位置（scripts/build-cli.cjs 输出目录）
+  // 2) 开发构建位置
   const devBin = pJoin(__dirname, '..', 'build', 'ainovel-cli', 'bin', binName)
-  if (existsSync(devBin)) return devBin
+  if (existsSync(devBin) && isAllowed(devBin)) return devBin
 
-  // 3) PATH
+  // 3) PATH（仅接受白名单内的路径）
   try {
     const cmd = os.platform() === 'win32' ? 'where ainovel-cli' : 'which ainovel-cli'
     const which = execSync(cmd, { encoding: 'utf8' }).trim().split('\n')[0]
-    if (which) return which
+    if (which && isAllowed(which)) return which
   } catch { log.debug('ainovel-cli not in PATH') }
 
   // 4) 常见位置
-  const h = app.getPath('home')
   const candidates = os.platform() === 'win32'
     ? [pJoin(h, 'AppData', 'Local', 'ainovel-cli', binName),
        pJoin(h, 'go', 'bin', binName)]
@@ -70,10 +91,10 @@ function getAinovelBinary() {
        pJoin(h, 'go', 'bin', binName),
        pJoin(h, '.local', 'bin', binName)]
   for (const c of candidates) {
-    if (existsSync(c)) return c
+    if (existsSync(c) && isAllowed(c)) return c
   }
 
-  // 5) 降级到任何能找到的 ainovel-cli（fallback）
+  // 5) 降级（仅二进制名，依赖 PATH 查找）
   return binName
 }
 
