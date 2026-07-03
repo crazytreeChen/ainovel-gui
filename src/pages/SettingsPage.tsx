@@ -16,6 +16,10 @@ export default function SettingsPage() {
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [downloadPath, setDownloadPath] = useState('')
   const [updateError, setUpdateError] = useState('')
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [restoreBusy, setRestoreBusy] = useState(false)
+  const [backupMsg, setBackupMsg] = useState('')
+  const [restoreMsg, setRestoreMsg] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -72,6 +76,31 @@ export default function SettingsPage() {
   async function handleInstall() {
     if (!window.electronAPI || !downloadPath) return
     await window.electronAPI.installUpdate(downloadPath)
+  }
+
+  async function handleBackup() {
+    if (!window.electronAPI) return
+    setBackupBusy(true)
+    setBackupMsg('')
+    try {
+      const result = await window.electronAPI.backupData()
+      if (result.success) setBackupMsg(`✅ 已备份到: ${result.path}`)
+      else setBackupMsg(`❌ ${result.error}`)
+    } catch (e: any) { setBackupMsg(`❌ ${e.message}`) }
+    setBackupBusy(false)
+  }
+
+  async function handleRestore() {
+    if (!window.electronAPI) return
+    if (!confirm('⚠️ 恢复数据将覆盖当前所有数据，确认继续？')) return
+    setRestoreBusy(true)
+    setRestoreMsg('')
+    try {
+      const result = await window.electronAPI.restoreData()
+      if (result.success) setRestoreMsg('✅ 数据已恢复，建议重启应用')
+      else setRestoreMsg(`❌ ${result.error}`)
+    } catch (e: any) { setRestoreMsg(`❌ ${e.message}`) }
+    setRestoreBusy(false)
   }
 
   return (
@@ -189,6 +218,32 @@ export default function SettingsPage() {
 
         {updateInfo && !updateInfo.available && !updateInfo.error && (
           <div className="text-success text-sm">✅ 已是最新版本</div>
+        )}
+      </div>
+
+      {/* 数据备份与恢复 */}
+      <div className="card mb-12">
+        <div className="sidebar-section-header mb-8">💾 数据备份与恢复</div>
+        <div className="text-dim text-xs mb-8">
+          导出当前所有数据为 ZIP 压缩包，或从备份 ZIP 恢复
+        </div>
+        <div className="flex-row gap-8">
+          <button className="welcome-mode-btn active text-sm"
+            onClick={handleBackup} disabled={backupBusy}>
+            {backupBusy ? '导出中...' : '📤 导出数据快照'}
+          </button>
+          <button className="welcome-mode-btn text-sm"
+            onClick={handleRestore} disabled={restoreBusy}
+            style={{ color: 'var(--color-error)' }}>
+            {restoreBusy ? '恢复中...' : '📥 从快照恢复'}
+          </button>
+        </div>
+        {backupMsg && <div className="text-xs mt-8" style={{ color: backupMsg.startsWith('✅') ? 'var(--color-success)' : 'var(--color-error)' }}>{backupMsg}</div>}
+        {restoreMsg && <div className="text-xs mt-8" style={{ color: restoreMsg.startsWith('✅') ? 'var(--color-success)' : 'var(--color-error)' }}>{restoreMsg}</div>}
+        {backupMsg && backupMsg.includes('已备份') && (
+          <div className="text-dim text-xs mt-8">
+            💡 ZIP 文件包含 ainovel-gui/ 目录下的所有数据（数据库 + 书籍文件）
+          </div>
         )}
       </div>
 

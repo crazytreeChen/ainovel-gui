@@ -171,6 +171,10 @@ export interface ElectronAPI {
   installUpdate: (path: string) => Promise<{ success: boolean; error?: string }>
   onDownloadProgress: (callback: (data: DownloadProgress) => void) => () => void
 
+  // 数据备份与恢复
+  backupData: () => Promise<{ success: boolean; path?: string; error?: string }>
+  restoreData: () => Promise<{ success: boolean; error?: string }>
+
   // 事件监听
   onProcessExited: (callback: () => void) => () => void
   onSnapshotUpdate: (callback: (data: UISnapshot) => void) => () => void

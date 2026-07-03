@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "archiver": "^8.0.0",
     "better-sqlite3": "^12.11.1",
     "lucide-react": "^1.23.0",
     "react": "^18.3.1",

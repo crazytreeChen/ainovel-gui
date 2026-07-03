@@ -7,7 +7,7 @@ const { state, getDB, getAinovelBinary, GUI_DATA_DIR, home } = require('../conte
 const { validatePath } = require('../path-validator')
 const { createLogger } = require('../logger')
 const { join, dirname, resolve, extname, sep } = require('path')
-const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync } = require('fs')
+const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync, statSync } = require('fs')
 const { execFileSync, spawn } = require('child_process')
 import { ExecFileSyncOptions } from 'child_process'
 const os = require('os')
@@ -252,6 +252,78 @@ function register(ipcMain: Electron.IpcMain) {
       if (os.platform() === 'win32') { require('child_process').spawn(filePath, ['/S'], { detached: true, stdio: 'ignore' }); return { success: true } }
       else { require('electron').shell.openPath(filePath); return { success: true } }
     } catch (e: any) { return { success: false, error: e.message || '启动安装失败' } }
+  })
+
+  // ── 数据备份与恢复 ──
+  ipcMain.handle('backup-data', async () => {
+    try {
+      const archiver = require('archiver')
+      const { dialog } = require('electron')
+      const defaultName = `ainovel-backup-${new Date().toISOString().slice(0, 10)}.zip`
+      const result = await dialog.showSaveDialog({
+        title: '导出数据快照',
+        defaultPath: defaultName,
+        filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+      })
+      if (result.canceled || !result.filePath) return { success: false, error: '取消' }
+      return new Promise<{ success: boolean; path?: string; error?: string }>((resolve) => {
+        const output = require('fs').createWriteStream(result.filePath!)
+        const archive = archiver('zip', { zlib: { level: 6 } })
+        output.on('close', () => resolve({ success: true, path: result.filePath!, error: undefined }))
+        archive.on('error', (err: Error) => resolve({ success: false, error: err.message }))
+        archive.pipe(output)
+        archive.directory(GUI_DATA_DIR, 'ainovel-gui')
+        archive.finalize()
+      })
+    } catch (e: any) { return { success: false, error: e.message || '备份失败' } }
+  })
+
+  ipcMain.handle('restore-data', async () => {
+    try {
+      const { dialog } = require('electron')
+      const result = await dialog.showOpenDialog({
+        title: '从快照恢复数据',
+        filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+        properties: ['openFile'],
+      })
+      if (result.canceled || result.filePaths.length === 0) return { success: false, error: '取消' }
+      const zipPath = result.filePaths[0]
+      // 解压前先备份当前数据库（以防恢复失败）
+      const crypto = require('crypto')
+      const backupName = `pre-restore-${Date.now()}.db`
+      const fs = require('fs')
+      const { join: pJoin } = require('path')
+      if (fs.existsSync(pJoin(GUI_DATA_DIR, 'ainovel.db'))) {
+        fs.copyFileSync(pJoin(GUI_DATA_DIR, 'ainovel.db'), pJoin(GUI_DATA_DIR, backupName))
+      }
+      // 解压 zip 覆盖 GUI_DATA_DIR
+      const { execFileSync } = require('child_process')
+      execFileSync('unzip', ['-o', zipPath, '-d', require('path').dirname(GUI_DATA_DIR)], { shell: false, stdio: 'ignore' })
+      // 重启数据库连接
+      const dbPath = pJoin(GUI_DATA_DIR, 'ainovel-gui', 'ainovel.db')
+      if (fs.existsSync(dbPath)) {
+        // 如果 zip 内包含 ainovel-gui/ 目录，将其内容移到 GUI_DATA_DIR
+        const srcDir = pJoin(GUI_DATA_DIR, 'ainovel-gui')
+        if (fs.existsSync(srcDir) && fs.statSync(srcDir).isDirectory()) {
+          const entries = fs.readdirSync(srcDir)
+          for (const entry of entries) {
+            const src = pJoin(srcDir, entry)
+            const dst = pJoin(GUI_DATA_DIR, entry)
+            if (fs.existsSync(dst)) {
+              // 合并目录
+              if (fs.statSync(dst).isDirectory()) continue // 跳过已存在的目录
+              fs.unlinkSync(dst)
+            }
+            fs.renameSync(src, dst)
+          }
+          fs.rmdirSync(srcDir)
+        }
+      }
+      // 重启 DB
+      state.db = null
+      getDB()
+      return { success: true }
+    } catch (e: any) { return { success: false, error: e.message || '恢复失败' } }
   })
 }
 
