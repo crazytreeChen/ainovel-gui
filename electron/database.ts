@@ -145,10 +145,13 @@ class AppDatabase {
       this.database.exec(SCHEMA_SQL)
       this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', '1')
     }
-    // 迁移：添加 tags 列（如果不存在）
-    try { this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""') } catch (_e) { /* 列已存在，忽略错误 */ }
-    // 迁移：添加 avatar 列（如果不存在）
-    try { this.database.exec('ALTER TABLE characters_t ADD COLUMN avatar TEXT DEFAULT ""') } catch (_e) { /* 列已存在，忽略错误 */ }
+    // 用 PRAGMA table_info 检查列是否存在，避免 try/catch 浪费
+    const hasColumn = (table: string, col: string) => {
+      const cols = this.database.prepare(`PRAGMA table_info(${table})`).all() as any[]
+      return cols.some((c: any) => c.name === col)
+    }
+    if (!hasColumn('books', 'tags')) this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""')
+    if (!hasColumn('characters_t', 'avatar')) this.database.exec('ALTER TABLE characters_t ADD COLUMN avatar TEXT DEFAULT ""')
   }
 
   listBooks() {

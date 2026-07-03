@@ -33,7 +33,11 @@ function register(ipcMain: Electron.IpcMain) {
         state.ainovelProcess = null
         if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', code)
       })
-      state.ainovelProcess.on('error', () => { state.ainovelProcess = null })
+      state.ainovelProcess.on('error', (err: Error) => {
+        log.error('start-writing:error', err.message)
+        state.ainovelProcess = null
+        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', -1)
+      })
       startRuntimeSync()
       return true
     } catch (e: any) { log.error('start-writing:spawn', e); return false }
@@ -96,7 +100,11 @@ function register(ipcMain: Electron.IpcMain) {
         stopRuntimeSync(); state.ainovelProcess = null
         if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', code)
       })
-      state.ainovelProcess.on('error', () => { state.ainovelProcess = null })
+      state.ainovelProcess.on('error', (err: Error) => {
+        log.error('resume-writing:error', err.message)
+        stopRuntimeSync(); state.ainovelProcess = null
+        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', -1)
+      })
       startRuntimeSync()
       return true
     } catch (e: any) { log.error('resume-writing:spawn', e); return false }
