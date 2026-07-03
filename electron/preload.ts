@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listBooks: () => ipcRenderer.invoke('list-books'),
   createBook: (name: string, style: string, phase?: string, premise?: string, tags?: string) => ipcRenderer.invoke('create-book', name, style, phase, premise, tags),
   deleteBook: (id: string) => ipcRenderer.invoke('delete-book', id),
+  getBook: (id: string) => ipcRenderer.invoke('get-book', id),
   getBookDir: (id: string) => ipcRenderer.invoke('get-book-dir', id),
   getGuiDataDir: () => ipcRenderer.invoke('get-gui-data-dir'),
 

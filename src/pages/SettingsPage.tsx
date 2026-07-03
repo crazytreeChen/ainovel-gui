@@ -119,7 +119,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-24" style={{ maxWidth: 640, margin: '0 auto' }}>
+    <div className="scroll-y p-24" style={{ maxWidth: 640, margin: '0 auto', height: '100vh' }}>
       <div className="flex-row items-center gap-12 mb-24">
         <button className="welcome-mode-btn" onClick={() => navigate('/')}>← 返回</button>
         <h2 className="mono text-accent m-0 text-lg">系统设置</h2>
