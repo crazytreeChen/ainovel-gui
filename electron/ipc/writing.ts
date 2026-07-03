@@ -12,7 +12,7 @@ const { spawn } = require('child_process')
 const log = createLogger('ipc:writing')
 
 function register(ipcMain: Electron.IpcMain) {
-  ipcMain.handle('start-writing', async (_e: Electron.IpcMainInvokeEvent, prompt: string, bookId: string) => {
+  ipcMain.handle('start-writing', async (_e: Electron.IpcMainInvokeEvent, _prompt: string, bookId: string) => {
     await stopAinovelProcess()
     const binary = getAinovelBinary()
     if (!existsSync(binary)) return false
@@ -25,7 +25,7 @@ function register(ipcMain: Electron.IpcMain) {
     }
     if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true })
     state.outputDir = cwd
-    const args = ['--headless', '--prompt', prompt]
+    const args = ['--headless']
     if (state.configPath) args.push('--config', state.configPath)
     try {
       state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
