@@ -4,6 +4,7 @@ import BookNavSidebar from '@/components/BookNavSidebar'
 import CastEcosystem from '@/components/characters/CastEcosystem'
 import RelationGraph from '@/components/characters/RelationGraph'
 import CharacterEditor from '@/components/characters/CharacterEditor'
+import ImageViewer from '@/components/ImageViewer'
 import type { Character, CastEntry, Relation } from '@/types/characters'
 import { TIER_COLORS, TIER_LABELS, PLACEHOLDER_FACES } from '@/types/characters'
 import { useBookId } from '@/hooks/useBookId'
@@ -23,6 +24,7 @@ export default function CharactersPage() {
   const [relLoading, setRelLoading] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editChar, setEditChar] = useState<Character | null>(null)
+  const [viewerSrc, setViewerSrc] = useState<string | null>(null)
 
   useEffect(() => { loadChars(); loadCast(); loadRelations() }, [id])
 
@@ -120,15 +122,31 @@ export default function CharactersPage() {
               <div className="flex-1 flex-row gap-16 overflow-hidden">
                 <div className="scroll-y border-right" style={{ width: '40%', paddingRight: 12 }}>
                   {filtered.map((c) => (
-                    <div key={c.name} className="cursor-clickable"
+                    <div key={c.name} className="cursor-clickable flex-row items-center gap-10"
                       onClick={() => setSelected(c)}
                       style={{ padding: '10px 12px', marginBottom: 4, borderRadius: 'var(--radius)',
                         background: selected?.name === c.name ? 'var(--color-surface-2)' : 'transparent',
                         border: '1px solid transparent', borderLeft: `3px solid ${TIER_COLORS[c.tier] || '#666'}` }}>
-                      <div style={{ fontWeight: 'bold', fontSize: 14 }}>{c.name}</div>
-                      <div className="text-dim text-xs flex-row gap-8">
-                        <span style={{ color: TIER_COLORS[c.tier] }}>{TIER_LABELS[c.tier]}</span>
-                        {c.role && <span>{c.role}</span>}
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+                        background: c.avatar ? 'transparent' : 'var(--color-surface)',
+                        border: c.avatar ? '1px solid var(--color-border)' : 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: c.avatar ? 'zoom-in' : 'default',
+                      }}
+                        onClick={e => { if (c.avatar) { e.stopPropagation(); setViewerSrc(c.avatar!) } }}>
+                        {c.avatar ? (
+                          <img src={c.avatar} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: 16, opacity: 0.4 }}>{PLACEHOLDER_FACES[chars.indexOf(c) % PLACEHOLDER_FACES.length]}</span>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 'bold', fontSize: 14 }}>{c.name}</div>
+                        <div className="text-dim text-xs flex-row gap-8">
+                          <span style={{ color: TIER_COLORS[c.tier] }}>{TIER_LABELS[c.tier]}</span>
+                          {c.role && <span>{c.role}</span>}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -138,10 +156,23 @@ export default function CharactersPage() {
                 <div className="flex-1 scroll-y">
                   {selected ? (
                     <div>
-                      <div style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 4 }}>{selected.name}</div>
-                      <div className="text-dim text-sm flex-row gap-12 mb-16">
-                        <span style={{ color: TIER_COLORS[selected.tier] }}>{TIER_LABELS[selected.tier]}</span>
-                        {selected.role && <span>· {selected.role}</span>}
+                      <div className="flex-row items-start gap-16 mb-16">
+                        {selected.avatar && (
+                          <div style={{
+                            width: 80, height: 80, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+                            border: '1px solid var(--color-border)', cursor: 'zoom-in',
+                          }}
+                            onClick={() => setViewerSrc(selected.avatar!)}>
+                            <img src={selected.avatar} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 4 }}>{selected.name}</div>
+                          <div className="text-dim text-sm flex-row gap-12">
+                            <span style={{ color: TIER_COLORS[selected.tier] }}>{TIER_LABELS[selected.tier]}</span>
+                            {selected.role && <span>· {selected.role}</span>}
+                          </div>
+                        </div>
                       </div>
                       {selected.aliases?.length > 0 && (
                         <div className="mb-12">
@@ -255,6 +286,11 @@ export default function CharactersPage() {
           onDelete={handleDelete}
           onClose={() => { setEditorOpen(false); setEditChar(null) }}
         />
+      )}
+
+      {/* 图片放大查看 */}
+      {viewerSrc && (
+        <ImageViewer src={viewerSrc} alt="头像" onClose={() => setViewerSrc(null)} />
       )}
     </div>
   )

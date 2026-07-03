@@ -46,24 +46,16 @@
     "generate-icons": "node scripts/generate-icons.cjs"
   },
   "dependencies": {
+    "archiver": "^8.0.0",
+    "better-sqlite3": "^12.11.1"
+  },
+  "devDependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@testing-library/react": "^14.2.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^7.0.2",
-    "archiver": "^8.0.0",
-    "better-sqlite3": "^12.11.1",
-    "diff": "^9.0.0",
-    "lucide-react": "^1.23.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.18.1",
-    "remark-gfm": "^4.0.1",
-    "zustand": "^4.5.4"
-  },
-  "devDependencies": {
-    "@testing-library/react": "^14.2.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
@@ -71,15 +63,23 @@
     "@vitejs/plugin-react": "^6.0.3",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
+    "diff": "^9.0.0",
     "electron": "^41.9.2",
     "electron-builder": "^24.13.3",
     "eslint": "^9.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "lucide-react": "^1.23.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.18.1",
+    "remark-gfm": "^4.0.1",
     "sharp": "^0.33.4",
     "typescript": "^5.5.2",
     "vite": "^8.1.2",
     "vitest": "^4.1.9",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.2.0",
+    "zustand": "^4.5.4"
   },
   "build": {
     "appId": "com.ainovel.gui",
@@ -93,7 +93,11 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "package.json"
+      "package.json",
+      "!**/.DS_Store",
+      "!**/*.map",
+      "!**/*.test.{js,ts}",
+      "!dist-electron/database.test.js"
     ],
     "extraResources": [
       {
@@ -105,7 +109,7 @@
       }
     ],
     "asarUnpack": [
-      "dist-electron/**"
+      "**/node_modules/better-sqlite3/**"
     ],
     "asar": {
       "smartUnpack": true

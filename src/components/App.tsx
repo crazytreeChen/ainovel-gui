@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/stores/useAppStore'
 import type { ThemeMode } from '@/stores/useAppStore'
@@ -9,6 +9,7 @@ import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, Se
 import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
 import SearchModal from './SearchModal'
+import { useIPCListeners } from '@/hooks/useIPCListeners'
 
 function resolveTheme(theme: ThemeMode): string {
   if (theme === 'system') {
@@ -37,77 +38,13 @@ function useThemeEffect() {
 
 function AppRoutes() {
   useThemeEffect()
+  useIPCListeners()
   const navigate = useNavigate()
   const [showSearch, setShowSearch] = useState(false)
-  const refreshSnapshot = useAppStore((s) => s.refreshSnapshot)
-  const refreshEvents = useAppStore((s) => s.refreshEvents)
-  const refreshChapters = useAppStore((s) => s.refreshChapters)
-  const setBinaryInfo = useAppStore((s) => s.setBinaryInfo)
-  const mode = useAppStore((s) => s.mode)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // 初始化：检查 binary + 加载快照
-  useEffect(() => {
-    async function init() {
-      if (window.electronAPI) {
-        const info = await window.electronAPI.checkBinary()
-        setBinaryInfo(info)
-        // 首次加载快照（从 SQLite 读取已有数据）
-        await refreshSnapshot()
-        await refreshChapters()
-      }
-    }
-    init()
-  }, [setBinaryInfo, refreshSnapshot, refreshChapters])
-
-  // 轮询快照和事件
-  useEffect(() => {
-    if (mode === 'running') {
-      // 推送更新触发即时刷新
-      const cleanupPush = window.electronAPI?.onRuntimeUpdate(() => {
-        refreshSnapshot()
-        refreshEvents()
-        refreshChapters()
-      })
-      // 降级轮询（推送失败时的保底）
-      pollRef.current = setInterval(async () => {
-        await refreshSnapshot()
-        await refreshEvents()
-        await refreshChapters()
-      }, 10000) // 轮询间隔从 2s 延长到 10s，由推送驱动即时更新
-      return () => {
-        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-        if (cleanupPush) cleanupPush()
-      }
-    } else {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-    }
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [mode, refreshSnapshot, refreshEvents, refreshChapters])
-
-  // 监听进程退出
-  useEffect(() => {
-    if (!window.electronAPI) return
-    const cleanup = window.electronAPI.onProcessExited(() => {
-      useAppStore.getState().setMode('welcome')
-      refreshSnapshot()
-    })
-    return cleanup
-  }, [refreshSnapshot])
-
-  // 监听流式输出
-  useEffect(() => {
-    if (!window.electronAPI) return
-    const cleanup = window.electronAPI.onStreamOutput((data) => {
-      try {
-        const parsed = JSON.parse(data)
-        useAppStore.getState().appendStreamOutput(parsed)
-      } catch {
-        useAppStore.getState().appendStreamOutput({type: 'content', text: data})
-      }
-    })
-    return cleanup
-  }, [])
+  const showHelp = useAppStore((s) => s.showHelp)
+  const showDiagnostics = useAppStore((s) => s.showDiagnostics)
+  const showModelSwitch = useAppStore((s) => s.showModelSwitch)
+  const showCoCreate = useAppStore((s) => s.showCoCreate)
 
   // 键盘事件
   useEffect(() => {
@@ -120,15 +57,15 @@ function AppRoutes() {
       }
       if (e.key === 'Escape') {
         if (showSearch) { setShowSearch(false); return }
-        if (useAppStore.getState().showHelp) useAppStore.getState().toggleHelp()
-        if (useAppStore.getState().showDiagnostics) useAppStore.getState().toggleDiagnostics()
-        if (useAppStore.getState().showModelSwitch) useAppStore.getState().toggleModelSwitch()
-        if (useAppStore.getState().showCoCreate) useAppStore.getState().toggleCoCreate()
+        if (showHelp) useAppStore.getState().toggleHelp()
+        if (showDiagnostics) useAppStore.getState().toggleDiagnostics()
+        if (showModelSwitch) useAppStore.getState().toggleModelSwitch()
+        if (showCoCreate) useAppStore.getState().toggleCoCreate()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSearch])
+  }, [showSearch, showHelp, showDiagnostics, showModelSwitch, showCoCreate])
 
   return (
     <>

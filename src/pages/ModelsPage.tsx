@@ -58,6 +58,11 @@ export default function ModelsPage() {
   const [addKey, setAddKey] = useState('')
   const [addType, setAddType] = useState<ProtocolType>('openai')
   const [roleAssign, setRoleAssign] = useState<Record<string, { provider: string; model: string }>>({})
+  const [imageProvider, setImageProvider] = useState('')
+  const [imageModel, setImageModel] = useState('')
+  const [imageFormat, setImageFormat] = useState('agnes')
+  const [imageSaving, setImageSaving] = useState(false)
+  const [imageSaveMsg, setImageSaveMsg] = useState('')
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -79,6 +84,9 @@ export default function ModelsPage() {
         setCustoms(extra)
       }
       if (cfg.provider) setEnabled(cfg.provider)
+      if (cfg.image_provider) setImageProvider(cfg.image_provider)
+      if (cfg.image_model) setImageModel(cfg.image_model)
+      if (cfg.image_format) setImageFormat(cfg.image_format)
     })()
   }, [])
 
@@ -142,6 +150,20 @@ export default function ModelsPage() {
     setSelected(key)
     setShowAdd(false); setAddName(''); setAddUrl(''); setAddKey('')
   }
+
+  async function handleSaveImageConfig() {
+    if (!window.electronAPI) return
+    setImageSaving(true); setImageSaveMsg('')
+    await window.electronAPI.saveImageProviderConfig(imageProvider, imageModel, imageFormat)
+    setImageSaveMsg('已保存')
+    setImageSaving(false); setTimeout(() => setImageSaveMsg(''), 2500)
+  }
+
+  // 从当前 provider 获取模型列表（用于图片模型选择）
+  const imageProviderModels = (() => {
+    const item = itemByKey(imageProvider)
+    return item?.models || []
+  })()
 
   const allItems = [...providers, ...customs]
   const filtered = searchQuery
@@ -218,6 +240,61 @@ export default function ModelsPage() {
           if (!item) return null
           return <div ref={panelRef}><ProviderEditPanel item={item} enabled={enabled} fetching={fetching} presets={PRESETS} onUpdate={updateItem} onFetch={doFetch} onSetEnabled={setEnabled} onRemoveCustom={removeCustom} /></div>
         })()}
+
+        {/* ── 图片生成配置 ── */}
+        <div className="card mb-12" style={{ borderColor: 'var(--color-accent2)' }}>
+          <div className="sidebar-section-header text-sm mb-8">🖼️ 图片生成模型</div>
+          <div className="text-dim text-xs mb-12">
+            选择用于 AI 生成封面和角色头像的模型与接口格式。不同供应商的接口格式不同，请根据实际情况选择。
+          </div>
+          <div className="flex-row gap-8 items-end flex-wrap">
+            <div className="flex-col" style={{ minWidth: 160 }}>
+              <label className="text-muted text-xs mb-4 d-block">接口格式</label>
+              <select value={imageFormat} onChange={e => setImageFormat(e.target.value)}
+                className="text-sm" style={{ padding: '6px 8px', width: '100%' }}>
+                <option value="agnes">Agnes AI / LiteLLM</option>
+                <option value="openai">OpenAI 标准 (DALL·E)</option>
+              </select>
+            </div>
+            <div className="flex-col" style={{ minWidth: 160 }}>
+              <label className="text-muted text-xs mb-4 d-block">Provider</label>
+              <select value={imageProvider} onChange={e => { setImageProvider(e.target.value); setImageModel('') }}
+                className="text-sm" style={{ padding: '6px 8px', width: '100%' }}>
+                <option value="">未选择</option>
+                {allItems.filter(p => p.apiKey).map(p => (
+                  <option key={p.key} value={p.key}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-col" style={{ minWidth: 220 }}>
+              <label className="text-muted text-xs mb-4 d-block">图片模型</label>
+              {imageProviderModels.length > 0 ? (
+                <select value={imageModel} onChange={e => setImageModel(e.target.value)}
+                  className="text-sm" style={{ padding: '6px 8px', width: '100%' }}>
+                  <option value="">请选择模型</option>
+                  {imageProviderModels.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input value={imageModel} onChange={e => setImageModel(e.target.value)}
+                  placeholder="手动输入模型名（如 dall-e-3）"
+                  className="input-field text-sm" style={{ padding: '6px 10px' }} />
+              )}
+            </div>
+            <div className="flex-row items-center gap-8">
+              {imageSaveMsg && <span className="text-success text-xs">{imageSaveMsg}</span>}
+              <button className="welcome-mode-btn active text-sm" onClick={handleSaveImageConfig} disabled={imageSaving}>
+                {imageSaving ? '保存中...' : '保存图片配置'}
+              </button>
+            </div>
+          </div>
+          {imageProvider && imageModel && (
+            <div className="text-success text-xs mt-8">
+              已配置：{itemByKey(imageProvider)?.name || imageProvider} / {imageModel}（{imageFormat === 'openai' ? 'OpenAI 标准' : 'Agnes AI'} 格式）
+            </div>
+          )}
+        </div>
 
         <RoleAssignment roles={ROLES} allItems={allItems} enabled={enabled} roleAssign={roleAssign} onChange={() => {}} />
       </div>

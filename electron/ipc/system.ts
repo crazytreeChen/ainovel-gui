@@ -168,6 +168,85 @@ function register(ipcMain: Electron.IpcMain) {
     return true
   })
 
+  // ── 图片生成 ──
+  // 支持多种图片接口格式，通过 image_format 配置切换：
+  //   "openai"  — OpenAI DALL·E 标准格式（response_format 在顶层）
+  //   "agnes"   — Agnes AI / LiteLLM 格式（response_format 在 extra_body 内 + return_base64）
+  //   未设置    — 自动兼容模式（优先尝试 agnes 格式）
+  ipcMain.handle('generate-image', async (_e: Electron.IpcMainInvokeEvent, providerKey: string, model: string, prompt: string, options?: { size?: string; style?: string }) => {
+    try {
+      const config = getDB().getConfig('provider_config')
+      if (!config) return { error: '未配置任何 Provider，请先在模型管理中设置' }
+      const key = providerKey || config.image_provider || ''
+      const mdl = model || config.image_model || ''
+      if (!key) return { error: '未配置图片生成 Provider，请先在模型管理中设置图片生成模型' }
+      if (!mdl) return { error: '未配置图片生成模型，请先在模型管理中选择图片模型' }
+      if (!config?.providers?.[key]) return { error: `Provider "${key}" 未配置` }
+      const p = config.providers[key]
+      if (!p.api_key) return { error: `Provider "${key}" API Key 未设置` }
+      const url = (p.base_url || '').replace(/\/+$/, '') + '/images/generations'
+      const imageFormat = config.image_format || 'agnes'
+
+      // 根据接口格式构建请求体
+      let body: Record<string, any>
+      switch (imageFormat) {
+        case 'openai':
+          // OpenAI DALL·E 标准
+          body = {
+            model: mdl, prompt,
+            size: options?.size || '1024x1024',
+            n: 1,
+            response_format: 'b64_json',
+          }
+          break
+        case 'agnes':
+        default:
+          // Agnes AI / LiteLLM 兼容格式
+          body = {
+            model: mdl, prompt,
+            size: options?.size || '1024x1024',
+            return_base64: true,
+            extra_body: { response_format: 'b64_json' },
+          }
+          break
+      }
+      if (options?.style) body.style = options.style
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + p.api_key, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120000),
+      })
+      const data = await resp.json()
+      if (!resp.ok) return { error: data?.error?.message || `HTTP ${resp.status}: ${resp.statusText}` }
+      const item = data?.data?.[0]
+      // 优先使用 base64 数据
+      if (item?.b64_json) return { image: `data:image/png;base64,${item.b64_json}` }
+      // 兼容返回 URL 的 provider：下载后转 base64
+      if (item?.url) {
+        const imgResp = await fetch(item.url, { signal: AbortSignal.timeout(30000) })
+        if (!imgResp.ok) return { error: `下载图片失败: HTTP ${imgResp.status}` }
+        const arr = await imgResp.arrayBuffer()
+        const contentType = imgResp.headers.get('content-type') || 'image/png'
+        const b64 = Buffer.from(arr).toString('base64')
+        return { image: `data:${contentType};base64,${b64}` }
+      }
+      return { error: 'API 未返回图片数据' }
+    } catch (e: any) { return { error: e.message || '图片生成失败' } }
+  })
+
+  ipcMain.handle('save-image-provider-config', async (_e: Electron.IpcMainInvokeEvent, imageProvider: string, imageModel: string, imageFormat?: string) => {
+    try {
+      const config = getDB().getConfig('provider_config') || {}
+      config.image_provider = imageProvider
+      config.image_model = imageModel
+      if (imageFormat) config.image_format = imageFormat
+      getDB().setConfig('provider_config', config)
+      return true
+    } catch (e: any) { log.error('save-image-provider-config', e); return false }
+  })
+
   // ── 封面图片 ──
   ipcMain.handle('select-cover-image', async () => {
     const { dialog } = require('electron')
@@ -178,9 +257,19 @@ function register(ipcMain: Electron.IpcMain) {
 
   ipcMain.handle('save-book-cover', async (_e: Electron.IpcMainInvokeEvent, id: string, imagePath: string) => {
     const { join: pJoin } = require('path')
-    const safeImagePath = validatePath(imagePath)
     const dir = pJoin(GUI_DATA_DIR, 'books', id)
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    // 支持 base64 data URL（AI 生成的图片）
+    if (typeof imagePath === 'string' && imagePath.startsWith('data:image/')) {
+      const match = imagePath.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/)
+      if (!match) { log.error('save-cover:invalid base64 format'); return false }
+      const ext = '.' + match[1].replace('jpeg', 'jpg')
+      const dest = pJoin(dir, 'cover' + ext)
+      for (const e of coverExts) { const old = pJoin(dir, 'cover' + e); if (old !== dest && existsSync(old)) try { unlinkSync(old) } catch (e: any) { log.error('save-cover:unlink', e) } }
+      try { writeFileSync(dest, Buffer.from(match[2], 'base64')); return true } catch (e: any) { log.error('save-cover:write', e); return e.message }
+    }
+    // 原有逻辑：本地文件路径
+    const safeImagePath = validatePath(imagePath)
     if (!existsSync(safeImagePath)) { log.error('save-cover: image not found:', safeImagePath); return false }
     const ext = coverExts.find(e => safeImagePath.toLowerCase().endsWith(e)) || '.png'
     const dest = pJoin(dir, 'cover' + ext)

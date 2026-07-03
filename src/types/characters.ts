@@ -4,6 +4,7 @@ export interface Character {
   name: string; aliases: string[]; role: string
   tier: 'core' | 'important' | 'secondary' | 'decorative'
   description: string; arc: string; traits: string[]
+  avatar?: string // base64 data URL for character portrait
 }
 
 export interface CastEntry {

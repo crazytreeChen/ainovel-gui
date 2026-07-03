@@ -244,12 +244,6 @@ npm run generate-icons   # 从 SVG 生成多尺寸图标
 
 ---
 
-## 开发指南
-
-详细开发规范见 [`AGENTS.md`](./AGENTS.md)，技术速览见 [`CLAUDE.md`](./CLAUDE.md)。
-
----
-
 ## 致敬
 
 - [voocel/ainovel-cli](https://github.com/voocel/ainovel-cli) — 社区 fork，提供安装脚本与持续维护

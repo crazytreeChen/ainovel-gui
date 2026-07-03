@@ -101,6 +101,12 @@ export interface ElectronAPI {
   // 评审
   getBookReviews: (id: string) => Promise<any[]>
 
+  // 图片生成
+  /** 图片接口格式：openai=标准 OpenAI 格式，agnes=Agnes AI 格式 */
+  generateImage: (providerKey: string, model: string, prompt: string, options?: { size?: string; style?: string }) =>
+    Promise<{ image?: string; error?: string }>
+  saveImageProviderConfig: (imageProvider: string, imageModel: string, imageFormat?: string) => Promise<boolean>
+
   // 封面
   selectCoverImage: () => Promise<string | null>
   saveBookCover: (id: string, imagePath: string) => Promise<boolean | string>

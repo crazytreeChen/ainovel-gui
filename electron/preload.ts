@@ -33,6 +33,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 评审管理
   getBookReviews: (id: string) => ipcRenderer.invoke('get-book-reviews', id),
 
+  // 图片生成
+  generateImage: (providerKey: string, model: string, prompt: string, options?: { size?: string; style?: string }) =>
+    ipcRenderer.invoke('generate-image', providerKey, model, prompt, options),
+  saveImageProviderConfig: (imageProvider: string, imageModel: string, imageFormat?: string) =>
+    ipcRenderer.invoke('save-image-provider-config', imageProvider, imageModel, imageFormat),
+
   // 封面图片
   selectCoverImage: () => ipcRenderer.invoke('select-cover-image'),
   saveBookCover: (id: string, imagePath: string) => ipcRenderer.invoke('save-book-cover', id, imagePath),

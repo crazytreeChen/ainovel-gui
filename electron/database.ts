@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS summaries (id INTEGER PRIMARY KEY AUTOINCREMENT,
 CREATE TABLE IF NOT EXISTS characters_t (id INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id TEXT NOT NULL REFERENCES books(id), name TEXT NOT NULL, aliases TEXT DEFAULT '[]',
   role TEXT DEFAULT '', tier TEXT DEFAULT 'important', description TEXT DEFAULT '',
-  arc TEXT DEFAULT '', traits TEXT DEFAULT '[]');
+  arc TEXT DEFAULT '', traits TEXT DEFAULT '[]', avatar TEXT DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS character_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id TEXT NOT NULL REFERENCES books(id), volume INTEGER NOT NULL, arc INTEGER NOT NULL,
@@ -147,6 +147,8 @@ class AppDatabase {
     }
     // 迁移：添加 tags 列（如果不存在）
     try { this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""') } catch (_e) { /* 列已存在，忽略错误 */ }
+    // 迁移：添加 avatar 列（如果不存在）
+    try { this.database.exec('ALTER TABLE characters_t ADD COLUMN avatar TEXT DEFAULT ""') } catch (_e) { /* 列已存在，忽略错误 */ }
   }
 
   listBooks() {
@@ -383,11 +385,11 @@ class AppDatabase {
 
   saveCharacters(bookId: string, chars: any[]) {
     const del = this.database.prepare('DELETE FROM characters_t WHERE book_id = ?')
-    const ins = this.database.prepare('INSERT INTO characters_t (book_id, name, aliases, role, tier, description, arc, traits) VALUES (?,?,?,?,?,?,?,?)')
+    const ins = this.database.prepare('INSERT INTO characters_t (book_id, name, aliases, role, tier, description, arc, traits, avatar) VALUES (?,?,?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
       del.run(bookId)
       for (const c of chars || []) {
-        ins.run(bookId, c.name || '', JSON.stringify(c.aliases || []), c.role || '', c.tier || 'important', c.description || '', c.arc || '', JSON.stringify(c.traits || []))
+        ins.run(bookId, c.name || '', JSON.stringify(c.aliases || []), c.role || '', c.tier || 'important', c.description || '', c.arc || '', JSON.stringify(c.traits || []), c.avatar || '')
       }
     })
     tx()
