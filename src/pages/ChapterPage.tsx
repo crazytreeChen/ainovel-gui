@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export default function ChapterPage() {
   const id = useBookId()
@@ -16,6 +18,7 @@ export default function ChapterPage() {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
   const [showDraft, setShowDraft] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const [chapterList, setChapterList] = useState<{ num: number; title: string }[]>([])
   const [chaptersLoading, setChaptersLoading] = useState(true)
 
@@ -113,25 +116,41 @@ export default function ChapterPage() {
 
       {/* 草稿/终稿切换 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexShrink: 0 }}>
-        <button className={`welcome-mode-btn ${!showDraft ? 'active' : ''}`} onClick={() => setShowDraft(false)}>终稿</button>
-        <button className={`welcome-mode-btn ${showDraft ? 'active' : ''}`} onClick={() => setShowDraft(true)}>草稿</button>
+        <button className={`welcome-mode-btn ${!showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(false); setShowPreview(false) }}>终稿</button>
+        <button className={`welcome-mode-btn ${showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(true); setShowPreview(false) }}>草稿</button>
+        <button className={`welcome-mode-btn ${showPreview ? 'active' : ''}`} onClick={() => setShowPreview(!showPreview)}>预览</button>
       </div>
 
-      {/* 编辑器 */}
-      <textarea
-        value={showDraft ? draft : content}
-        onChange={e => { if (showDraft) setDraft(e.target.value); else setContent(e.target.value) }}
-        style={{
-          flex: 1, width: '100%', resize: 'none',
+      {/* 编辑器 / Markdown 预览 */}
+      {showPreview ? (
+        <div className="scroll-y" style={{
+          flex: 1, width: '100%',
           background: 'var(--color-bg)', color: 'var(--color-text)',
           border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-          padding: 16, fontFamily: 'var(--font-mono)', fontSize: 14, lineHeight: 1.8,
-          outline: 'none',
-        }}
-        placeholder="# 第N章 章节标题
+          padding: 16, fontSize: 14, lineHeight: 1.8,
+        }}>
+          {showDraft ? (
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{draft || '*（无草稿内容）*'}</ReactMarkdown>
+          ) : (
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || '*（无终稿内容）*'}</ReactMarkdown>
+          )}
+        </div>
+      ) : (
+        <textarea
+          value={showDraft ? draft : content}
+          onChange={e => { if (showDraft) setDraft(e.target.value); else setContent(e.target.value) }}
+          style={{
+            flex: 1, width: '100%', resize: 'none',
+            background: 'var(--color-bg)', color: 'var(--color-text)',
+            border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+            padding: 16, fontFamily: 'var(--font-mono)', fontSize: 14, lineHeight: 1.8,
+            outline: 'none',
+          }}
+          placeholder="# 第N章 章节标题
 
 在此输入章节内容..."
-      />
+        />
+      )}
       </div>
     </div>
   )
