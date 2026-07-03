@@ -249,10 +249,10 @@ function register(ipcMain: Electron.IpcMain) {
       const s = row.structured || {}
       return {
         rules: {
-          forbiddenCharacters: Array.isArray(s.forbiddenCharacters) ? s.forbiddenCharacters : [],
-          forbiddenPhrases: Array.isArray(s.forbiddenPhrases) ? s.forbiddenPhrases : [],
+          forbiddenCharacters: Array.isArray(s.forbidden_chars) ? s.forbidden_chars : Array.isArray(s.forbiddenCharacters) ? s.forbiddenCharacters : [],
+          forbiddenPhrases: Array.isArray(s.forbidden_phrases) ? s.forbidden_phrases : Array.isArray(s.forbiddenPhrases) ? s.forbiddenPhrases : [],
           wordCountRange: (s.chapter_words && typeof s.chapter_words === 'object') ? s.chapter_words : (s.wordCountRange && typeof s.wordCountRange === 'object') ? s.wordCountRange : { min: 0, max: 0 },
-          fatigueWords: Array.isArray(s.fatigueWords) ? s.fatigueWords : [],
+          fatigueWords: Array.isArray(s.fatigue_words) ? s.fatigue_words : Array.isArray(s.fatigueWords) ? s.fatigueWords : [],
           stylePreferences: row.preferences || '',
           tabooTopics: Array.isArray(s.tabooTopics) ? s.tabooTopics : [],
           sources: Array.isArray(row.sources) ? row.sources : [],
@@ -269,10 +269,10 @@ function register(ipcMain: Electron.IpcMain) {
         version: payload.version || 1,
         status: payload.status || 'ready',
         structured: {
-          forbiddenCharacters: r.forbiddenCharacters || [],
-          forbiddenPhrases: r.forbiddenPhrases || [],
+          forbidden_chars: r.forbiddenCharacters || [],
+          forbidden_phrases: r.forbiddenPhrases || [],
           chapter_words: r.wordCountRange || { min: 0, max: 0 },
-          fatigueWords: r.fatigueWords || [],
+          fatigue_words: Array.isArray(r.fatigueWords) ? Object.fromEntries(r.fatigueWords.map((w: string) => [w, 1])) : {},
           tabooTopics: r.tabooTopics || [],
         },
         preferences: r.stylePreferences || '',
