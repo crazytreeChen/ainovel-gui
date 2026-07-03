@@ -118,6 +118,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('download-progress', handler)
   },
 
+  // 全局搜索
+  searchBook: (id: string, query: string) => ipcRenderer.invoke('search-book', id, query),
+
+  // 数据备份与恢复
+  backupData: () => ipcRenderer.invoke('backup-data'),
+  restoreData: () => ipcRenderer.invoke('restore-data'),
+
   // 事件监听
   onProcessExited: (callback: () => void) => {
     ipcRenderer.on('process-exited', callback)

@@ -61,6 +61,13 @@ export interface DownloadProgress {
   percent: number; bytesPerSecond: number; downloaded: number; total: number
 }
 
+export interface SearchResults {
+  chapters: { type: 'chapter'; num: number; title: string; match: string }[]
+  characters: { type: 'character'; name: string; role: string; match: string }[]
+  events: { type: 'event'; chapter: number; event: string; match: string }[]
+  outline: { type: 'outline'; chapter: number; title: string; match: string }[]
+}
+
 export interface ElectronAPI {
   // 书籍
   listBooks: () => Promise<BookItem[]>
@@ -164,6 +171,9 @@ export interface ElectronAPI {
   // 用户指令
   getUserDirectives: (id: string) => Promise<any[]>
   saveUserDirectives: (id: string, directives: any[]) => Promise<boolean>
+
+  // 全局搜索
+  searchBook: (id: string, query: string) => Promise<SearchResults>
 
   // 更新
   checkUpdate: () => Promise<UpdateInfo>

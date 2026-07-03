@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/stores/useAppStore'
 import type { ThemeMode } from '@/stores/useAppStore'
@@ -8,6 +8,7 @@ import NewBook from '@/pages/NewBook'
 import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, SettingsPage, ModelsPage, SimulationPage, UserRulesPage, WorldRulesPage, SummaryPage, BookIntroPage, DashboardPage } from '@/pages'
 import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
+import SearchModal from './SearchModal'
 
 function resolveTheme(theme: ThemeMode): string {
   if (theme === 'system') {
@@ -37,6 +38,7 @@ function useThemeEffect() {
 function AppRoutes() {
   useThemeEffect()
   const navigate = useNavigate()
+  const [showSearch, setShowSearch] = useState(false)
   const refreshSnapshot = useAppStore((s) => s.refreshSnapshot)
   const refreshEvents = useAppStore((s) => s.refreshEvents)
   const refreshChapters = useAppStore((s) => s.refreshChapters)
@@ -110,7 +112,14 @@ function AppRoutes() {
   // 键盘事件
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+K / Ctrl+K 全局搜索
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(s => !s)
+        return
+      }
       if (e.key === 'Escape') {
+        if (showSearch) { setShowSearch(false); return }
         if (useAppStore.getState().showHelp) useAppStore.getState().toggleHelp()
         if (useAppStore.getState().showDiagnostics) useAppStore.getState().toggleDiagnostics()
         if (useAppStore.getState().showModelSwitch) useAppStore.getState().toggleModelSwitch()
@@ -119,10 +128,11 @@ function AppRoutes() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [showSearch])
 
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/" element={<BookList />} />
       <Route path="/books/new" element={<NewBook />} />
       <Route path="/books/:id" element={<Workspace />} />
@@ -141,6 +151,8 @@ function AppRoutes() {
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/settings/models" element={<ModelsPage />} />
     </Routes>
+      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+    </>
   )
 }
 

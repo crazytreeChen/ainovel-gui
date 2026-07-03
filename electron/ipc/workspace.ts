@@ -316,6 +316,32 @@ function register(ipcMain: Electron.IpcMain) {
     try { getDB().saveUserDirectives(bookId, directives); return true }
     catch (e: any) { log.error('save-directives', e); return false }
   })
+
+  // ── 全局搜索 ──
+  ipcMain.handle('search-book', async (_e: Electron.IpcMainInvokeEvent, bookId: string, query: string) => {
+    const q = query.toLowerCase().trim()
+    if (!q || q.length < 1) return { chapters: [], characters: [], events: [], outline: [] }
+    try {
+      const db = getDB()
+      // 章节搜索
+      const chapters = db.getChapters(bookId)
+        .filter((ch: any) => (ch.title || '').toLowerCase().includes(q))
+        .map((ch: any) => ({ type: 'chapter', num: ch.num, title: ch.title, match: ch.title }))
+      // 角色搜索
+      const characters = db.getCharacters(bookId)
+        .filter((c: any) => (c.name || '').toLowerCase().includes(q) || (c.role || '').toLowerCase().includes(q))
+        .map((c: any) => ({ type: 'character', name: c.name, role: c.role, match: c.name }))
+      // 大纲搜索
+      const outline = db.getOutlineEntries(bookId)
+        .filter((o: any) => (o.title || '').toLowerCase().includes(q) || (o.core_event || '').toLowerCase().includes(q))
+        .map((o: any) => ({ type: 'outline', chapter: o.chapter, title: o.title, match: o.title || o.core_event }))
+      // 时间线事件搜索
+      const events = db.getTimelineEvents(bookId)
+        .filter((ev: any) => (ev.event || '').toLowerCase().includes(q))
+        .map((ev: any) => ({ type: 'event', chapter: ev.chapter, event: ev.event, match: ev.event }))
+      return { chapters, characters, events, outline }
+    } catch (e: any) { log.error('search-book', e); return { chapters: [], characters: [], events: [], outline: [] } }
+  })
 }
 
 module.exports = { register }
