@@ -243,8 +243,24 @@ function register(ipcMain: Electron.IpcMain) {
 
   // ── 用户规则 ──
   ipcMain.handle('get-user-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getUserRules(bookId) }
-    catch (e: any) { log.error('get-user-rules', e); return null }
+    try {
+      const row = getDB().getUserRules(bookId)
+      if (!row) return null
+      const s = row.structured || {}
+      return {
+        rules: {
+          forbiddenCharacters: s.forbiddenCharacters || [],
+          forbiddenPhrases: s.forbiddenPhrases || [],
+          wordCountRange: s.wordCountRange || { min: 0, max: 0 },
+          fatigueWords: s.fatigueWords || [],
+          stylePreferences: row.preferences || '',
+          tabooTopics: s.tabooTopics || [],
+          sources: row.sources || [],
+          uncertain: row.uncertain || [],
+        },
+        directives: row.directives || [],
+      }
+    } catch (e: any) { log.error('get-user-rules', e); return null }
   })
   ipcMain.handle('save-user-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string, rules: any) => {
     try { getDB().saveUserRules(bookId, rules); return true }
