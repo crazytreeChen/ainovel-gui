@@ -29,24 +29,24 @@ export default function RulesEditor({ data, onUpdate, onAddForbiddenChar, onRemo
       </Section>
 
       <Section title="禁用角色" onAdd={onAddForbiddenChar}>
-        {(data.forbiddenCharacters || []).map((item, i) => (
+        {(Array.isArray(data.forbiddenCharacters) ? data.forbiddenCharacters : []).map((item, i) => (
           <Tag key={item} label={item} onRemove={() => onRemoveForbiddenChar(i)} />
         ))}
-        {(!data.forbiddenCharacters || data.forbiddenCharacters.length === 0) && <EmptyHint />}
+        {(!Array.isArray(data.forbiddenCharacters) || data.forbiddenCharacters.length === 0) && <EmptyHint />}
       </Section>
 
       <Section title="禁用短语" onAdd={onAddForbiddenPhrase}>
-        {(data.forbiddenPhrases || []).map((item, i) => (
+        {(Array.isArray(data.forbiddenPhrases) ? data.forbiddenPhrases : []).map((item, i) => (
           <Tag key={item} label={item} onRemove={() => onRemoveForbiddenPhrase(i)} />
         ))}
-        {(!data.forbiddenPhrases || data.forbiddenPhrases.length === 0) && <EmptyHint />}
+        {(!Array.isArray(data.forbiddenPhrases) || data.forbiddenPhrases.length === 0) && <EmptyHint />}
       </Section>
 
       <Section title="易疲劳词" onAdd={onAddFatigueWord}>
-        {(data.fatigueWords || []).map((word) => (
+        {(Array.isArray(data.fatigueWords) ? data.fatigueWords : []).map((word) => (
           <Tag key={word} label={word} onRemove={() => onRemoveFatigueWord(word)} />
         ))}
-        {(!data.fatigueWords || data.fatigueWords.length === 0) && <EmptyHint />}
+        {(!Array.isArray(data.fatigueWords) || data.fatigueWords.length === 0) && <EmptyHint />}
       </Section>
     </div>
   )

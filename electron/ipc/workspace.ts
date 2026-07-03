@@ -249,16 +249,16 @@ function register(ipcMain: Electron.IpcMain) {
       const s = row.structured || {}
       return {
         rules: {
-          forbiddenCharacters: s.forbiddenCharacters || [],
-          forbiddenPhrases: s.forbiddenPhrases || [],
-          wordCountRange: s.wordCountRange || { min: 0, max: 0 },
-          fatigueWords: s.fatigueWords || [],
+          forbiddenCharacters: Array.isArray(s.forbiddenCharacters) ? s.forbiddenCharacters : [],
+          forbiddenPhrases: Array.isArray(s.forbiddenPhrases) ? s.forbiddenPhrases : [],
+          wordCountRange: (s.wordCountRange && typeof s.wordCountRange === 'object') ? s.wordCountRange : { min: 0, max: 0 },
+          fatigueWords: Array.isArray(s.fatigueWords) ? s.fatigueWords : [],
           stylePreferences: row.preferences || '',
-          tabooTopics: s.tabooTopics || [],
-          sources: row.sources || [],
-          uncertain: row.uncertain || [],
+          tabooTopics: Array.isArray(s.tabooTopics) ? s.tabooTopics : [],
+          sources: Array.isArray(row.sources) ? row.sources : [],
+          uncertain: Array.isArray(row.uncertain) ? row.uncertain : [],
         },
-        directives: row.directives || [],
+        directives: Array.isArray(row.directives) ? row.directives : [],
       }
     } catch (e: any) { log.error('get-user-rules', e); return null }
   })
