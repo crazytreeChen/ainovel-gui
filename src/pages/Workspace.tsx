@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import TopBar from '@/components/TopBar'
+import StatusSidebar from '@/components/StatusSidebar'
 import EventFlow from '@/components/EventFlow'
 import StreamOutput from '@/components/StreamOutput'
 import DetailPanel from '@/components/DetailPanel'
@@ -27,6 +28,7 @@ export default function Workspace() {
   const pauseWriting = useAppStore(s => s.pauseWriting)
   const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
   const [fullscreen, setFullscreen] = useState(false)
+  const [showStatus, setShowStatus] = useState(false)
 
   // 同步运行状态
   useEffect(() => {
@@ -95,7 +97,18 @@ export default function Workspace() {
           <span className="ml-auto">
             {snapshot.contextPercent > 0 && `上下文 ${snapshot.contextPercent.toFixed(0)}%`}
           </span>
+          <button className={`welcome-mode-btn text-xs ${showStatus ? 'active' : ''}`}
+            onClick={() => setShowStatus(s => !s)}>
+            📊 详情
+          </button>
         </div>
+
+        {/* 可折叠状态面板 — 章节进度/缓存/上下文/用量等 */}
+        {showStatus && (
+          <div className="flex-shrink-0" style={{ maxHeight: 300, overflow: 'auto', borderBottom: '1px solid var(--color-border)', marginBottom: 4 }}>
+            <StatusSidebar />
+          </div>
+        )}
 
         {/* 主体：2 列（中央 + 右侧详情） */}
         <div className="flex-1 flex-row overflow-hidden" style={{ gap: 12 }}>
