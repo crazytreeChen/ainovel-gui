@@ -6,6 +6,7 @@ import PreferencesEditor from '@/components/rules/PreferencesEditor'
 import SourcesList from '@/components/rules/SourcesList'
 import UncertainList from '@/components/rules/UncertainList'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 import { showToast } from '@/components/Toast'
 
 interface WordRange { min: number; max: number }
@@ -108,7 +109,7 @@ export default function UserRulesPage() {
       <BookNavSidebar bookId={id || ''} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
+          <BackButton to={`/books/${id}/intro`} />
           <h2 className="mono text-accent" style={{ margin: 0, fontSize: 18 }}>用户规则</h2>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             {([

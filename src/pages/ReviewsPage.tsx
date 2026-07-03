@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 import { useBookData } from '@/hooks/useBookData'
 import RadarChart from '@/components/RadarChart'
 
@@ -43,7 +44,7 @@ export default function ReviewsPage() {
       <BookNavSidebar bookId={id || ''} />
       <div className="flex-1 flex-col overflow-hidden">
         <div className="flex-row items-center gap-12 mb-16 flex-shrink-0">
-          <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
+          <BackButton to={`/books/${id}/intro`} />
           <h2 className="mono text-accent m-0 text-lg">评审管理</h2>
           <span className="text-dim text-sm">{reviewList.length} 条记录</span>
         </div>

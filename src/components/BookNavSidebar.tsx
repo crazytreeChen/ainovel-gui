@@ -43,8 +43,13 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
       {/* 导航项 */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {items.map((item) => {
-          const isActive = location.pathname === item.path ||
-            (item.path !== `/books/${bookId}` && location.pathname.startsWith(item.path))
+          const isActive = (() => {
+            if (location.pathname === item.path) return true
+            if (item.path === `/books/${bookId}`) return false
+            const locParts = location.pathname.split('/')
+            const itemParts = item.path.split('/')
+            return itemParts.every((part, i) => part === locParts[i])
+          })()
           return (
             <div
               key={item.path}

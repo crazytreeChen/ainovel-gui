@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import ChapterDiff from '@/components/ChapterDiff'
@@ -80,7 +81,7 @@ export default function ChapterPage() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 导航 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0, flexWrap: 'wrap' }}>
-        <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
+        <BackButton to={`/books/${id}/intro`} />
         <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/chapters/${chapterNum - 1}`)} disabled={chapterNum <= 1}>← 上一章</button>
 
         {/* 章节选择器 */}

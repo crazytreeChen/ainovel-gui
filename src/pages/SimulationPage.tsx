@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 import SimOverview from '@/components/SimOverview'
 import SimSources from '@/components/SimSources'
 import SimSynthesis from '@/components/SimSynthesis'
@@ -42,7 +43,7 @@ export default function SimulationPage() {
       <BookNavSidebar bookId={id || ''} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
+          <BackButton to={`/books/${id}/intro`} />
           <h2 className="mono text-accent" style={{ margin: 0, fontSize: 18 }}>仿写画像</h2>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button className="welcome-mode-btn active" onClick={handleRunSimulate}>

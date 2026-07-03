@@ -4,6 +4,7 @@ import BookNavSidebar from '@/components/BookNavSidebar'
 import BookCover from '@/components/BookCover'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 
 const PAGE_SIZE = 60
 

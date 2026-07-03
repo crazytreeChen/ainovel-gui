@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 
 interface ChapterInfo {
   num: number; title: string; wordCount: number

@@ -8,6 +8,7 @@ import ImageViewer from '@/components/ImageViewer'
 import type { Character, CastEntry, Relation } from '@/types/characters'
 import { TIER_COLORS, TIER_LABELS, PLACEHOLDER_FACES } from '@/types/characters'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 
 export default function CharactersPage() {
   const id = useBookId()
@@ -26,7 +27,9 @@ export default function CharactersPage() {
   const [editChar, setEditChar] = useState<Character | null>(null)
   const [viewerSrc, setViewerSrc] = useState<string | null>(null)
 
-  useEffect(() => { loadChars(); loadCast(); loadRelations() }, [id])
+  useEffect(() => {
+    Promise.all([loadChars(), loadCast(), loadRelations()])
+  }, [id])
 
   async function loadChars() {
     if (!id || !window.electronAPI) return
@@ -88,7 +91,7 @@ export default function CharactersPage() {
       <BookNavSidebar bookId={id || ''} />
       <div className="flex-1 flex-col overflow-hidden">
         <div className="flex-row items-center gap-12 mb-12 flex-shrink-0">
-          <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
+          <BackButton to={`/books/${id}/intro`} />
           <h2 className="mono text-accent m-0 text-lg">角色管理</h2>
           {tab === 'chars' && (
             <button className="welcome-mode-btn active text-xs ml-auto"

@@ -15,6 +15,7 @@ import BookNavSidebar from '@/components/BookNavSidebar'
 import { useAppStore } from '@/stores/useAppStore'
 import { showToast } from '@/components/Toast'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 
 export default function Workspace() {
   const id = useBookId()

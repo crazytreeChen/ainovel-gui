@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAppStore } from '@/stores/useAppStore'
 import type { ThemeMode } from '@/stores/useAppStore'
 import { showToast } from '@/components/Toast'
+import BackButton from '@/components/BackButton'
 
 export default function SettingsPage() {
   const navigate = useNavigate()
@@ -123,7 +124,7 @@ export default function SettingsPage() {
   return (
     <div className="scroll-y p-24" style={{ maxWidth: 640, margin: '0 auto', height: '100vh' }}>
       <div className="flex-row items-center gap-12 mb-24">
-        <button className="welcome-mode-btn" onClick={() => navigate('/')}>← 返回</button>
+        <BackButton to="/" />
         <h2 className="mono text-accent m-0 text-lg">系统设置</h2>
       </div>
 

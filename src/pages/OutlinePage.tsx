@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import BackButton from '@/components/BackButton'
 import { showToast } from '@/components/Toast'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -198,7 +199,7 @@ export default function OutlinePage() {
         <div className="flex-1 flex-col overflow-hidden">
 
           <div className="flex-row items-center gap-12 mb-16 flex-shrink-0">
-            <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回工作台</button>
+            <BackButton to={`/books/${id}/workspace?mode=writing`} />
             <h2 className="mono text-accent m-0 text-lg">大纲管理</h2>
             <div className="ml-auto flex-row gap-8">
               <button className={`welcome-mode-btn ${mode === 'flat' ? 'active' : ''}`} onClick={() => setMode('flat')}>扁平</button>
