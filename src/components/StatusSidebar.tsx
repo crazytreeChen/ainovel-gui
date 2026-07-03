@@ -81,7 +81,7 @@ export default function StatusSidebar() {
         {snapshot.layered ? (
           <>
             <Field label="已完成" value={`${snapshot.completedCount} 章`} />
-            {snapshot.outline.length > 0 && (
+            {snapshot.outline.length > 0 && snapshot.completedCount <= (snapshot.totalOutlineCount || snapshot.outline.length) && (
               <Field label="已规划" value={`${snapshot.totalOutlineCount || snapshot.outline.length} 章`} />
             )}
           </>
