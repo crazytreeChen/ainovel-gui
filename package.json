@@ -46,8 +46,10 @@
     "generate-icons": "node scripts/generate-icons.cjs"
   },
   "dependencies": {
+    "@types/react-window": "^1.8.8",
     "archiver": "^8.0.0",
-    "better-sqlite3": "^12.11.1"
+    "better-sqlite3": "^12.11.1",
+    "react-window": "^2.2.7"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",
