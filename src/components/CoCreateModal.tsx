@@ -1,8 +1,8 @@
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore } from '@/stores/useAppStore'
 
 export default function CoCreateModal() {
-  const toggleCoCreate = useAppStore((s) => s.toggleCoCreate)
-  const setInputValue = useAppStore((s) => s.setInputValue)
+  const toggleCoCreate = useUIStore((s) => s.toggleCoCreate)
+  const setInputValue = useUIStore((s) => s.setInputValue)
 
   const suggestions = [
     '我想写一部现代都市背景的悬疑小说',

@@ -60,9 +60,7 @@ export default function ChapterPage() {
     if (!isNaN(n)) navigate(`/books/${id}/chapters/${n}`)
   }
 
-  if (loading) return <div className="text-dim" style={{ padding: 32 }}>加载中...</div>
-
-  // Cmd+S / Ctrl+S 保存
+  // Cmd+S / Ctrl+S 保存（必须在早期 return 之前）
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -73,6 +71,8 @@ export default function ChapterPage() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [content, id, chapterNum])
+
+  if (loading) return <div className="text-dim" style={{ padding: 32 }}>加载中...</div>
 
   return (
     <div style={{ padding: 24, height: '100vh', display: 'flex', gap: 24 }}>

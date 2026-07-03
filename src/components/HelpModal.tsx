@@ -1,4 +1,4 @@
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore } from '@/stores/useAppStore'
 
 const COMMANDS = [
   { cmd: '/help', desc: '查看命令列表', group: 'system' },
@@ -13,7 +13,7 @@ const COMMANDS = [
 ]
 
 export default function HelpModal() {
-  const toggleHelp = useAppStore((s) => s.toggleHelp)
+  const toggleHelp = useUIStore((s) => s.toggleHelp)
 
   const groups = [...new Set(COMMANDS.map((c) => c.group))]
 

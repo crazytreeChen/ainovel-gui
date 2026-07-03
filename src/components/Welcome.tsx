@@ -1,9 +1,9 @@
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore } from '@/stores/useAppStore'
 
 export default function Welcome() {
-  const startupMode = useAppStore((s) => s.startupMode)
-  const setStartupMode = useAppStore((s) => s.setStartupMode)
-  const setInputValue = useAppStore((s) => s.setInputValue)
+  const startupMode = useUIStore((s) => s.startupMode)
+  const setStartupMode = useUIStore((s) => s.setStartupMode)
+  const setInputValue = useUIStore((s) => s.setInputValue)
 
   const examples = [
     '写一部 12 章都市悬疑小说，主角是一名女法医',

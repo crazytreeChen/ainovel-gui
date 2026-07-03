@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore, useWritingStore } from '@/stores/useAppStore'
 
 export default function DiagnosticsModal() {
-  const diagReport = useAppStore((s) => s.diagReport)
-  const toggleDiagnostics = useAppStore((s) => s.toggleDiagnostics)
-  const runDiag = useAppStore((s) => s.runDiag)
+  const diagReport = useUIStore((s) => s.diagReport)
+  const toggleDiagnostics = useUIStore((s) => s.toggleDiagnostics)
+  const runDiag = useWritingStore((s) => s.runDiag)
   const [loading, setLoading] = useState(false)
 
   const handleRun = async () => {

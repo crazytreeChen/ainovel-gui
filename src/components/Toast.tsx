@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore, useAppStore } from '@/stores/useAppStore'
 
 type ToastType = 'error' | 'success' | 'info'
 
@@ -23,8 +23,8 @@ export function showToast(message: string, type: ToastType = 'info') {
 }
 
 export default function ToastContainer() {
-  const toasts = useAppStore(s => s.toasts)
-  const removeToast = useAppStore(s => s.removeToast)
+  const toasts = useUIStore(s => s.toasts)
+  const removeToast = useUIStore(s => s.removeToast)
 
   return (
     <div style={{
