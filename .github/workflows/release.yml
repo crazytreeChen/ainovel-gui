@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-latest
+            target: mac
+          - platform: windows
+            runner: windows-latest
+            target: win
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # ========== 新增：安装Go 1.21+，解决build-cli报错 ==========
+      - name: Setup Go 1.21
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true # 缓存Go模块，加速构建
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer & electron
+        run: npm run build
+
+      - name: Build ${{ matrix.platform }}
+        run: npx electron-builder --${{ matrix.target }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-artifacts
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+          retention-days: 7
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 可选：publish阶段不需要编译cli，可省略Go安装，这里没加
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Move artifacts to release/
+        run: |
+          mkdir -p release
+          cp artifacts/*/* release/ 2>/dev/null || true
+
+      - name: Generate release notes from download.json
+        id: notes
+        run: |
+          node -e "
+            const dd = require('./download.json');
+            console.log(dd.release_notes || '');
+          " > release-notes.md
+          echo "notes=$(cat release-notes.md)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: AINovel ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: release/*
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-' ) }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit updated download.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add download.json
+          git commit -m "chore: 更新 download.json for ${{ github.ref_name }}" || true
+          git push
