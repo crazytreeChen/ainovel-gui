@@ -357,6 +357,7 @@ function stopAinovelProcess() {
 
 let snapshotTimer: ReturnType<typeof setInterval> | null = null
 let runtimeSyncActive = false
+let chapterCache: { files: string[]; mtime: number } | null = null
 
 function startRuntimeSync() {
   if (runtimeSyncActive) return
@@ -364,27 +365,34 @@ function startRuntimeSync() {
   snapshotTimer = setInterval(() => {
     if (!state.mainWindow || state.mainWindow.isDestroyed()) return
     if (!state.outputDir || state.outputDir.trim() === '') { return }
-    const { existsSync, readFileSync, readdirSync } = require('fs')
+    const { existsSync, readFileSync, readdirSync, statSync } = require('fs')
     const { join } = require('path')
     const bookDir = findActiveBookDir()
     if (!bookDir) return
     const db = getDB()
     const bookId = getDB().listBooks()?.[0]?.id
-    // Auto-import new chapters
+
+    // 自动导入新章节（带目录 mtime 缓存，避免每次全扫）
     const chDir = join(bookDir, 'chapters')
     if (existsSync(chDir)) {
       try {
-        const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
-        for (const file of files) {
-          const num = parseInt(file.replace('.md', ''), 10)
-          if (!isNaN(num)) {
-            const existing = db.getChapter(bookId, num)
-            if (!existing) {
-              const content = readFileSync(join(chDir, file), 'utf8')
-              const title = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || `第${num}章`
-              db.saveChapter(bookId, num, content, title)
+        const currentMtime = statSync(chDir).mtimeMs
+        if (chapterCache && chapterCache.mtime === currentMtime) {
+          // 目录未变更，跳过扫描
+        } else {
+          const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+          for (const file of files) {
+            const num = parseInt(file.replace('.md', ''), 10)
+            if (!isNaN(num)) {
+              const existing = db.getChapter(bookId, num)
+              if (!existing) {
+                const content = readFileSync(join(chDir, file), 'utf8')
+                const title = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || `第${num}章`
+                db.saveChapter(bookId, num, content, title)
+              }
             }
           }
+          chapterCache = { files, mtime: currentMtime }
         }
       } catch (e: any) { log.error('runtime-sync:chapters', e) }
     }
@@ -392,8 +400,6 @@ function startRuntimeSync() {
     // 推送最新快照到渲染进程（替代前端轮询）
     try {
       const { ipcMain } = require('electron')
-      // 复用 get-snapshot 处理逻辑：通过 ipcMain 已有的事件处理
-      // 直接向渲染进程推送数据
       if (bookId && state.mainWindow && !state.mainWindow.isDestroyed()) {
         state.mainWindow.webContents.send('runtime-update', {
           type: 'sync',
