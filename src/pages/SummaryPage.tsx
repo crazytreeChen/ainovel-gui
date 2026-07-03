@@ -76,7 +76,7 @@ export default function SummaryPage() {
               const refKey = String(entry.refKey ?? '')
               const key = refKey || String(currentList.indexOf(entry))
               const isOpen = expanded.has(key)
-              const label = tab === 'chapter' ? `第${refKey}章` :
+              const label = tab === 'chapter' ? (refKey ? `第${refKey}章` : `章节 ${currentList.indexOf(entry) + 1}`) :
                 tab === 'arc' ? refKey.replace('arc-', '弧 ').replace('v', '第').replace('a', '弧') :
                 refKey.replace('vol-', '第').replace('v', '卷 ')
               return (

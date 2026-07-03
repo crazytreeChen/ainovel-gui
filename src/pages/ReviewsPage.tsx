@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
 import BackButton from '@/components/BackButton'
-import { useBookData } from '@/hooks/useBookData'
 import RadarChart from '@/components/RadarChart'
 
 interface DimensionScore {
@@ -29,14 +28,21 @@ const DIM_COLORS: Record<string, string> = {
 export default function ReviewsPage() {
   const id = useBookId()
   const navigate = useNavigate()
-  const { data: reviews, loading } = useBookData<ReviewEntry[]>(
-    async (bid) => (await window.electronAPI?.getBookReviews(bid)) ?? [],
-    [],
-  )
-
+  const [reviews, setReviews] = useState<ReviewEntry[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedIdx, setSelectedIdx] = useState(0)
 
-  const reviewList = reviews ?? []
+  useEffect(() => { loadReviews() }, [id])
+
+  async function loadReviews() {
+    if (!id || !window.electronAPI) return
+    setLoading(true)
+    const data = await window.electronAPI.getBookReviews(id)
+    setReviews(data || [])
+    setLoading(false)
+  }
+
+  const reviewList = reviews
   const review = reviewList[selectedIdx]
 
   return (
