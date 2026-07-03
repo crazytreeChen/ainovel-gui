@@ -256,6 +256,13 @@ function fillRunningSnapshot(snap: any) {
   snap.inProgressChapter = progress.in_progress_chapter || 0; snap.currentChapter = progress.current_chapter || 0
   snap.pendingRewrites = progress.pending_rewrites || []; snap.rewriteReason = progress.rewrite_reason || ''
   snap.layered = progress.layered || false
+  // 从 progress.json 读取上下文/缓存数据（ainovel-cli 运行时写入）
+  if (progress.context_percent) snap.contextPercent = progress.context_percent
+  if (progress.context_tokens) snap.contextTokens = progress.context_tokens
+  if (progress.context_window) snap.contextWindow = progress.context_window
+  if (progress.context_percent !== undefined) snap.contextPercent = progress.context_percent
+  if (progress.cache_read !== undefined) snap.cacheReadTokens = progress.cache_read
+  if (progress.cache_write !== undefined) snap.cacheWriteTokens = progress.cache_write
   if (progress.current_volume && progress.current_arc) snap.currentVolumeArc = `第${progress.current_volume}卷·第${progress.current_arc}弧`
   if (completed.length > 0) {
     const last = completed[completed.length - 1]; const wc = (progress.chapter_word_counts || {})[last] || ''
