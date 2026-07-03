@@ -25,10 +25,18 @@ export default function DetailPanel() {
         if (b?.name) setBookName(b.name)
       }).catch(() => {})
     }
+    loadStats()
+    // 运行时每 30s 刷新用量统计
+    const timer = setInterval(loadStats, 30000)
+    return () => clearInterval(timer)
+  }, [id, bookName])
+
+  async function loadStats() {
+    if (!id || !window.electronAPI) return
     window.electronAPI.getUsageStats(id).then(setUsageStats).catch(() => {})
     window.electronAPI.getRunMeta(id).then(setRunMeta).catch(() => {})
     window.electronAPI.getBookCast(id).then(setCast).catch(() => {})
-  }, [id, bookName])
+  }
 
   return (
     <div>

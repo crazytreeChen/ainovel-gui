@@ -214,6 +214,21 @@ function createSnapshotHandler() {
     } catch (e: any) { log.error('snapshot:book', e) }
     if (isAlive) { fillRunningSnapshot(snap) }
     else { fillDbSnapshot(snap) }
+    // 两份路径之后都从 DB 补用量统计（运行时 progress.json 不含用量）
+    try {
+      const books = getDB().listBooks()
+      if (books?.length) {
+        const usage = getDB().getUsageStats(books[0].id)
+        if (usage) {
+          snap.totalInputTokens = usage.total_input || 0
+          snap.totalOutputTokens = usage.total_output || 0
+          snap.totalCostUSD = usage.total_cost || 0
+          snap.totalSavedUSD = usage.total_saved || 0
+          snap.cacheReadTokens = usage.cache_read || 0
+          snap.cacheWriteTokens = usage.cache_write || 0
+        }
+      }
+    } catch (e: any) { log.error('snapshot:usage', e) }
     snap.statusLabel = deriveStatusLabel(snap)
     fillFallbackData(snap)
     return snap
