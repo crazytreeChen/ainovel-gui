@@ -85,6 +85,9 @@ export default function Workspace() {
           <span className="mono">
             {snapshot.runtimeState === 'running' ? '● 运行中' : snapshot.runtimeState === 'paused' ? '⏸ 已暂停' : '○ 空闲'}
           </span>
+          <span className="mono" style={{ color: snapshot.flow === 'polishing' ? 'var(--color-accent)' : undefined }}>
+            {snapshot.flow === 'writing' ? '写作中' : snapshot.flow === 'polishing' ? '打磨中' : snapshot.flow || ''}
+          </span>
           {snapshot.provider && <span>{snapshot.provider}/{snapshot.modelName || '-'}</span>}
           {snapshot.agents?.length > 0 && (
             <span>
@@ -92,10 +95,11 @@ export default function Workspace() {
             </span>
           )}
           {snapshot.pendingRewrites?.length > 0 && (
-            <span style={{ color: 'var(--color-error)' }}>返工 [{snapshot.pendingRewrites.join(',')}]</span>
+            <span style={{ color: 'var(--color-error)' }}>待打磨 [{snapshot.pendingRewrites.join(',')}]</span>
           )}
           <span className="ml-auto">
             {snapshot.contextPercent > 0 && `上下文 ${snapshot.contextPercent.toFixed(0)}%`}
+            {snapshot.contextPercent > 80 && <span className="text-error"> ⚠️ 接近上限</span>}
           </span>
           <button className={`welcome-mode-btn text-xs ${showStatus ? 'active' : ''}`}
             onClick={() => setShowStatus(s => !s)}>
