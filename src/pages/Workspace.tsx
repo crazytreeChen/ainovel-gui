@@ -70,13 +70,7 @@ export default function Workspace() {
       <div className="flex-1 flex-col overflow-hidden" style={{ gap: fullscreen ? 0 : 24 }}>
         {/* 顶栏 */}
         <div className="top-bar mb-8" style={{ padding: 0 }}>
-          <div className="flex-row items-center gap-8">
-            <TopBar bookName={book?.name} />
-            <button className="welcome-mode-btn text-xs" onClick={() => setFullscreen(s => !s)}
-              style={{ flexShrink: 0 }}>
-              {fullscreen ? '⊞ 退出全屏' : '⊟ 全屏写作'}
-            </button>
-          </div>
+          <TopBar bookName={book?.name} />
         </div>
 
         {/* 主体内容 */}
@@ -85,6 +79,9 @@ export default function Workspace() {
           {!fullscreen && (<>
           {!isRunning && !isComplete && (
             <div className="state-panel">
+              <button className="welcome-mode-btn text-xs btn-block mb-8" onClick={() => setFullscreen(true)}>
+                ⊟ 全屏写作
+              </button>
               <button onClick={handleResume} className="btn btn-primary btn-block mb-8">
                 ▶️ {book?.completedCount ? '继续创作' : '开始创作'}
               </button>
@@ -93,6 +90,9 @@ export default function Workspace() {
           )}
           {isRunning && (
             <div className="state-panel">
+              <button className="welcome-mode-btn text-xs btn-block mb-8" onClick={() => setFullscreen(true)}>
+                ⊟ 全屏写作
+              </button>
               <button onClick={() => pauseWriting()} className="btn btn-danger btn-block mb-8">
                 ⏸ 暂停
               </button>
