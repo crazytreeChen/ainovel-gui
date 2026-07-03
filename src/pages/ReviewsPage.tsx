@@ -135,6 +135,20 @@ export default function ReviewsPage() {
                     ))}
                   </div>
                 )}
+                {review.verdict !== 'accept' && (
+                  <div className="mt-16" style={{ paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
+                    <div className="text-xs text-dim mb-8">
+                      {review.verdict === 'rewrite' ? '需重写' : '需打磨'} — 共 {review.affectedChapters?.length || 1} 章受影响
+                    </div>
+                    <button className="welcome-mode-btn active text-sm"
+                      onClick={() => navigate(`/books/${id}/workspace?mode=writing`)}>
+                      ✏️ 前往工作台{review.verdict === 'rewrite' ? '重写' : '打磨'}
+                    </button>
+                    <div className="text-dim text-xs mt-4">
+                      进入工作台后点击「继续创作」，AI 将自动处理待修改的章节
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
