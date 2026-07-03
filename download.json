@@ -1,20 +1,25 @@
 {
   "version": "0.6.1",
-  "release_notes": "## v0.6.0 更新内容\n\n### 🚀 技术升级\n- Electron 31 → 41\n- Vite 5 → 8\n- React Router 7 / Zustand 4 / Lucide React 1.x\n- 状态管理重构：useAppStore 拆分为 4 个领域 store\n- 自定义 hooks 提取：useBookCRUD / useIPCListeners / useKeyboardShortcuts / useCommandPalette\n\n### 🔧 修复\n- TopBar 版本号从 package.json 动态读取\n- forceGraph.ts 类型安全修正\n- scripts/*.js → *.cjs（ESM/CJS 兼容）\n- 构建流程修复（Electron 主进程 + scripts）\n\n### 📦 构建\n- macOS arm64: DMG + zip\n- Windows x64: NSIS 安装包 + zip",
+  "release_notes": "## v0.6.1 更新内容\n\n### ✨ 新功能\n- 角色管理 CRUD（新建/编辑/删除角色）\n- 章节编辑器 Markdown 预览\n- 数据统计仪表盘（字数/Token/成本可视化）\n- 数据备份与恢复（ZIP 导出/导入）\n- 全局搜索 Cmd+K（跨模块搜索章节/角色/事件/大纲）\n- 写作目标与进度追踪\n- 章节版本对比 Diff\n- 大纲可编辑（inline 双击编辑）\n- 评审雷达图可视化\n\n### 🔧 优化\n- 提取 useBookId/useBookData hooks 消除代码重复\n- 升级 Vitest 1.6→4.1.9\n- 批量迁移内联样式至 CSS 类\n- 统一的版本号单一声源\n\n### 📦 构建\n- macOS arm64/x64: DMG + zip",
   "release_date": "2026-07-03",
   "downloads": {
     "mac-arm64": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.0/AINovel-0.6.0-mac-arm64.dmg",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.1/AINovel-0.6.1-mac-arm64.dmg",
+      "size": 0,
+      "sha256": ""
+    },
+    "mac-x64": {
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.1/AINovel-0.6.1-mac-x64.dmg",
       "size": 0,
       "sha256": ""
     },
     "win-x64": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.0/AINovel-0.6.0-win-x64.exe",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.1/AINovel-0.6.1-win-x64.exe",
       "size": 0,
       "sha256": ""
     },
     "mac-arm64-zip": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.0/AINovel-0.6.0-mac-arm64.zip",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.1/AINovel-0.6.1-mac-arm64.zip",
       "size": 0,
       "sha256": ""
     }

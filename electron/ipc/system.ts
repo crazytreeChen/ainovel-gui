@@ -208,17 +208,31 @@ function register(ipcMain: Electron.IpcMain) {
     try {
       const apiUrl = 'https://api.github.com/repos/crazytreeChen/ainovel-gui/releases/latest'
       const apiResp = await fetch(apiUrl, { headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'ainovel-gui' }, signal: AbortSignal.timeout(10000) })
-      if (!apiResp.ok) return { available: false, error: 'HTTP ' + apiResp.status }
+      if (!apiResp.ok) return { available: false, error: '无法获取最新版本信息 (HTTP ' + apiResp.status + ')' }
       const release = await apiResp.json()
       const latestVersion = (release.tag_name || '').replace(/^v/, '') || '0.0.0'
-      const manifestUrl = `https://github.com/crazytreeChen/ainovel-gui/releases/download/v${latestVersion}/download.json`
-      const manifestResp = await fetch(manifestUrl, { signal: AbortSignal.timeout(10000) })
-      if (!manifestResp.ok) return { available: false, error: '无法获取版本清单' }
-      const manifest = await manifestResp.json()
-      const platform = os.platform() === 'darwin' ? (os.arch() === 'arm64' ? 'mac-arm64' : 'mac-x64') : os.platform() === 'win32' ? 'win-x64' : 'linux-x64'
-      const download = manifest.downloads?.[platform]
       const available = semverGt(latestVersion, APP_VERSION)
-      return { available, currentVersion: APP_VERSION, latestVersion, url: download?.url || '', notes: manifest.release_notes || '', releaseDate: manifest.release_date || '', size: download?.size || 0, sha256: download?.sha256 || '' }
+      // 尝试获取下载清单 — 404 时仍有版本信息
+      let download = null
+      try {
+        const manifestUrl = `https://github.com/crazytreeChen/ainovel-gui/releases/download/v${latestVersion}/download.json`
+        const manifestResp = await fetch(manifestUrl, { signal: AbortSignal.timeout(5000) })
+        if (manifestResp.ok) {
+          const manifest = await manifestResp.json()
+          const platform = os.platform() === 'darwin' ? (os.arch() === 'arm64' ? 'mac-arm64' : 'mac-x64') : os.platform() === 'win32' ? 'win-x64' : 'linux-x64'
+          download = manifest.downloads?.[platform]
+        }
+      } catch { /* manifest not available, show version info only */ }
+      return {
+        available,
+        currentVersion: APP_VERSION,
+        latestVersion,
+        url: download?.url || '',
+        notes: release.body || '',
+        releaseDate: release.published_at || '',
+        size: download?.size || 0,
+        sha256: download?.sha256 || '',
+      }
     } catch (e: any) { return { available: false, error: e.message || '检查更新失败' } }
   })
 
