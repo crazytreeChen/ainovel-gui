@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
-import { useBookData } from '@/hooks/useBookData'
 
 interface SummaryEntry {
   id?: number; type: string; refKey: string
@@ -12,16 +11,22 @@ interface SummaryEntry {
 export default function SummaryPage() {
   const id = useBookId()
   const navigate = useNavigate()
-  const { data: summaries, loading } = useBookData<SummaryEntry[]>(
-    async (bid) => (await window.electronAPI?.getBookSummaries(bid)) ?? [],
-    [],
-  )
+  const [summaries, setSummaries] = useState<SummaryEntry[]>([])
+  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'chapter' | 'arc' | 'volume'>('chapter')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const list = summaries ?? []
+  useEffect(() => { loadData() }, [id])
 
-  const grouped = list.reduce<Record<string, SummaryEntry[]>>((acc, s) => {
+  async function loadData() {
+    if (!id || !window.electronAPI) return
+    setLoading(true)
+    const data = await window.electronAPI.getBookSummaries(id)
+    setSummaries(data || [])
+    setLoading(false)
+  }
+
+  const grouped = summaries.reduce<Record<string, SummaryEntry[]>>((acc, s) => {
     const key = s.type || 'chapter'
     if (!acc[key]) acc[key] = []
     acc[key].push(s)
@@ -45,7 +50,7 @@ export default function SummaryPage() {
         <div className="flex-row items-center gap-12 mb-16 flex-shrink-0">
           <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
           <h2 className="mono text-accent m-0 text-lg">摘要管理</h2>
-          <span className="text-dim text-sm">{list.length} 条</span>
+          <span className="text-dim text-sm">{summaries.length} 条</span>
         </div>
 
         <div className="flex-row gap-8 mb-12 flex-shrink-0">
