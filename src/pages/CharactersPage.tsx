@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import CastEcosystem from '@/components/characters/CastEcosystem'
 import RelationGraph from '@/components/characters/RelationGraph'
+import CharacterEditor from '@/components/characters/CharacterEditor'
 import type { Character, CastEntry, Relation } from '@/types/characters'
 import { TIER_COLORS, TIER_LABELS, PLACEHOLDER_FACES } from '@/types/characters'
 import { useBookId } from '@/hooks/useBookId'
@@ -20,6 +21,8 @@ export default function CharactersPage() {
   const [selectedCast, setSelectedCast] = useState<CastEntry | null>(null)
   const [relations, setRelations] = useState<Relation[]>([])
   const [relLoading, setRelLoading] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editChar, setEditChar] = useState<Character | null>(null)
 
   useEffect(() => { loadChars(); loadCast(); loadRelations() }, [id])
 
@@ -47,6 +50,35 @@ export default function CharactersPage() {
     setRelLoading(false)
   }
 
+  const saveChars = useCallback(async (updated: Character[]) => {
+    if (!id || !window.electronAPI) return
+    await window.electronAPI.saveBookCharacters(id, updated)
+    setChars(updated)
+  }, [id])
+
+  function handleSave(char: Character) {
+    const idx = chars.findIndex(c => c.name === char.name)
+    let updated: Character[]
+    if (idx >= 0) {
+      updated = [...chars]
+      updated[idx] = char
+    } else {
+      updated = [...chars, char]
+    }
+    saveChars(updated)
+    setSelected(char)
+    setEditChar(null)
+    setEditorOpen(false)
+  }
+
+  function handleDelete(name: string) {
+    const updated = chars.filter(c => c.name !== name)
+    saveChars(updated)
+    if (selected?.name === name) setSelected(null)
+    setEditChar(null)
+    setEditorOpen(false)
+  }
+
   const filtered = filterTier === 'all' ? chars : chars.filter(c => c.tier === filterTier)
 
   return (
@@ -56,7 +88,11 @@ export default function CharactersPage() {
         <div className="flex-row items-center gap-12 mb-12 flex-shrink-0">
           <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}`)}>← 返回</button>
           <h2 className="mono text-accent m-0 text-lg">角色管理</h2>
-          <div className="ml-auto flex-row" style={{ gap: 6 }}>
+          {tab === 'chars' && (
+            <button className="welcome-mode-btn active text-xs ml-auto"
+              onClick={() => { setEditChar(null); setEditorOpen(true) }}>+ 新建角色</button>
+          )}
+          <div className="ml-8 flex-row" style={{ gap: 6 }}>
             {([
               ['chars', `角色 (${chars.length})`],
               ['cast', `配角名册 (${cast.length})`],
@@ -131,6 +167,17 @@ export default function CharactersPage() {
                           <div className="text-dim text-sm">{selected.traits.join(' · ')}</div>
                         </div>
                       )}
+                      <div className="flex-row gap-8 mt-16">
+                        <button className="welcome-mode-btn text-xs"
+                          onClick={() => { setEditChar(selected); setEditorOpen(true) }}>
+                          编辑角色
+                        </button>
+                        <button className="welcome-mode-btn text-xs"
+                          style={{ color: 'var(--color-error)' }}
+                          onClick={() => handleDelete(selected.name)}>
+                          删除
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-dim text-center mt-60">选择一个角色查看详情</div>
@@ -199,6 +246,16 @@ export default function CharactersPage() {
           <CastEcosystem chars={chars} cast={cast} relations={relations} />
         )}
       </div>
+
+      {/* 角色编辑器模态框 */}
+      {editorOpen && (
+        <CharacterEditor
+          character={editChar}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onClose={() => { setEditorOpen(false); setEditChar(null) }}
+        />
+      )}
     </div>
   )
 }
