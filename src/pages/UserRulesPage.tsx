@@ -19,7 +19,7 @@ interface UserRulesData {
   directives: any[]
 }
 interface Directive {
-  chapter: number; instruction: string; active: boolean
+  chapter: number; text: string; active: boolean
 }
 
 export default function UserRulesPage() {
@@ -47,7 +47,7 @@ export default function UserRulesPage() {
     ])
     if (rulesResult?.rules) { setData(rulesResult.rules); setOriginal(JSON.parse(JSON.stringify(rulesResult.rules))) }
     if (rulesResult?.directives) setDirectives(rulesResult.directives)
-    if (userRules?.length) setDirectives(prev => [...prev, ...userRules])
+    if (userRules?.length) setDirectives(userRules.map((d: any) => ({ chapter: d.chapter || 0, text: d.text || d.instruction || '', active: true })))
     setLoading(false)
   }
 
@@ -162,11 +162,11 @@ export default function UserRulesPage() {
                 <div className="text-dim" style={{ textAlign: 'center', marginTop: 40 }}>暂无指令</div>
               ) : (
                 directives.map((d, i) => (
-                  <div key={`${d.chapter}-${d.instruction}-${i}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: 12 }}>
+                  <div key={`${d.chapter}-${d.text}-${i}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: 12 }}>
                     <span className="text-accent mono">{d.chapter ? `#${d.chapter}` : '—'}</span>
-                    <span className="text-dim" style={{ flex: 1, fontSize: 12 }}>{d.instruction}</span>
-                    <span style={{ fontSize: 11, color: d.active ? 'var(--color-success)' : 'var(--color-dim)' }}>
-                      {d.active ? '活跃' : '非活跃'}
+                    <span className="text-dim" style={{ flex: 1, fontSize: 12 }}>{d.text}</span>
+                    <span style={{ fontSize: 11, color: d.active !== false ? 'var(--color-success)' : 'var(--color-dim)' }}>
+                      {d.active !== false ? '活跃' : '非活跃'}
                     </span>
                   </div>
                 ))
