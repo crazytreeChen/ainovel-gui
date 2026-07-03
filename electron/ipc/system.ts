@@ -103,7 +103,7 @@ function register(ipcMain: Electron.IpcMain) {
   ipcMain.handle('run-diag', async () => {
     const binary = getAinovelBinary()
     const cwd = state.outputDir || require('electron').app.getPath('documents')
-    try { return await runCli(binary, ['--headless', '--diag'], { cwd, timeout: 60000 }) }
+    try { return await runCli(binary, ['--headless'], { cwd, timeout: 60000 }) }
     catch (e: any) { return e.stdout || e.stderr || e.message || '诊断执行失败' }
   })
 
