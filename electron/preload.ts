@@ -50,6 +50,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadProviderConfig: () => ipcRenderer.invoke('load-provider-config'),
   saveProviderConfig: (config: any) => ipcRenderer.invoke('save-provider-config', config),
 
+  // 全局配置
+  saveConfigValue: (key: string, value: any) => ipcRenderer.invoke('save-config-value', key, value),
+  loadConfigValue: (key: string) => ipcRenderer.invoke('load-config-value', key),
+
   // 快照和状态
   getSnapshot: () => ipcRenderer.invoke('get-snapshot'),
   getEvents: () => ipcRenderer.invoke('get-events'),

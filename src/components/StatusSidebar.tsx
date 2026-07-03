@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { FLOW_LABELS, AGENT_DISPLAY, AGENT_COLORS, AGENT_TASK_LABELS } from '@/types'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
@@ -55,6 +56,15 @@ function agentStateLabel(state: string): string {
 
 export default function StatusSidebar() {
   const snapshot = useAppStore((s) => s.snapshot)
+  const [dailyGoal, setDailyGoal] = useState(0)
+
+  useEffect(() => {
+    if (window.electronAPI) {
+      window.electronAPI.loadConfigValue('writing_daily_goal').then((v: number) => {
+        if (v) setDailyGoal(v)
+      })
+    }
+  }, [])
 
   const agents = snapshot.agents || []
   const activeAgents = agents.filter((a) => a.state !== 'idle')
@@ -82,6 +92,25 @@ export default function StatusSidebar() {
         )}
         <Field label="字数" value={formatNumber(snapshot.totalWordCount)} />
       </div>
+
+      {/* 写作目标进度 */}
+      {dailyGoal > 0 && snapshot.totalWordCount > 0 && (
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">今日进度</div>
+          <div className="flex-row items-center gap-8" style={{ fontSize: 12, marginTop: 4 }}>
+            <div className="flex-1" style={{ height: 6, background: 'var(--color-surface-2)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.min(100, (snapshot.totalWordCount / dailyGoal) * 100)}%`, height: '100%',
+                background: snapshot.totalWordCount >= dailyGoal ? 'var(--color-success)' : 'var(--color-accent)',
+                borderRadius: 3, transition: 'width 0.3s',
+              }} />
+            </div>
+            <span className="text-dim mono text-xs flex-shrink-0">
+              {formatNumber(snapshot.totalWordCount)} / {formatNumber(dailyGoal)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 运行角色 */}
       {activeAgents.length > 0 && (

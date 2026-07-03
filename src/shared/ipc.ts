@@ -119,6 +119,10 @@ export interface ElectronAPI {
   loadProviderConfig: () => Promise<any>
   saveProviderConfig: (config: any) => Promise<boolean>
 
+  // 全局配置
+  saveConfigValue: (key: string, value: any) => Promise<boolean>
+  loadConfigValue: (key: string) => Promise<any>
+
   // 快照/事件/章节
   getSnapshot: () => Promise<UISnapshot>
   getEvents: () => Promise<EventItem[]>

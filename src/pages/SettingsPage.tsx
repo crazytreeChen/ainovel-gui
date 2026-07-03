@@ -20,6 +20,9 @@ export default function SettingsPage() {
   const [restoreBusy, setRestoreBusy] = useState(false)
   const [backupMsg, setBackupMsg] = useState('')
   const [restoreMsg, setRestoreMsg] = useState('')
+  const [dailyGoal, setDailyGoal] = useState(2000)
+  const [weeklyGoal, setWeeklyGoal] = useState(10000)
+  const [goalLoaded, setGoalLoaded] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -28,9 +31,21 @@ export default function SettingsPage() {
       setDataDir(dir)
       const bin = await window.electronAPI.checkBinary()
       setBinaryInfo(bin)
+      // 加载写作目标
+      const dg = await window.electronAPI.loadConfigValue('writing_daily_goal')
+      if (dg) setDailyGoal(dg)
+      const wg = await window.electronAPI.loadConfigValue('writing_weekly_goal')
+      if (wg) setWeeklyGoal(wg)
+      setGoalLoaded(true)
     }
     load()
   }, [])
+
+  async function handleSaveGoal() {
+    if (!window.electronAPI) return
+    await window.electronAPI.saveConfigValue('writing_daily_goal', dailyGoal)
+    await window.electronAPI.saveConfigValue('writing_weekly_goal', weeklyGoal)
+  }
 
   useEffect(() => {
     if (!window.electronAPI) return
@@ -246,6 +261,31 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* 写作目标 */}
+      {goalLoaded && (
+        <div className="card mb-12">
+          <div className="sidebar-section-header mb-8">🎯 写作目标</div>
+          <div className="flex-row gap-16 items-center">
+            <div>
+              <div className="text-dim text-xs mb-4">每日目标（字）</div>
+              <input type="number" value={dailyGoal}
+                onChange={e => setDailyGoal(Math.max(100, parseInt(e.target.value) || 0))}
+                className="input-field" style={{ width: 120, padding: '6px 8px' }} min={100} step={100} />
+            </div>
+            <div>
+              <div className="text-dim text-xs mb-4">每周目标（字）</div>
+              <input type="number" value={weeklyGoal}
+                onChange={e => setWeeklyGoal(Math.max(500, parseInt(e.target.value) || 0))}
+                className="input-field" style={{ width: 120, padding: '6px 8px' }} min={500} step={500} />
+            </div>
+            <button className="welcome-mode-btn active text-sm mt-16" onClick={handleSaveGoal}>保存目标</button>
+          </div>
+          <div className="text-dim text-xs mt-8">
+            💡 目标数据保存在本地，在工作台侧栏可查看进度
+          </div>
+        </div>
+      )}
 
       {/* 界面主题 */}
       <div className="card mb-12">
