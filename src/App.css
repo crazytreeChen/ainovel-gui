@@ -503,3 +503,9 @@ input[type="number"] {
   padding: 6px 8px; outline: none; font-size: 13px;
 }
 input[type="number"]:focus { border-color: var(--color-accent); }
+
+/* ── 骨架屏动画 ── */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

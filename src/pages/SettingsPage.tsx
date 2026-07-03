@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAppStore } from '@/stores/useAppStore'
 import type { ThemeMode } from '@/stores/useAppStore'
+import { showToast } from '@/components/Toast'
 
 export default function SettingsPage() {
   const navigate = useNavigate()
@@ -45,6 +46,7 @@ export default function SettingsPage() {
     if (!window.electronAPI) return
     await window.electronAPI.saveConfigValue('writing_daily_goal', dailyGoal)
     await window.electronAPI.saveConfigValue('writing_weekly_goal', weeklyGoal)
+    showToast('写作目标已保存', 'success')
   }
 
   useEffect(() => {

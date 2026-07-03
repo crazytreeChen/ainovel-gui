@@ -5,6 +5,7 @@ import { useBookId } from '@/hooks/useBookId'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import ChapterDiff from '@/components/ChapterDiff'
+import { showToast } from '@/components/Toast'
 
 export default function ChapterPage() {
   const id = useBookId()
@@ -51,8 +52,7 @@ export default function ChapterPage() {
     setSaving(true)
     await window.electronAPI.saveBookChapter(id, chapterNum, content)
     setSaving(false)
-    setStatus('已保存')
-    setTimeout(() => setStatus(''), 2000)
+    showToast('已保存', 'success')
   }
 
   function handleChapterSelect(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -61,6 +61,18 @@ export default function ChapterPage() {
   }
 
   if (loading) return <div className="text-dim" style={{ padding: 32 }}>加载中...</div>
+
+  // Cmd+S / Ctrl+S 保存
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        handleSave()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [content, id, chapterNum])
 
   return (
     <div style={{ padding: 24, height: '100vh', display: 'flex', gap: 24 }}>

@@ -21,8 +21,7 @@ export default function DetailPanel() {
   useEffect(() => {
     if (!id || !window.electronAPI) return
     if (!bookName) {
-      window.electronAPI.listBooks().then((books: any[]) => {
-        const b = books.find((x: any) => x.id === id)
+      window.electronAPI.getBook(id).then((b: any) => {
         if (b?.name) setBookName(b.name)
       }).catch(() => {})
     }

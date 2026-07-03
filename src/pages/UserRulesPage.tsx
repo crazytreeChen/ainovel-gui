@@ -6,6 +6,7 @@ import PreferencesEditor from '@/components/rules/PreferencesEditor'
 import SourcesList from '@/components/rules/SourcesList'
 import UncertainList from '@/components/rules/UncertainList'
 import { useBookId } from '@/hooks/useBookId'
+import { showToast } from '@/components/Toast'
 
 interface WordRange { min: number; max: number }
 interface UserRulesStructured {
@@ -57,6 +58,7 @@ export default function UserRulesPage() {
     await window.electronAPI.saveUserRules(id, { rules: data, directives })
     setOriginal(JSON.parse(JSON.stringify(data)))
     setSaving(false)
+    showToast('用户规则已保存', 'success')
   }
 
   function updateStructured(updates: Partial<UserRulesStructured>) {

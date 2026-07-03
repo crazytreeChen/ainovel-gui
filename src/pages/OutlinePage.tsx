@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import { showToast } from '@/components/Toast'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -87,6 +88,7 @@ export default function OutlinePage() {
       outline, layeredOutline: layered, compass, premise,
     })
     setSaving(false)
+    showToast('大纲已保存', 'success')
   }
 
   function startEdit(path: string, currentValue: string) {

@@ -205,7 +205,7 @@ export default function CharactersPage() {
                         </button>
                         <button className="welcome-mode-btn text-xs"
                           style={{ color: 'var(--color-error)' }}
-                          onClick={() => handleDelete(selected.name)}>
+                          onClick={() => { if (confirm(`确认删除角色「${selected.name}」？`)) handleDelete(selected.name) }}>
                           删除
                         </button>
                       </div>
