@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
+import { useWritingStore } from '@/stores/useWritingStore'
 import { useAppStore } from '@/stores/useAppStore'
 import { translateEventSummary } from '@/types'
 
 export default function StreamOutput() {
-  const streamOutput = useAppStore((s) => s.streamOutput)
+  const streamOutput = useWritingStore((s) => s.streamOutput)
   const snapshot = useAppStore((s) => s.snapshot)
   const containerRef = useRef<HTMLDivElement>(null)
 
