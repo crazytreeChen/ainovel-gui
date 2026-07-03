@@ -4,6 +4,7 @@ import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import ChapterDiff from '@/components/ChapterDiff'
 
 export default function ChapterPage() {
   const id = useBookId()
@@ -19,6 +20,7 @@ export default function ChapterPage() {
   const [status, setStatus] = useState('')
   const [showDraft, setShowDraft] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [showDiff, setShowDiff] = useState(false)
   const [chapterList, setChapterList] = useState<{ num: number; title: string }[]>([])
   const [chaptersLoading, setChaptersLoading] = useState(true)
 
@@ -119,10 +121,15 @@ export default function ChapterPage() {
         <button className={`welcome-mode-btn ${!showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(false); setShowPreview(false) }}>终稿</button>
         <button className={`welcome-mode-btn ${showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(true); setShowPreview(false) }}>草稿</button>
         <button className={`welcome-mode-btn ${showPreview ? 'active' : ''}`} onClick={() => setShowPreview(!showPreview)}>预览</button>
+        <button className={`welcome-mode-btn ${showDiff ? 'active' : ''}`}
+          onClick={() => { setShowDiff(!showDiff); if (!showDiff && !draft) setDraft(content) }}
+          disabled={!content && !draft}>对比</button>
       </div>
 
-      {/* 编辑器 / Markdown 预览 */}
-      {showPreview ? (
+      {/* 编辑器 / Markdown 预览 / Diff */}
+      {showDiff && draft && content ? (
+        <ChapterDiff oldText={draft} newText={content} />
+      ) : showPreview ? (
         <div className="scroll-y" style={{
           flex: 1, width: '100%',
           background: 'var(--color-bg)', color: 'var(--color-text)',
