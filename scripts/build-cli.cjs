@@ -79,19 +79,17 @@ function build() {
 
   log('Building ainovel-cli from submodule...')
 
-  const outputFlag = os.platform() === 'win32'
-    ? `-o "${OUTPUT_BIN}"`
-    : `-o '${OUTPUT_BIN}'`
+  const outputFlag = `-o ${JSON.stringify(OUTPUT_BIN)}`
 
   try {
     execSync(
-      `cd '${SUBMODULE_DIR}' && ${goBinary} build -ldflags="-s -w" ${outputFlag} ./cmd/ainovel-cli/`,
-      { stdio: 'inherit', timeout: 120000 }
+      `${goBinary} build -ldflags="-s -w" ${outputFlag} ./cmd/ainovel-cli/`,
+      { cwd: SUBMODULE_DIR, stdio: 'inherit', timeout: 120000 }
     )
 
-    // 设置执行权限
-    if (os.platform() !== 'win32') {
-      execSync(`chmod +x '${OUTPUT_BIN}'`)
+    // 设置执行权限（仅非 Windows）
+    if (process.platform !== 'win32') {
+      execSync(`chmod +x "${OUTPUT_BIN}"`)
     }
 
     const stats = require('fs').statSync(OUTPUT_BIN)
