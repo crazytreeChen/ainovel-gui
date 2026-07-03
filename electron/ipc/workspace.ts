@@ -251,7 +251,7 @@ function register(ipcMain: Electron.IpcMain) {
         rules: {
           forbiddenCharacters: Array.isArray(s.forbiddenCharacters) ? s.forbiddenCharacters : [],
           forbiddenPhrases: Array.isArray(s.forbiddenPhrases) ? s.forbiddenPhrases : [],
-          wordCountRange: (s.wordCountRange && typeof s.wordCountRange === 'object') ? s.wordCountRange : { min: 0, max: 0 },
+          wordCountRange: (s.chapter_words && typeof s.chapter_words === 'object') ? s.chapter_words : (s.wordCountRange && typeof s.wordCountRange === 'object') ? s.wordCountRange : { min: 0, max: 0 },
           fatigueWords: Array.isArray(s.fatigueWords) ? s.fatigueWords : [],
           stylePreferences: row.preferences || '',
           tabooTopics: Array.isArray(s.tabooTopics) ? s.tabooTopics : [],
@@ -271,7 +271,7 @@ function register(ipcMain: Electron.IpcMain) {
         structured: {
           forbiddenCharacters: r.forbiddenCharacters || [],
           forbiddenPhrases: r.forbiddenPhrases || [],
-          wordCountRange: r.wordCountRange || { min: 0, max: 0 },
+          chapter_words: r.wordCountRange || { min: 0, max: 0 },
           fatigueWords: r.fatigueWords || [],
           tabooTopics: r.tabooTopics || [],
         },
