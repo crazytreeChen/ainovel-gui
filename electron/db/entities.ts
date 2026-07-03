@@ -4,10 +4,10 @@
 export function mixinEntities(proto: any) {
   proto.saveCharacters = function (bookId: string, chars: any[]) {
     const del = this.database.prepare('DELETE FROM characters_t WHERE book_id = ?')
-    const ins = this.database.prepare('INSERT INTO characters_t (book_id, name, aliases, role, tier, description, arc, traits) VALUES (?,?,?,?,?,?,?,?)')
+    const ins = this.database.prepare('INSERT INTO characters_t (book_id, name, aliases, role, tier, description, arc, traits, avatar) VALUES (?,?,?,?,?,?,?,?,?)')
     const tx = this.database.transaction(() => {
       del.run(bookId)
-      for (const c of chars || []) ins.run(bookId, c.name, JSON.stringify(c.aliases || []), c.role || '', c.tier || 'secondary', c.description || '', c.arc || '', JSON.stringify(c.traits || []))
+      for (const c of chars || []) ins.run(bookId, c.name, JSON.stringify(c.aliases || []), c.role || '', c.tier || 'secondary', c.description || '', c.arc || '', JSON.stringify(c.traits || []), c.avatar || '')
     })
     tx()
   }

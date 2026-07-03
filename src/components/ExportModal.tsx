@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore, useWritingStore } from '@/stores/useAppStore'
 
 interface ExportOption { key: string; label: string; desc: string; args: string }
 
@@ -13,8 +13,8 @@ const EXPORT_FORMATS: ExportOption[] = [
 
 export default function ExportModal() {
   const { id } = useParams<{ id: string }>()
-  const toggleExport = useAppStore((s) => s.toggleExport)
-  const runExport = useAppStore((s) => s.runExport)
+  const toggleExport = useUIStore((s) => s.toggleExport)
+  const runExport = useWritingStore((s) => s.runExport)
 
   const [selected, setSelected] = useState('txt')
   const [running, setRunning] = useState(false)

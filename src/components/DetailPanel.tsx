@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useAppStore } from '@/stores/useAppStore'
+import { useBookStore } from '@/stores/useAppStore'
 import BookCover from './BookCover'
 import { AGENT_DISPLAY, AGENT_COLORS } from '@/types'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
 export default function DetailPanel() {
-  const snapshot = useAppStore((s) => s.snapshot)
+  const snapshot = useBookStore((s) => s.snapshot)
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [bookName, setBookName] = useState('')

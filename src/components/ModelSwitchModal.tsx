@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore } from '@/stores/useAppStore'
 
 const ROLES = [
   { key: '', label: '默认' }, { key: 'coordinator', label: '协调器' },
@@ -13,7 +13,7 @@ const THINKING_LEVELS = [
 ]
 
 export default function ModelSwitchModal() {
-  const toggleModelSwitch = useAppStore((s) => s.toggleModelSwitch)
+  const toggleModelSwitch = useUIStore((s) => s.toggleModelSwitch)
   const [selectedRole, setSelectedRole] = useState('')
   const [provider, setProvider] = useState('openrouter')
   const [model, setModel] = useState('google/gemini-2.5-flash')

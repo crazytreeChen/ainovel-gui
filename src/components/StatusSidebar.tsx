@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAppStore } from '@/stores/useAppStore'
+import { useBookStore } from '@/stores/useAppStore'
 import { FLOW_LABELS, AGENT_DISPLAY, AGENT_COLORS, AGENT_TASK_LABELS } from '@/types'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
@@ -55,7 +55,7 @@ function agentStateLabel(state: string): string {
 }
 
 export default function StatusSidebar() {
-  const snapshot = useAppStore((s) => s.snapshot)
+  const snapshot = useBookStore((s) => s.snapshot)
   const [dailyGoal, setDailyGoal] = useState(0)
 
   useEffect(() => {
