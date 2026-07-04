@@ -13,6 +13,7 @@ export default function DetailPanel() {
   const [usageStats, setUsageStats] = useState<any>(null)
   const [runMeta, setRunMeta] = useState<any>(null)
   const [cast, setCast] = useState<any[]>([])
+  const [chapterCount, setChapterCount] = useState(0)
 
   useEffect(() => {
     if (snapshot.novelName) setBookName(snapshot.novelName)
@@ -26,8 +27,8 @@ export default function DetailPanel() {
       }).catch(() => {})
     }
     loadStats()
-    // 运行时每 30s 刷新用量统计
-    const timer = setInterval(loadStats, 30000)
+    refreshChapters()
+    const timer = setInterval(() => { loadStats(); refreshChapters() }, 30000)
     return () => clearInterval(timer)
   }, [id, bookName])
 
@@ -38,6 +39,12 @@ export default function DetailPanel() {
     window.electronAPI.getBookCast(id).then(setCast).catch(() => {})
   }
 
+  async function refreshChapters() {
+    if (!id || !window.electronAPI) return
+    const chs = await window.electronAPI.getBookChapters(id).catch(() => [])
+    if (chs?.length) setChapterCount(chs.length)
+  }
+
   return (
     <div>
       {id && (
@@ -45,7 +52,7 @@ export default function DetailPanel() {
           <BookCover bookId={id} size="small" />
           <div>
             <div style={{ fontWeight: 'bold', fontSize: 14, color: 'var(--color-text)' }}>{bookName || snapshot.novelName || '未定书名'}</div>
-            <div className="text-dim mono text-xs mt-8">{getPhaseLabel(snapshot.phase)} · {snapshot.completedCount} 章</div>
+            <div className="text-dim mono text-xs mt-8">{getPhaseLabel(snapshot.phase)} · {(chapterCount || snapshot.completedCount)} 章</div>
           </div>
         </div>
       )}
