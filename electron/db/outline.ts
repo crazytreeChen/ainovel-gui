@@ -1,6 +1,8 @@
 /**
  * 大纲/卷/弧/章节/草稿/计划
  */
+const { cleanChapterTitle } = require('../utils')
+
 export function mixinOutline(proto: any) {
   proto.saveOutlineEntries = function (bookId: string, entries: any[]) {
     const del = this.database.prepare('DELETE FROM outline_entries WHERE book_id = ?')
@@ -75,8 +77,15 @@ export function mixinOutline(proto: any) {
   proto.saveChapter = function (bookId: string, num: number, content: string, title: string) {
     const now = new Date().toISOString()
     const wc = content.trim() ? content.trim().length : 0
-    this.database.prepare(`INSERT OR REPLACE INTO chapters (book_id, num, title, content, word_count, status, created_at, updated_at) VALUES (?,?,?,?,?,?,COALESCE((SELECT created_at FROM chapters WHERE book_id=? AND num=?),?),?)`)
-      .run(bookId, num, title || '', content || '', wc, 'draft', bookId, num, now, now)
+    const cleanTitle = cleanChapterTitle(title || '', num)
+    // 先尝试 UPDATE，只有 (book_id, num) 不存在时才 INSERT
+    // 避免 INSERT OR REPLACE 因自增主键导致重复行
+    const upd = this.database.prepare(`UPDATE chapters SET title=?, content=?, word_count=?, status=?, updated_at=? WHERE book_id=? AND num=?`)
+      .run(cleanTitle, content || '', wc, 'draft', now, bookId, num)
+    if (upd.changes === 0) {
+      this.database.prepare(`INSERT INTO chapters (book_id, num, title, content, word_count, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`)
+        .run(bookId, num, cleanTitle, content || '', wc, 'draft', now, now)
+    }
   }
 
   proto.getChapter = function (bookId: string, num: number) {

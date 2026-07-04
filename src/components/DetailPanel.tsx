@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useBookStore } from '@/stores/useAppStore'
 import BookCover from './BookCover'
-import { AGENT_DISPLAY, AGENT_COLORS } from '@/types'
+import UsageStats from './UsageStats'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
 export default function DetailPanel() {
@@ -28,8 +28,6 @@ export default function DetailPanel() {
     }
     loadStats()
     refreshChapters()
-    const timer = setInterval(() => { loadStats(); refreshChapters() }, 30000)
-    return () => clearInterval(timer)
   }, [id, bookName])
 
   async function loadStats() {
@@ -137,68 +135,7 @@ export default function DetailPanel() {
       {usageStats && (
         <div className="sidebar-section">
           <div className="sidebar-section-header text-xs">用量统计</div>
-          <div className="mono text-xs" style={{ lineHeight: 1.8 }}>
-            <div className="usage-row">
-              <span className="text-muted">输入 Token</span>
-              <span>{(usageStats.total_input || 0).toLocaleString()}</span>
-            </div>
-            <div className="usage-row">
-              <span className="text-muted">输出 Token</span>
-              <span>{(usageStats.total_output || 0).toLocaleString()}</span>
-            </div>
-            <div className="usage-row">
-              <span className="text-muted">总费用</span>
-              <span>${(usageStats.total_cost || 0).toFixed(4)}</span>
-            </div>
-            {usageStats.total_saved > 0 && (
-              <div className="usage-row">
-                <span className="text-success">节省</span>
-                <span className="text-success">${usageStats.total_saved.toFixed(4)}</span>
-              </div>
-            )}
-            {(usageStats.cache_read || 0) > 0 && (
-              <div className="usage-row">
-                <span className="text-muted">缓存读取</span>
-                <span>{(usageStats.cache_read || 0).toLocaleString()}</span>
-              </div>
-            )}
-            {(usageStats.cache_write || 0) > 0 && (
-              <div className="usage-row">
-                <span className="text-muted">缓存写入</span>
-                <span>{(usageStats.cache_write || 0).toLocaleString()}</span>
-              </div>
-            )}
-            {usageStats.per_model && Object.keys(usageStats.per_model).length > 0 && (
-              <>
-                <div className="usage-row border-top mt-8" style={{ paddingTop: 4 }}>
-                  <span className="text-dim text-xs">按模型</span>
-                  <span></span>
-                </div>
-                {Object.entries(usageStats.per_model).slice(0, 5).map(([model, stats]: [string, any]) => (
-                  <div key={model} className="usage-row">
-                    <span className="text-dim text-xs">{model.split('/').pop()}</span>
-                    <span className="text-dim text-xs">{(stats.input || 0).toLocaleString()}</span>
-                  </div>
-                ))}
-              </>
-            )}
-            {usageStats.per_agent && Object.keys(usageStats.per_agent).length > 0 && (
-              <>
-                <div className="usage-row border-top mt-8" style={{ paddingTop: 4 }}>
-                  <span className="text-dim text-xs">按角色</span>
-                  <span></span>
-                </div>
-                {Object.entries(usageStats.per_agent).map(([agent, stats]: [string, any]) => (
-                  <div key={agent} className="usage-row">
-                    <span style={{ fontSize: 11, color: AGENT_COLORS[agent] || 'var(--color-dim)', fontWeight: 'bold' }}>
-                      {AGENT_DISPLAY[agent] || agent}
-                    </span>
-                    <span className="text-dim text-xs">{(stats.input || 0).toLocaleString()}</span>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
+          <UsageStats stats={usageStats} />
         </div>
       )}
 

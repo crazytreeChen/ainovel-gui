@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import BookCover from '@/components/BookCover'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
-import type { BookItem } from './BookCard'
+import type { BookItem } from '@/shared/ipc'
 
 interface BookEditModalProps {
   book: BookItem

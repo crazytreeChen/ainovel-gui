@@ -54,17 +54,51 @@ class AppDatabase {
   }
 
   migrate() {
-    const row = this.database.prepare('SELECT value FROM _meta WHERE key = ?').get('schema_version')
-    if (!row) {
+    const row = this.database.prepare('SELECT value FROM _meta WHERE key = ?').get('schema_version') as any
+    let version = row ? parseInt(row.value) : 0
+
+    if (version < 1) {
       this.database.exec(SCHEMA_SQL)
-      this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', '1')
+      version = 1
     }
-    const hasColumn = (table: string, col: string) => {
-      const cols = this.database.prepare(`PRAGMA table_info(${table})`).all() as any[]
-      return cols.some((c: any) => c.name === col)
+
+    if (version < 2) {
+      // 清理 chapters 表重复数据（旧版 INSERT OR REPLACE 因自增主键产生重复行）
+      this.database.exec(`DELETE FROM chapters WHERE id NOT IN (SELECT MIN(id) FROM chapters GROUP BY book_id, num)`)
+      this.database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_chapters_book_num ON chapters(book_id, num)`)
+      version = 2
     }
-    if (!hasColumn('books', 'tags')) this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""')
-    if (!hasColumn('characters_t', 'avatar')) this.database.exec('ALTER TABLE characters_t ADD COLUMN avatar TEXT DEFAULT ""')
+
+    if (version < 3) {
+      // 清理 drafts 表重复数据
+      this.database.exec(`DELETE FROM drafts WHERE id NOT IN (SELECT MIN(id) FROM drafts GROUP BY book_id, num)`)
+      this.database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_drafts_book_num ON drafts(book_id, num)`)
+
+      // 清理 chapter_plans 表重复数据
+      this.database.exec(`DELETE FROM chapter_plans WHERE id NOT IN (SELECT MIN(id) FROM chapter_plans GROUP BY book_id, chapter)`)
+      this.database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_chapter_plans_book_chapter ON chapter_plans(book_id, chapter)`)
+
+      // 新增列（若不存在则添加）
+      const hasColumn = (table: string, col: string) => {
+        const cols = this.database.prepare(`PRAGMA table_info(${table})`).all() as any[]
+        return cols.some((c: any) => c.name === col)
+      }
+      if (!hasColumn('books', 'tags')) this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""')
+      if (!hasColumn('characters_t', 'avatar')) this.database.exec('ALTER TABLE characters_t ADD COLUMN avatar TEXT DEFAULT ""')
+
+      // 补充高频查询索引
+      this.database.exec(`CREATE INDEX IF NOT EXISTS idx_cast_entries_book ON cast_entries(book_id)`)
+      this.database.exec(`CREATE INDEX IF NOT EXISTS idx_timeline_events_book_chapter ON timeline_events(book_id, chapter)`)
+      this.database.exec(`CREATE INDEX IF NOT EXISTS idx_foreshadow_entries_book ON foreshadow_entries(book_id)`)
+      this.database.exec(`CREATE INDEX IF NOT EXISTS idx_relationship_entries_book ON relationship_entries(book_id)`)
+      this.database.exec(`CREATE INDEX IF NOT EXISTS idx_state_changes_book_chapter ON state_changes(book_id, chapter)`)
+      this.database.exec(`CREATE INDEX IF NOT EXISTS idx_summaries_book_type ON summaries(book_id, type)`)
+      this.database.exec(`CREATE INDEX IF NOT EXISTS idx_user_directives_book ON user_directives(book_id)`)
+
+      version = 3
+    }
+
+    this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', String(version))
   }
 
   close() { this.database.close() }

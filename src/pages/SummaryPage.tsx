@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import { useExpandSet } from '@/hooks/useExpandSet'
+import TabBar from '@/components/TabBar'
 import BackButton from '@/components/BackButton'
 
 interface SummaryEntry {
@@ -15,7 +17,7 @@ export default function SummaryPage() {
   const [summaries, setSummaries] = useState<SummaryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'chapter' | 'arc' | 'volume'>('chapter')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const expand = useExpandSet<string>()
 
   useEffect(() => { loadData() }, [id])
 
@@ -36,12 +38,6 @@ export default function SummaryPage() {
 
   const currentList = grouped[tab] || []
 
-  function toggleExpand(key: string) {
-    const next = new Set(expanded)
-    if (next.has(key)) next.delete(key); else next.add(key)
-    setExpanded(next)
-  }
-
   if (loading) return <div className="text-dim p-32">加载中...</div>
 
   return (
@@ -54,16 +50,16 @@ export default function SummaryPage() {
           <span className="text-dim text-sm">{summaries.length} 条</span>
         </div>
 
-        <div className="flex-row gap-8 mb-12 flex-shrink-0">
-          {([
-            ['chapter', '章节摘要'],
-            ['arc', '弧摘要'],
-            ['volume', '卷摘要'],
-          ] as const).map(([k, label]) => (
-            <button key={k} className={`welcome-mode-btn text-xs ${tab === k ? 'active' : ''}`}
-              onClick={() => setTab(k)}>{label} ({(grouped[k] || []).length})</button>
-          ))}
-        </div>
+        <TabBar
+          className="flex-row gap-8 mb-12 flex-shrink-0"
+          tabs={[
+            ['chapter', `章节摘要 (${(grouped['chapter'] || []).length})`],
+            ['arc', `弧摘要 (${(grouped['arc'] || []).length})`],
+            ['volume', `卷摘要 (${(grouped['volume'] || []).length})`],
+          ] as const}
+          active={tab}
+          onSelect={(k) => setTab(k as typeof tab)}
+        />
 
         <div className="flex-1 scroll-y">
           {currentList.length === 0 ? (
@@ -75,14 +71,14 @@ export default function SummaryPage() {
             currentList.map((entry) => {
               const refKey = String(entry.refKey ?? '')
               const key = refKey || String(currentList.indexOf(entry))
-              const isOpen = expanded.has(key)
+              const isOpen = expand.isExpanded(key)
               const label = tab === 'chapter' ? (refKey ? `第${refKey}章` : `章节 ${currentList.indexOf(entry) + 1}`) :
                 tab === 'arc' ? refKey.replace('arc-', '弧 ').replace('v', '第').replace('a', '弧') :
                 refKey.replace('vol-', '第').replace('v', '卷 ')
               return (
                 <div key={key} className="mb-8">
                   <div className="cursor-clickable flex-row items-center gap-8 card"
-                    onClick={() => toggleExpand(key)}>
+                    onClick={() => expand.toggle(key)}>
                     <span className="text-dim">{isOpen ? '▼' : '▶'}</span>
                     <span className="text-accent mono" style={{ fontWeight: 'bold', fontSize: 13 }}>{label}</span>
                     {entry.characters?.length > 0 && (

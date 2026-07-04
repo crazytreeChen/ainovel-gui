@@ -5,6 +5,7 @@ import CastEcosystem from '@/components/characters/CastEcosystem'
 import RelationGraph from '@/components/characters/RelationGraph'
 import CharacterEditor from '@/components/characters/CharacterEditor'
 import ImageViewer from '@/components/ImageViewer'
+import TabBar from '@/components/TabBar'
 import type { Character, CastEntry, Relation } from '@/types/characters'
 import { TIER_COLORS, TIER_LABELS, PLACEHOLDER_FACES } from '@/types/characters'
 import { useBookId } from '@/hooks/useBookId'
@@ -97,17 +98,18 @@ export default function CharactersPage() {
             <button className="welcome-mode-btn active text-xs ml-auto"
               onClick={() => { setEditChar(null); setEditorOpen(true) }}>+ 新建角色</button>
           )}
-          <div className="ml-8 flex-row" style={{ gap: 6 }}>
-            {([
+          <TabBar
+            className="ml-8 flex-row"
+            style={{ gap: 6 }}
+            tabs={[
               ['chars', `角色 (${chars.length})`],
               ['cast', `配角名册 (${cast.length})`],
               ['relations', `关系图谱 (${relations.length})`],
               ['eco', `配角生态 (${cast.length})`],
-            ] as const).map(([k, label]) => (
-              <button key={k} className={`welcome-mode-btn text-xs ${tab === k ? 'active' : ''}`}
-                onClick={() => setTab(k)}>{label}</button>
-            ))}
-          </div>
+            ] as const}
+            active={tab}
+            onSelect={(k) => setTab(k as typeof tab)}
+          />
         </div>
 
         {tab === 'chars' && (

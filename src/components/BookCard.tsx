@@ -1,20 +1,6 @@
 import BookCover from '@/components/BookCover'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
-
-export interface BookItem {
-  id: string
-  name: string
-  style: string
-  phase: string
-  flow: string
-  completedCount: number
-  totalWordCount: number
-  premise?: string
-  tags?: string
-  createdAt: string
-  lastOpenedAt: string
-  workspaceDir?: string
-}
+import type { BookItem } from '@/shared/ipc'
 
 interface BookCardProps {
   book: BookItem

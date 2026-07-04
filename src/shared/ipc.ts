@@ -97,9 +97,11 @@ export interface ElectronAPI {
 
   // 时间线
   getBookTimeline: (id: string) => Promise<any>
+  saveBookTimeline: (id: string, data: any) => Promise<boolean>
 
   // 评审
   getBookReviews: (id: string) => Promise<any[]>
+  saveBookReview: (id: string, review: any) => Promise<boolean>
 
   // 图片生成
   /** 图片接口格式：openai=标准 OpenAI 格式，agnes=Agnes AI 格式 */
@@ -184,6 +186,41 @@ export interface ElectronAPI {
 
   // 全局搜索
   searchBook: (id: string, query: string) => Promise<SearchResults>
+
+  // 批量清洗
+  batchCleanTitles: (id: string) => Promise<{ cleaned: number; total: number; error?: string }>
+
+  // AI 批量生成标题
+  batchGenerateTitles: (id: string) => Promise<{
+    success: boolean; updated: number; total: number; error?: string
+    results?: { chapter: number; oldTitle: string; newTitle: string; error?: string }[]
+  }>
+
+  // 全书评审修复 Agent
+  batchAuditBook: (id: string) => Promise<{
+    success: boolean; total: number; error?: string
+    stats: {
+      reviewed: number; titleUpdated: number
+      needsRewrite: number; needsTrimming: number
+      errors: number; skipped: number
+      avgTitleScore: number; avgAiFlavorScore: number
+      avgPacingScore: number; avgOutlineScore: number
+      avgCharContinuityScore: number; avgTimelineScore: number; avgPlotThreadScore: number
+      totalMissingIntros: number; totalCharStateInconsistencies: number; totalTimelineGaps: number; totalDroppedThreads: number
+    }
+    results: {
+      chapter: number; oldTitle: string; newTitle?: string
+      review?: {
+        title_score: number; ai_flavor_score: number; pacing_score: number
+        outline_alignment_score: number; word_count_ok: boolean
+        character_continuity_score: number; timeline_consistency_score: number; plot_thread_score: number
+      }
+      issues?: string[]; strengths?: string[]
+      missingIntroductions?: string[]; characterStateInconsistencies?: string[]; timelineGaps?: string[]; droppedThreads?: string[]
+      applied?: string[]; needsRewrite?: boolean; needsTrimming?: boolean
+      summary?: string; error?: string; skipped?: boolean
+    }[]
+  }>
 
   // 更新
   checkUpdate: () => Promise<UpdateInfo>

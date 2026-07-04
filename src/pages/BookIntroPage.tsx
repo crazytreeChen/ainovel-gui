@@ -15,6 +15,8 @@ export default function BookIntroPage() {
   const [chapters, setChapters] = useState<{ num: number; title: string; wordCount: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
+  const [cleaning, setCleaning] = useState(false)
+  const [auditing, setAuditing] = useState(false)
 
   useEffect(() => {
     if (!id || !window.electronAPI) return
@@ -28,6 +30,69 @@ export default function BookIntroPage() {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id])
+
+  async function handleBatchCleanTitles() {
+    if (!id || !window.electronAPI || cleaning) return
+    if (!confirm('将批量清洗所有章节标题：\n- 移除描述性括号内容\n- 截断超长标题（≤30字）\n- 更新章节文件与数据库\n\n确认继续？')) return
+    setCleaning(true)
+    try {
+      const result = await window.electronAPI.batchCleanTitles(id)
+      alert(`清洗完成：${result.cleaned}/${result.total} 章标题已更新`)
+      // 重新加载章节列表
+      const chs = await window.electronAPI.getBookChapters(id)
+      setChapters(chs || [])
+    } catch (e: any) {
+      alert('清洗失败: ' + (e.message || e))
+    }
+    setCleaning(false)
+  }
+
+  async function handleAuditBook() {
+    if (!id || !window.electronAPI || auditing) return
+    if (!confirm('将启动全书评审修复 Agent：\n\n' +
+      '• 逐章检查：标题质量、AI 味、节奏、大纲对齐、字数\n' +
+      '• 自动修复：不合格标题将被重写\n' +
+      '• 标记问题：需重写或删减的章节会被标注\n' +
+      '• 耗时较长：每章约 10-15 秒，50 章约 10 分钟\n\n' +
+      '确认开始全面审查？')) return
+    setAuditing(true)
+    try {
+      const result = await window.electronAPI.batchAuditBook(id)
+      if (!result.success) {
+        alert('审查失败: ' + (result.error || '未知错误'))
+      } else {
+        const s = result.stats
+        let msg = `📊 全书审查报告\n\n`
+        msg += `已审 ${s.reviewed}/${result.total} 章`
+        if (s.skipped) msg += `（${s.skipped} 章跳过）`
+        msg += `\n\n`
+        msg += `📈 平均分\n`
+        msg += `  标题质量:    ${s.avgTitleScore}/10\n`
+        msg += `  AI 味:      ${s.avgAiFlavorScore}/10\n`
+        msg += `  节奏结构:   ${s.avgPacingScore}/10\n`
+        msg += `  大纲对齐:   ${s.avgOutlineScore}/10\n`
+        msg += `  角色连续性: ${s.avgCharContinuityScore}/10\n`
+        msg += `  时间线连贯: ${s.avgTimelineScore}/10\n`
+        msg += `  线索管理:   ${s.avgPlotThreadScore}/10\n\n`
+        msg += `🛠 处理结果\n`
+        if (s.titleUpdated) msg += `  ✅ 标题已更新: ${s.titleUpdated} 章\n`
+        if (s.needsRewrite) msg += `  ⚠️ 建议重写: ${s.needsRewrite} 章\n`
+        if (s.needsTrimming) msg += `  ✂️ 建议删减: ${s.needsTrimming} 章\n`
+        if (s.totalMissingIntros) msg += `  👤 缺角色交代: ${s.totalMissingIntros} 处\n`
+        if (s.totalCharStateInconsistencies) msg += `  ☠️ 状态冲突(死而复生): ${s.totalCharStateInconsistencies} 处\n`
+        if (s.totalTimelineGaps) msg += `  ⏱ 时间线跳跃: ${s.totalTimelineGaps} 处\n`
+        if (s.totalDroppedThreads) msg += `  🧵 丢弃线索: ${s.totalDroppedThreads} 处\n`
+        if (s.errors) msg += `  ❌ 失败: ${s.errors} 章\n`
+        alert(msg)
+      }
+      // 重新加载章节列表
+      const chs = await window.electronAPI.getBookChapters(id)
+      setChapters(chs || [])
+    } catch (e: any) {
+      alert('审查失败: ' + (e.message || e))
+    }
+    setAuditing(false)
+  }
 
   const totalPages = Math.ceil(chapters.length / PAGE_SIZE)
   const start = (page - 1) * PAGE_SIZE
@@ -57,6 +122,12 @@ export default function BookIntroPage() {
                 <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/outline`)}>📋 大纲</button>
                 <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/characters`)}>👤 角色</button>
                 <button className="welcome-mode-btn" onClick={() => navigate('/settings/models')}>⚙️ 模型</button>
+                <button className="welcome-mode-btn" onClick={handleBatchCleanTitles} disabled={cleaning} style={{ borderColor: 'var(--color-accent)' }}>
+                  {cleaning ? '⏳ 清洗中...' : '🧹 清洗标题'}
+                </button>
+                <button className="welcome-mode-btn" onClick={handleAuditBook} disabled={auditing} style={{ borderColor: 'var(--color-success)' }}>
+                  {auditing ? '⏳ 审查中...' : '🔍 全书审查'}
+                </button>
               </div>
             </div>
           </div>

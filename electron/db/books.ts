@@ -25,11 +25,20 @@ export function mixinBooks(proto: any) {
     return this.database.prepare('SELECT * FROM books WHERE id = ?').get(id) || null
   }
 
-  proto.createBook = function (id: string, name: string, style: string, phase: string, premise: string, tags: string) {
-    const now = new Date().toISOString()
-    this.database.prepare(`INSERT INTO books (id, name, style, phase, premise, created_at, updated_at, last_opened_at) VALUES (?,?,?,?,?,?,?,?)`)
-      .run(id, name, style || 'default', phase || 'init', premise || '', now, now, now)
-    return this.getBook(id)
+  proto.createBook = function (book: Record<string, any>) {
+    const now = book.created_at || new Date().toISOString()
+    this.database.prepare(`INSERT INTO books 
+      (id, name, premise, style, planning_tier, phase, flow, layered, total_word_count, workspace_dir, tags, created_at, updated_at, last_opened_at) 
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(
+        book.id, book.name || '',
+        book.premise || '', book.style || 'default',
+        book.planning_tier || 'short', book.phase || 'init',
+        book.flow || 'writing', book.layered ? 1 : 0,
+        book.total_word_count || 0, book.workspace_dir || '',
+        book.tags || '', now, now, now,
+      )
+    return this.getBook(book.id)
   }
 
   proto.deleteBook = function (id: string) {
@@ -46,8 +55,17 @@ export function mixinBooks(proto: any) {
       const book = this.database.prepare('SELECT * FROM books WHERE id = ?').get(id) as any
       if (!book) return false
       const merged = { ...book, ...fields, updated_at: new Date().toISOString() }
-      this.database.prepare(`INSERT OR REPLACE INTO books (id, name, style, phase, premise, tags, created_at, updated_at, last_opened_at, total_word_count, workspace_dir) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(merged.id, merged.name, merged.style, merged.phase, merged.premise || '', merged.tags || '', merged.created_at, merged.updated_at, merged.last_opened_at, merged.total_word_count || 0, merged.workspace_dir || '')
+      this.database.prepare(`INSERT OR REPLACE INTO books 
+        (id, name, premise, style, planning_tier, phase, flow, layered, total_word_count, workspace_dir, tags, created_at, updated_at, last_opened_at) 
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(
+          merged.id, merged.name || '', merged.premise || '',
+          merged.style || 'default', merged.planning_tier || 'short',
+          merged.phase || 'init', merged.flow || 'writing',
+          merged.layered ? 1 : 0, merged.total_word_count || 0,
+          merged.workspace_dir || '', merged.tags || '',
+          merged.created_at, merged.updated_at, merged.last_opened_at,
+        )
       return true
     })
     return update()

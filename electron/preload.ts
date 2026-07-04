@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 章节管理
   getBookChapters: (id: string) => ipcRenderer.invoke('get-book-chapters', id),
   getBookChapter: (id: string, num: number) => ipcRenderer.invoke('get-book-chapter', id, num),
-  saveBookChapter: (id: string, num: number, content: string) => ipcRenderer.invoke('save-book-chapter', id, num, content),
+  saveBookChapter: (id: string, num: number, content: string, title?: string) => ipcRenderer.invoke('save-book-chapter', id, num, content, title),
 
   // 角色管理
   getBookCharacters: (id: string) => ipcRenderer.invoke('get-book-characters', id),
@@ -29,9 +29,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 时间线管理
   getBookTimeline: (id: string) => ipcRenderer.invoke('get-book-timeline', id),
+  saveBookTimeline: (id: string, data: any) => ipcRenderer.invoke('save-book-timeline', id, data),
 
   // 评审管理
   getBookReviews: (id: string) => ipcRenderer.invoke('get-book-reviews', id),
+  saveBookReview: (id: string, review: any) => ipcRenderer.invoke('save-book-review', id, review),
 
   // 图片生成
   generateImage: (providerKey: string, model: string, prompt: string, options?: { size?: string; style?: string }) =>
@@ -92,6 +94,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 系统
   checkBinary: () => ipcRenderer.invoke('check-binary'),
+
+  // 批量操作
+  batchCleanTitles: (id: string) => ipcRenderer.invoke('batch-clean-titles', id),
+  batchGenerateTitles: (id: string) => ipcRenderer.invoke('batch-generate-titles', id),
+  batchAuditBook: (id: string) => ipcRenderer.invoke('batch-audit-book', id),
 
   // 调试
   debugDb: () => ipcRenderer.invoke('debug-db'),

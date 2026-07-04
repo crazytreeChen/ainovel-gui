@@ -7,6 +7,7 @@ const { state, getDB, getAinovelBinary, GUI_DATA_DIR } = require('../context')
 const { createLogger } = require('../logger')
 const { join } = require('path')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } = require('fs')
+const { cleanChapterTitle } = require('../utils')
 
 const log = createLogger('ipc:workspace')
 
@@ -21,7 +22,7 @@ function writeJSON(dir: string, rel: string, data: any) {
 function getBookDirById(id: string) {
   try {
     const book = getDB().getBook(id)
-    if (book) return join(GUI_DATA_DIR, 'books', id)
+    if (book?.workspace_dir) return book.workspace_dir
   } catch (e: any) { log.error('getBookDirById', e) }
   return join(GUI_DATA_DIR, 'books', id)
 }
@@ -155,8 +156,10 @@ function register(ipcMain: Electron.IpcMain) {
     const dir = getBookDirById(id)
     if (!dir) return false
     try { getDB().saveChapter(id, num, content, title || '') } catch (e: any) { log.error('save-chapter', e) }
-    // JSON 写（CLI 兼容）
-    writeJSON(dir, `${String(num).padStart(2, '0')}.md`, content)
+    // JSON 写（CLI 兼容，写入 chapters/ 子目录）
+    const chDir = join(dir, 'chapters')
+    if (!existsSync(chDir)) mkdirSync(chDir, { recursive: true })
+    writeJSON(chDir, `${String(num).padStart(2, '0')}.md`, content)
     return true
   })
 
@@ -203,6 +206,29 @@ function register(ipcMain: Electron.IpcMain) {
     return { timeline, foreshadow, relationships, stateChanges }
   })
 
+  // ── 时间线保存 ──
+  ipcMain.handle('save-book-timeline', async (_e: Electron.IpcMainInvokeEvent, id: string, data: any) => {
+    const dir = getBookDirById(id)
+    if (!dir) return false
+    const db = getDB()
+    try {
+      if (data.timeline) db.saveTimelineEvents(id, data.timeline)
+      if (data.foreshadow) db.saveForeshadowEntries(id, data.foreshadow)
+      if (data.relationships) db.saveRelationshipEntries(id, data.relationships)
+      if (data.stateChanges) db.saveStateChanges(id, data.stateChanges)
+    } catch (e: any) { log.error('save-timeline:sqlite', e) }
+    // JSON 写（CLI 兼容）
+    if (data.timeline) writeJSON(dir, 'timeline.json', data.timeline)
+    if (data.foreshadow) writeJSON(dir, 'foreshadow_ledger.json', data.foreshadow)
+    if (data.relationships) writeJSON(dir, 'relationship_state.json', data.relationships)
+    if (data.stateChanges) {
+      const metaDir = join(dir, 'meta')
+      if (!existsSync(metaDir)) mkdirSync(metaDir, { recursive: true })
+      writeJSON(metaDir, 'state_changes.json', data.stateChanges)
+    }
+    return true
+  })
+
   // ── 评审 ──
   ipcMain.handle('get-book-reviews', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
     const dir = getBookDirById(id)
@@ -221,6 +247,20 @@ function register(ipcMain: Electron.IpcMain) {
     return reviews
   })
 
+  ipcMain.handle('save-book-review', async (_e: Electron.IpcMainInvokeEvent, id: string, review: any) => {
+    const dir = getBookDirById(id)
+    if (!dir || !review) return false
+    const db = getDB()
+    try { db.saveReviews(id, [review]) } catch (e: any) { log.error('save-review:sqlite', e) }
+    // JSON 写（CLI 兼容）
+    const reviewDir = join(dir, 'reviews')
+    if (!existsSync(reviewDir)) mkdirSync(reviewDir, { recursive: true })
+    const chNum = review.chapter || 0
+    const fname = `review-${String(chNum).padStart(2, '0')}.json`
+    writeJSON(reviewDir, fname, review)
+    return true
+  })
+
   // ── 仿写画像 ──
   ipcMain.handle('get-simulation-profile', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
     try {
@@ -235,16 +275,19 @@ function register(ipcMain: Electron.IpcMain) {
   })
 
   ipcMain.handle('save-simulation-profile', async (_e: Electron.IpcMainInvokeEvent, bookId: string, profile: any) => {
+    const dir = getBookDirById(bookId)
     try {
       getDB().saveSimulationProfile(bookId, profile)
+      writeJSON(dir, 'simulation_profile.json', profile)
       return true
     } catch (e: any) { log.error('save-sim-profile', e); return false }
   })
 
   // ── 用户规则 ──
   ipcMain.handle('get-user-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try {
-      const row = getDB().getUserRules(bookId)
+    const dir = getBookDirById(bookId)
+    // 内部转换函数
+    const transform = (row: any) => {
       if (!row) return null
       const s = row.structured || {}
       return {
@@ -260,12 +303,24 @@ function register(ipcMain: Electron.IpcMain) {
         },
         directives: Array.isArray(row.directives) ? row.directives : [],
       }
-    } catch (e: any) { log.error('get-user-rules', e); return null }
+    }
+    try {
+      const row = getDB().getUserRules(bookId)
+      if (row) return transform(row)
+    } catch (e: any) { log.error('get-user-rules:sqlite', e) }
+    // JSON 回退
+    const json = readStoreJSONAt(dir, 'user_rules.json')
+    if (json) {
+      try { getDB().saveUserRules(bookId, json) } catch (e: any) { log.error('get-user-rules:sync', e) }
+      return transform(json)
+    }
+    return null
   })
   ipcMain.handle('save-user-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string, payload: any) => {
+    const dir = getBookDirById(bookId)
     try {
       const r = payload.rules || {}
-      getDB().saveUserRules(bookId, {
+      const dbPayload = {
         version: payload.version || 1,
         status: payload.status || 'ready',
         structured: {
@@ -278,74 +333,163 @@ function register(ipcMain: Electron.IpcMain) {
         preferences: r.stylePreferences || '',
         sources: r.sources || [],
         uncertain: r.uncertain || [],
-      })
+      }
+      getDB().saveUserRules(bookId, dbPayload)
+      writeJSON(dir, 'user_rules.json', dbPayload)
       return true
     } catch (e: any) { log.error('save-user-rules', e); return false }
   })
 
   // ── 配角名册 ──
   ipcMain.handle('get-book-cast', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getCastEntries(bookId) }
-    catch (e: any) { log.error('get-cast', e); return [] }
+    const dir = getBookDirById(bookId)
+    try {
+      const entries = getDB().getCastEntries(bookId)
+      if (entries?.length) return entries
+    } catch (e: any) { log.error('get-cast:sqlite', e) }
+    // JSON 回退
+    const entries = readStoreJSONAt(dir, 'cast_ledger.json') || []
+    try { if (entries.length) getDB().saveCastEntries(bookId, entries) } catch (e: any) { log.error('get-cast:sync', e) }
+    return entries
   })
   ipcMain.handle('save-book-cast', async (_e: Electron.IpcMainInvokeEvent, bookId: string, entries: any) => {
-    try { getDB().saveCastEntries(bookId, entries); return true }
-    catch (e: any) { log.error('save-cast', e); return false }
+    const dir = getBookDirById(bookId)
+    try { getDB().saveCastEntries(bookId, entries) } catch (e: any) { log.error('save-cast', e) }
+    writeJSON(dir, 'cast_ledger.json', entries)
+    return true
   })
 
   // ── 世界观/风格规则 ──
   ipcMain.handle('get-world-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getWorldRules(bookId) }
-    catch (e: any) { log.error('get-world-rules', e); return [] }
+    const dir = getBookDirById(bookId)
+    try {
+      const rules = getDB().getWorldRules(bookId)
+      if (rules?.length) return rules
+    } catch (e: any) { log.error('get-world-rules:sqlite', e) }
+    const rules = readStoreJSONAt(dir, 'world_rules.json') || []
+    try { if (rules.length) getDB().saveWorldRules(bookId, rules) } catch (e: any) { log.error('get-world-rules:sync', e) }
+    return rules
   })
   ipcMain.handle('save-world-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string, rules: any) => {
-    try { getDB().saveWorldRules(bookId, rules); return true }
+    try {
+      getDB().saveWorldRules(bookId, rules)
+      const dir = getBookDirById(bookId)
+      writeJSON(dir, 'world_rules.json', rules)
+      return true
+    }
     catch (e: any) { log.error('save-world-rules', e); return false }
   })
   ipcMain.handle('get-style-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getStyleRules(bookId) }
-    catch (e: any) { log.error('get-style-rules', e); return null }
+    const dir = getBookDirById(bookId)
+    try {
+      const rules = getDB().getStyleRules(bookId)
+      if (rules) return rules
+    } catch (e: any) { log.error('get-style-rules:sqlite', e) }
+    const rules = readStoreJSONAt(dir, 'style_rules.json')
+    if (rules) { try { getDB().saveStyleRules(bookId, rules) } catch (e: any) { log.error('get-style-rules:sync', e) } }
+    return rules
   })
   ipcMain.handle('save-style-rules', async (_e: Electron.IpcMainInvokeEvent, bookId: string, rules: any) => {
-    try { getDB().saveStyleRules(bookId, rules); return true }
+    try {
+      getDB().saveStyleRules(bookId, rules)
+      const dir = getBookDirById(bookId)
+      writeJSON(dir, 'style_rules.json', rules)
+      return true
+    }
     catch (e: any) { log.error('save-style-rules', e); return false }
   })
 
   // ── 运行元/用量 ──
   ipcMain.handle('get-run-meta', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getRunMeta(bookId) }
-    catch (e: any) { log.error('get-run-meta', e); return null }
+    const dir = getBookDirById(bookId)
+    try {
+      const meta = getDB().getRunMeta(bookId)
+      if (meta) return meta
+    } catch (e: any) { log.error('get-run-meta:sqlite', e) }
+    const meta = readStoreJSONAt(dir, 'run.json')
+    if (meta) { try { getDB().saveRunMeta(bookId, meta) } catch (e: any) { log.error('get-run-meta:sync', e) } }
+    return meta
   })
   ipcMain.handle('save-run-meta', async (_e: Electron.IpcMainInvokeEvent, bookId: string, meta: any) => {
-    try { getDB().saveRunMeta(bookId, meta); return true }
+    try {
+      getDB().saveRunMeta(bookId, meta)
+      const dir = getBookDirById(bookId)
+      writeJSON(dir, 'run.json', meta)
+      return true
+    }
     catch (e: any) { log.error('save-run-meta', e); return false }
   })
   ipcMain.handle('get-usage-stats', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getUsageStats(bookId) }
-    catch (e: any) { log.error('get-usage-stats', e); return null }
+    const dir = getBookDirById(bookId)
+    try {
+      const stats = getDB().getUsageStats(bookId)
+      if (stats) return stats
+    } catch (e: any) { log.error('get-usage-stats:sqlite', e) }
+    const stats = readStoreJSONAt(dir, 'usage.json')
+    if (stats) { try { getDB().saveUsageStats(bookId, stats) } catch (e: any) { log.error('get-usage-stats:sync', e) } }
+    return stats
   })
   ipcMain.handle('save-usage-stats', async (_e: Electron.IpcMainInvokeEvent, bookId: string, stats: any) => {
-    try { getDB().saveUsageStats(bookId, stats); return true }
+    try {
+      getDB().saveUsageStats(bookId, stats)
+      const dir = getBookDirById(bookId)
+      writeJSON(dir, 'usage.json', stats)
+      return true
+    }
     catch (e: any) { log.error('save-usage-stats', e); return false }
   })
 
   // ── 摘要 ──
   ipcMain.handle('get-book-summaries', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getSummaries(bookId) }
-    catch (e: any) { log.error('get-summaries', e); return [] }
+    const dir = getBookDirById(bookId)
+    try {
+      const summaries = getDB().getSummaries(bookId)
+      if (summaries?.length) return summaries
+    } catch (e: any) { log.error('get-summaries:sqlite', e) }
+    // JSON 回退：从 summaries/ 目录读取
+    const sumDir = join(dir, 'summaries')
+    if (!existsSync(sumDir)) return []
+    const files = readdirSync(sumDir).filter((f: string) => f.endsWith('.json'))
+    const summaries = files.map((file: string) => readStoreJSONAt(sumDir, file)).filter(Boolean)
+    try { if (summaries.length) getDB().saveSummaries(bookId, summaries) } catch (e: any) { log.error('get-summaries:sync', e) }
+    return summaries
   })
   ipcMain.handle('save-book-summaries', async (_e: Electron.IpcMainInvokeEvent, bookId: string, summaries: any) => {
-    try { getDB().saveSummaries(bookId, summaries); return true }
+    try {
+      getDB().saveSummaries(bookId, summaries)
+      const dir = getBookDirById(bookId)
+      const sumDir = join(dir, 'summaries')
+      if (!existsSync(sumDir)) mkdirSync(sumDir, { recursive: true })
+      for (const s of (summaries || [])) {
+        const refKey = s.ref_key || String(s.chapter || '')
+        const fname = s.type === 'chapter' ? `chapter-${refKey}.json` : s.type === 'arc' ? `arc-${refKey}.json` : `volume-${refKey}.json`
+        writeJSON(sumDir, fname, s)
+      }
+      return true
+    }
     catch (e: any) { log.error('save-summaries', e); return false }
   })
 
   // ── 用户指令 ──
   ipcMain.handle('get-user-directives', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    try { return getDB().getUserDirectives(bookId) }
-    catch (e: any) { log.error('get-directives', e); return [] }
+    const dir = getBookDirById(bookId)
+    try {
+      const directives = getDB().getUserDirectives(bookId)
+      if (directives?.length) return directives
+    } catch (e: any) { log.error('get-directives:sqlite', e) }
+    const directives = readStoreJSONAt(dir, 'meta/user_directives.json') || []
+    try { if (directives.length) getDB().saveUserDirectives(bookId, directives) } catch (e: any) { log.error('get-directives:sync', e) }
+    return directives
   })
   ipcMain.handle('save-user-directives', async (_e: Electron.IpcMainInvokeEvent, bookId: string, directives: any) => {
-    try { getDB().saveUserDirectives(bookId, directives); return true }
+    try {
+      getDB().saveUserDirectives(bookId, directives)
+      const dir = getBookDirById(bookId)
+      const metaDir = join(dir, 'meta')
+      if (!existsSync(metaDir)) mkdirSync(metaDir, { recursive: true })
+      writeJSON(metaDir, 'user_directives.json', directives)
+      return true
+    }
     catch (e: any) { log.error('save-directives', e); return false }
   })
 
@@ -373,6 +517,361 @@ function register(ipcMain: Electron.IpcMain) {
         .map((ev: any) => ({ type: 'event', chapter: ev.chapter, event: ev.event, match: ev.event }))
       return { chapters, characters, events, outline }
     } catch (e: any) { log.error('search-book', e); return { chapters: [], characters: [], events: [], outline: [] } }
+  })
+
+  // ── 批量清洗章节标题 ──
+  ipcMain.handle('batch-clean-titles', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+    const dir = getBookDirById(bookId)
+    if (!dir) return { cleaned: 0, total: 0, error: 'book dir not found' }
+    const db = getDB()
+    const chDir = join(dir, 'chapters')
+    if (!existsSync(chDir)) return { cleaned: 0, total: 0, error: 'chapters dir not found' }
+    const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+    let cleaned = 0
+    for (const file of files) {
+      const num = parseInt(file.replace('.md', ''), 10)
+      if (isNaN(num)) continue
+      const filePath = join(chDir, file)
+      const content = readFileSync(filePath, 'utf8')
+      const lines = content.split('\n')
+      const firstLine = lines[0] || ''
+      const titleMatch = firstLine.match(/^#\s+(.+)/)
+      if (!titleMatch) continue
+      const rawTitle = titleMatch[1].trim()
+      const cleanTitle = cleanChapterTitle(rawTitle, num)
+      if (cleanTitle !== rawTitle) {
+        // 更新 markdown 文件首行
+        lines[0] = `# ${cleanTitle}`
+        writeFileSync(filePath, lines.join('\n'), 'utf8')
+        // 更新 SQLite
+        try { db.saveChapter(bookId, num, content, cleanTitle) } catch (e: any) { log.error('batch-clean:save', e) }
+        cleaned++
+      }
+    }
+    return { cleaned, total: files.length }
+  })
+
+  // ── AI 批量生成章节标题 ──
+  ipcMain.handle('batch-generate-titles', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+    const dir = getBookDirById(bookId)
+    if (!dir) return { success: false, error: '未找到书籍目录' }
+    const db = getDB()
+    const chDir = join(dir, 'chapters')
+    if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
+
+    // 读取 provider 配置
+    let providerConfig: any
+    try { providerConfig = db.getConfig('provider_config') } catch (e: any) { log.error('batch-gen:config', e) }
+    if (!providerConfig) return { success: false, error: '未配置 API Provider，请先在模型管理中设置' }
+    // batch-generate-titles 已合并进 batch-audit-book，此 handler 保留为兼容
+  })
+
+  // ── 全书评审修复 Agent ──
+  ipcMain.handle('batch-audit-book', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+    const dir = getBookDirById(bookId)
+    if (!dir) return { success: false, error: '未找到书籍目录' }
+    const db = getDB()
+    const chDir = join(dir, 'chapters')
+    if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
+
+    // 读取 provider 配置
+    let providerConfig: any
+    try { providerConfig = db.getConfig('provider_config') } catch (e: any) { log.error('batch-audit:config', e) }
+    if (!providerConfig) return { success: false, error: '未配置 API Provider' }
+    const providerKey = providerConfig.provider || ''
+    const model = providerConfig.model || ''
+    if (!providerKey || !model) return { success: false, error: '未配置写作 Provider/Model' }
+    const provider = providerConfig.providers?.[providerKey]
+    if (!provider?.api_key) return { success: false, error: 'API Key 未设置' }
+
+    const baseUrl = (provider.base_url || '').replace(/\/+$/, '')
+    const apiUrl = baseUrl + '/chat/completions'
+    const headers = { 'Authorization': 'Bearer ' + provider.api_key, 'Content-Type': 'application/json' }
+
+    // 加载上下文：大纲 + 角色 + 时间线 + 伏笔 + 配角名册 + 状态变化
+    let outline: any[] = []
+    let characters: string[] = []
+    let timelineEvents: any[] = []
+    let foreshadowEntries: any[] = []
+    let castEntries: any[] = []
+    let stateChanges: any[] = []
+    try {
+      outline = db.getOutlineEntries(bookId) || []
+      const chars = db.getCharacters(bookId) || []
+      characters = chars.map((c: any) => `${c.name}（${c.role || '未知'}）`)
+      timelineEvents = db.getTimelineEvents(bookId) || []
+      foreshadowEntries = db.getForeshadowEntries(bookId) || []
+      castEntries = db.getCastEntries(bookId) || []
+      stateChanges = db.getStateChanges(bookId) || []
+    } catch (e: any) { log.error('batch-audit:context', e) }
+
+    // 按章节构建状态变化索引 + 角色生死状态追踪
+    const stateChangesByChapter = new Map<number, any[]>()
+    // 角色最终状态快照（key=角色名，记录死亡/重伤等不可逆状态及所在章节）
+    const charIrreversibleStates = new Map<string, { field: string; value: string; chapter: number }[]>()
+    for (const sc of stateChanges) {
+      const ch = sc.chapter || 0
+      if (!stateChangesByChapter.has(ch)) stateChangesByChapter.set(ch, [])
+      stateChangesByChapter.get(ch)!.push(sc)
+      // 追踪不可逆状态变更（死亡/重伤/失踪/退场等）
+      if (['status', '生死', '状态', 'health', 'hp', '生命'].includes(sc.field || '')) {
+        if (!charIrreversibleStates.has(sc.entity)) charIrreversibleStates.set(sc.entity, [])
+        charIrreversibleStates.get(sc.entity)!.push({ field: sc.field, value: sc.new_value, chapter: ch })
+      }
+    }
+    // 按章节构建时间线索引
+    const timelineByChapter = new Map<number, any[]>()
+    for (const ev of timelineEvents) {
+      const ch = ev.chapter || 0
+      if (!timelineByChapter.has(ch)) timelineByChapter.set(ch, [])
+      timelineByChapter.get(ch)!.push(ev)
+    }
+
+    // 已出场角色集合（跨章追踪）
+    const appearedCharacters = new Set<string>()
+    // 后备：所有 core/important 角色默认为已出场
+    for (const c of castEntries) appearedCharacters.add(c.name)
+
+    // 闪回/倒叙标记
+    const flashbackChapters = new Set<number>()
+
+    const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+    const results: any[] = []
+
+    for (const file of files) {
+      const num = parseInt(file.replace('.md', ''), 10)
+      if (isNaN(num)) continue
+
+      const filePath = join(chDir, file)
+      const fullContent = readFileSync(filePath, 'utf8')
+      const lines = fullContent.split('\n')
+      const firstLine = lines[0] || ''
+      const titleMatch = firstLine.match(/^#\s+(.+)/)
+      const oldTitle = titleMatch ? titleMatch[1].trim() : `第${num}章`
+      const bodyText = lines.slice(1).join('\n').trim()
+      const wordCount = bodyText.length
+
+      if (!bodyText) {
+        results.push({ chapter: num, oldTitle, skipped: true, reason: '正文为空' })
+        continue
+      }
+
+      // 查找对应大纲条目
+      const outlineEntry = outline.find((o: any) => o.chapter === num)
+      const outlineInfo = outlineEntry
+        ? `标题: ${outlineEntry.title}\n核心事件: ${outlineEntry.core_event || '无'}\n钩子: ${outlineEntry.hook || '无'}`
+        : '无对应大纲条目'
+
+      // 本章时间线事件
+      const chTimeline = timelineByChapter.get(num) || []
+      const timelineInfo = chTimeline.length > 0
+        ? chTimeline.map((t: any) => `${t.event}（${t.time || '时间未知'}）`).join('\n')
+        : '无'
+
+      // 本章伏笔
+      const chForeshadow = foreshadowEntries.filter((f: any) => f.planted_at === num || f.resolved_at === num)
+      const foreshadowInfo = chForeshadow.length > 0
+        ? chForeshadow.map((f: any) => `[${f.status}] ${f.description}（章${f.planted_at}→章${f.resolved_at || '?'}）`).join('\n')
+        : '无'
+
+      // 本章角色状态变化
+      const chStateChanges = stateChangesByChapter.get(num) || []
+      const stateChangeInfo = chStateChanges.length > 0
+        ? chStateChanges.map((s: any) => `${s.entity}: ${s.field} → ${s.new_value}（原: ${s.old_value || '无'}，原因: ${s.reason || '未知'}）`).join('\n')
+        : '无'
+
+      // 至今为止已死亡/重伤/退场的角色（用于检测"死而复生"问题）
+      const deadOrGoneChars: string[] = []
+      for (const [name, states] of charIrreversibleStates) {
+        const latest = states[states.length - 1]
+        if (latest && ['死亡', '死', '战死', '陨落', '身亡', '退场', '失踪', '昏迷', '重伤'].some(k => (latest.value || '').includes(k))) {
+          if (latest.chapter < num) deadOrGoneChars.push(`${name}（${latest.value}，第${latest.chapter}章）`)
+        }
+      }
+
+      // 前一章末尾（衔接检查）
+      let prevChapterEnding = ''
+      if (num > 1) {
+        const prevFile = files.find((f: string) => f.startsWith(String(num - 1).padStart(2, '0') + '.md'))
+        if (prevFile) {
+          const prevContent = readFileSync(join(chDir, prevFile), 'utf8')
+          const prevLines = prevContent.trim().split('\n')
+          prevChapterEnding = prevLines.slice(-5).join('\n').slice(0, 500)
+        }
+      }
+
+      // 取正文前 3000 字 + 后 1000 字评审用
+      const reviewContent = bodyText.length > 4000
+        ? bodyText.slice(0, 3000) + '\n\n...（中间省略）...\n\n' + bodyText.slice(-1000)
+        : bodyText
+
+      const prompt = `你是一个专业的小说质量评审与修复 Agent。请对本章做全面检查并输出修改建议。
+
+## 章节信息
+- 章号: 第 ${num} 章
+- 当前标题: ${oldTitle}
+- 字数: ${wordCount}
+- 对应大纲: ${outlineInfo}
+
+## 本章时间线事件
+${timelineInfo}
+
+## 本章关联伏笔
+${foreshadowInfo}
+
+## 本章角色状态变化
+${stateChangeInfo}
+
+## 之前已死亡/重伤/退场的角色（不应再出现于本章）
+${deadOrGoneChars.length > 0 ? deadOrGoneChars.join('\n') : '无'}
+
+## 前一章末尾（衔接参考）
+${prevChapterEnding || '无（第一章）'}
+
+## 角色
+${characters.join('\n') || '无'}
+
+## 章节正文
+${reviewContent}
+
+## 评审维度（9 项）
+1. **标题质量**：标题是否根据本章核心主题提炼、准确概括核心情节或情绪基调
+2. **AI 味**：是否存在 AI 套句（"某种程度上""值得注意的是""不知为何"等）、机械排比、过度修饰
+3. **节奏结构**：开头是否快速进入冲突/悬念、场景转换是否自然、章末是否有力
+4. **大纲对齐**：正文是否与大纲条目一致（核心事件/钩子是否落地）
+5. **字数合规**：是否在合理字数范围（短篇 1200-2500，中篇 2500-5000）
+6. **内容跨度**：是否存在跨章节的情节跳跃、信息遗漏、与前文矛盾
+7. **角色连续性**：是否存在未介绍就突然出现的角色/人名；已有角色是否保持了行为逻辑和身份一致性；**特别检查：已死亡/重伤/退场的角色是否在本章重新出现且未做任何交代（"死而复生"）**
+8. **时间线一致性**：故事内时间是否连贯（无时间跳跃/倒叙无标记）、事件先后是否合理、与前章衔接是否自然
+9. **情节线索管理**：伏笔是否有起有落，情节线索是否有头有尾，是否突然出现新设定或无故丢弃旧线索
+
+## 输出格式
+
+请严格按以下 JSON 格式输出，不要任何多余文字：
+
+{
+  "review": {
+    "title_score": 1-10,
+    "ai_flavor_score": 1-10（10=完全无 AI 味）,
+    "pacing_score": 1-10,
+    "outline_alignment_score": 1-10,
+    "word_count_ok": true/false,
+    "character_continuity_score": 1-10（10=角色出场衔接完美）,
+    "timeline_consistency_score": 1-10（10=时间线完全连贯）,
+    "plot_thread_score": 1-10（10=情节线索管理完美）
+  },
+  "issues": ["问题1（严重度：高/中/低）"],
+  "strengths": ["优点1"],
+  "suggested_title": "根据本章核心主题提炼的新标题（若原标题合格则留空）",
+  "needs_trimming": true/false,
+  "trimming_suggestion": "如需删减，说明具体删哪些部分（段落/场景/对话），只删冗余不伤主干",
+  "needs_rewrite": true/false,
+  "rewrite_reason": "如需重写，说明原因",
+  "missing_introductions": ["本章突然出现但未在前文交代的角色名"],
+  "character_state_inconsistencies": ["已死亡/重伤/退场的角色重新出现且未交代的具体位置"，如"第15章已战死的张三在第20章再次出场无解释"],
+  "timeline_gaps": ["时间线跳跃或不连贯的具体位置"],
+  "dropped_threads": ["被无故丢弃的伏笔或情节线索"],
+  "summary": "本章一句话评审结论"
+}`
+
+      try {
+        const resp = await fetch(apiUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+            max_tokens: 1000,
+            response_format: { type: 'json_object' },
+          }),
+          signal: AbortSignal.timeout(60000),
+        })
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}))
+          results.push({ chapter: num, oldTitle, error: `HTTP ${resp.status}: ${errData?.error?.message || resp.statusText}` })
+          continue
+        }
+        const data = await resp.json()
+        const raw = data?.choices?.[0]?.message?.content || '{}'
+        let parsed: any
+        try { parsed = JSON.parse(raw) } catch { parsed = {} }
+
+        const review = parsed.review || {}
+        const issues = parsed.issues || []
+        const suggestedTitle = parsed.suggested_title || ''
+        const needsRewrite = parsed.needs_rewrite || false
+        const needsTrimming = parsed.needs_trimming || false
+        let applied: string[] = []
+
+        // 应用修复：标题
+        if (suggestedTitle && suggestedTitle !== oldTitle) {
+          lines[0] = `# ${suggestedTitle}`
+          writeFileSync(filePath, lines.join('\n'), 'utf8')
+          try { db.saveChapter(bookId, num, fullContent, suggestedTitle) } catch (e: any) { log.error('batch-audit:save-title', e) }
+          applied.push(`标题: "${oldTitle}" → "${suggestedTitle}"`)
+        }
+
+        // 标记需要重写的章节
+        if (needsRewrite) {
+          applied.push(`需重写（原因: ${parsed.rewrite_reason || '未说明'}）`)
+        }
+
+        // 标记需要删减的章节
+        if (needsTrimming) {
+          applied.push(`需删减: ${parsed.trimming_suggestion || '未说明'}`)
+        }
+
+        results.push({
+          chapter: num,
+          oldTitle,
+          newTitle: suggestedTitle || oldTitle,
+          review,
+          issues,
+          strengths: parsed.strengths || [],
+          missingIntroductions: parsed.missing_introductions || [],
+          characterStateInconsistencies: parsed.character_state_inconsistencies || [],
+          timelineGaps: parsed.timeline_gaps || [],
+          droppedThreads: parsed.dropped_threads || [],
+          applied,
+          needsRewrite,
+          needsTrimming,
+          summary: parsed.summary || '',
+          error: undefined,
+        })
+      } catch (e: any) {
+        results.push({ chapter: num, oldTitle, error: e.message || '请求失败' })
+      }
+    }
+
+    return {
+      success: true,
+      total: files.length,
+      // 统计
+      stats: (() => {
+        const valid = results.filter(r => !r.error && !r.skipped && r.review)
+        return {
+          reviewed: valid.length,
+          titleUpdated: results.filter(r => r.applied?.length > 0 && r.applied[0]?.startsWith('标题')).length,
+          needsRewrite: results.filter(r => r.needsRewrite).length,
+          needsTrimming: results.filter(r => r.needsTrimming).length,
+          errors: results.filter(r => r.error).length,
+          skipped: results.filter(r => r.skipped).length,
+          avgTitleScore: +(valid.reduce((s, r) => s + (r.review.title_score || 0), 0) / (valid.length || 1)).toFixed(1),
+          avgAiFlavorScore: +(valid.reduce((s, r) => s + (r.review.ai_flavor_score || 0), 0) / (valid.length || 1)).toFixed(1),
+          avgPacingScore: +(valid.reduce((s, r) => s + (r.review.pacing_score || 0), 0) / (valid.length || 1)).toFixed(1),
+          avgOutlineScore: +(valid.reduce((s, r) => s + (r.review.outline_alignment_score || 0), 0) / (valid.length || 1)).toFixed(1),
+          avgCharContinuityScore: +(valid.reduce((s, r) => s + (r.review.character_continuity_score || 0), 0) / (valid.length || 1)).toFixed(1),
+          avgTimelineScore: +(valid.reduce((s, r) => s + (r.review.timeline_consistency_score || 0), 0) / (valid.length || 1)).toFixed(1),
+          avgPlotThreadScore: +(valid.reduce((s, r) => s + (r.review.plot_thread_score || 0), 0) / (valid.length || 1)).toFixed(1),
+          totalMissingIntros: results.reduce((s, r) => s + (r.missingIntroductions?.length || 0), 0),
+          totalCharStateInconsistencies: results.reduce((s, r) => s + (r.characterStateInconsistencies?.length || 0), 0),
+          totalTimelineGaps: results.reduce((s, r) => s + (r.timelineGaps?.length || 0), 0),
+          totalDroppedThreads: results.reduce((s, r) => s + (r.droppedThreads?.length || 0), 0),
+        }
+      })(),
+      results,
+    }
   })
 }
 

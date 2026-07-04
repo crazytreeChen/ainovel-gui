@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useBookId } from '@/hooks/useBookId'
+import { useExpandSet } from '@/hooks/useExpandSet'
 import BackButton from '@/components/BackButton'
 import { showToast } from '@/components/Toast'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
@@ -22,7 +23,7 @@ export default function OutlinePage() {
   const [premise, setPremise] = useState('')
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<'flat' | 'layered'>('flat')
-  const [expandedVols, setExpandedVols] = useState<Set<number>>(new Set([0]))
+  const expand = useExpandSet<number>([0])
   const [editing, setEditing] = useState<{ path: string; value: string } | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -76,12 +77,6 @@ export default function OutlinePage() {
     setLoading(false)
   }
 
-  function toggleVolume(idx: number) {
-    const next = new Set(expandedVols)
-    if (next.has(idx)) next.delete(idx); else next.add(idx)
-    setExpandedVols(next)
-  }
-
   async function handleSave() {
     if (!id || !window.electronAPI) return
     setSaving(true)
@@ -125,9 +120,9 @@ export default function OutlinePage() {
     return (
       <div ref={setNodeRef} style={style} className="mb-8">
         <div className="cursor-clickable flex-row items-center gap-8 card"
-          onClick={() => toggleVolume(vi)} {...attributes} {...listeners}>
+          onClick={() => expand.toggle(vi)} {...attributes} {...listeners}>
           <span className="text-dim" style={{ cursor: 'grab' }}>⠿</span>
-          <span className="text-dim">{expandedVols.has(vi) ? '▼' : '▶'}</span>
+          <span className="text-dim">{expand.isExpanded(vi) ? '▼' : '▶'}</span>
           {editing?.path === `layered.${vi}.title` ? (
             <input className="input-field text-sm" style={{ width: 200, padding: '2px 6px' }}
               value={editing.value} autoFocus
@@ -144,7 +139,7 @@ export default function OutlinePage() {
           <span className="text-dim text-xs">{vol.theme}</span>
           <span className="text-dim text-xs ml-auto">{vol.arcs.length} 弧</span>
         </div>
-        {expandedVols.has(vi) && (
+        {expand.isExpanded(vi) && (
           <div style={{ marginLeft: 28, marginTop: 4 }}>
             <SortableContext items={vol.arcs.map((_, ai) => `arc:${vi}:${ai}`)} strategy={verticalListSortingStrategy}>
               {vol.arcs.map((arc, ai) => (

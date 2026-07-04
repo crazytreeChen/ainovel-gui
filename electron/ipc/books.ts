@@ -43,12 +43,11 @@ function register(ipcMain: Electron.IpcMain) {
   })
 
   ipcMain.handle('get-book-dir', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
-    const book = (state.index?.books || []).find((b: any) => b.id === id)
-    if (!book) return null
-    const fallback = join(GUI_DATA_DIR, 'books', id)
-    const candidate = book.workspaceDir || fallback
-    try { return validatePath(candidate) }
-    catch { return fallback }
+    try {
+      const book = getDB().getBook(id)
+      if (book?.workspace_dir) return validatePath(book.workspace_dir)
+    } catch (e: any) { log.error('get-book-dir', e) }
+    return join(GUI_DATA_DIR, 'books', id)
   })
 
   ipcMain.handle('get-gui-data-dir', async () => GUI_DATA_DIR)

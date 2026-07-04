@@ -283,6 +283,36 @@ function fillRunningSnapshot(snap: any) {
     const last = completed[completed.length - 1]; const wc = (progress.chapter_word_counts || {})[last] || ''
     snap.lastCommitSummary = `第${last}章 ${wc}字`
   }
+
+  // 补充大纲列表：优先从 DB chapters 表（已由 startRuntimeSync 同步），合并 outline_entries
+  try {
+    const books = getDB().listBooks()
+    if (books?.length) {
+      const bookId = books[0].id
+      const dbChapters = getDB().listChapters(bookId)
+      if (dbChapters?.length) {
+        snap.outline = dbChapters.slice(-30).map((c: any) => ({
+          chapter: c.num, title: c.title || `第${c.num}章`, coreEvent: '',
+        }))
+      }
+      // 从 outline_entries 补充 coreEvent 和大纲独有条目
+      const dbEntries = getDB().getOutlineEntries(bookId)
+      if (dbEntries?.length) {
+        const chMap = new Map<number, any>(snap.outline.map((o: any) => [o.chapter, o]))
+        for (const e of dbEntries) {
+          const ch = e.chapter || 0
+          let existing = chMap.get(ch)
+          if (existing) {
+            if (e.core_event) existing.coreEvent = e.core_event
+          } else {
+            chMap.set(ch, { chapter: ch, title: e.title || '', coreEvent: e.core_event || '' })
+          }
+        }
+        snap.outline = Array.from(chMap.values()).sort((a: any, b: any) => a.chapter - b.chapter).slice(-30)
+      }
+      snap.totalOutlineCount = snap.outline.length
+    }
+  } catch (e: any) { log.error('fillRunningSnapshot:outline', e) }
 }
 
 function fillDbSnapshot(snap: any) {
@@ -292,11 +322,30 @@ function fillDbSnapshot(snap: any) {
     const bookId = books[0].id
     try { const fullBook = getDB().getBook(bookId); if (fullBook?.premise) snap.premise = fullBook.premise.slice(0, 200) } catch (e: any) { log.error('snapshot:premise', e) }
     try { const chars = getDB().getCharacters(bookId); if (chars?.length) snap.characters = chars.map((c: any) => c.name + (c.role ? `（${c.role}）` : '')) } catch (e: any) { log.error('snapshot:chars', e) }
-    try { const entries = getDB().getOutlineEntries(bookId); if (entries?.length) { snap.totalOutlineCount = entries.length; snap.outline = entries.slice(-30).map((e: any) => ({ chapter: e.chapter || 0, title: e.title || '', coreEvent: e.core_event || '' })) } } catch (e: any) { log.error('snapshot:outline', e) }
+    try {
+      const dbChapters = getDB().listChapters(bookId)
+      if (dbChapters?.length) {
+        snap.outline = dbChapters.slice(-30).map((c: any) => ({
+          chapter: c.num, title: c.title || `第${c.num}章`, coreEvent: '',
+        }))
+      }
+      const entries = getDB().getOutlineEntries(bookId)
+      if (entries?.length) {
+        const chMap = new Map<number, any>(snap.outline.map((o: any) => [o.chapter, o]))
+        for (const e of entries) {
+          const ch = e.chapter || 0
+          const existing = chMap.get(ch)
+          if (existing) { if (e.core_event) existing.coreEvent = e.core_event }
+          else { chMap.set(ch, { chapter: ch, title: e.title || '', coreEvent: e.core_event || '' }) }
+        }
+        snap.outline = Array.from(chMap.values()).sort((a: any, b: any) => a.chapter - b.chapter).slice(-30)
+      }
+      snap.totalOutlineCount = snap.outline.length
+    } catch (e: any) { log.error('snapshot:outline', e) }
     try { const compass = getDB().getCompass(bookId); if (compass) { snap.compassDirection = compass.endingDirection || ''; snap.compassScale = compass.estimatedScale || '' } } catch (e: any) { log.error('snapshot:compass', e) }
     try { const reviews = getDB().getReviews(bookId); if (reviews?.length) { const last = reviews[reviews.length - 1]; snap.lastReviewSummary = last.summary ? `第${last.chapter}章: ${last.summary.slice(0, 80)}` : '' } } catch (e: any) { log.error('snapshot:reviews', e) }
     try { const usage = getDB().getUsageStats(bookId); if (usage) { snap.totalInputTokens = usage.total_input || 0; snap.totalOutputTokens = usage.total_output || 0; snap.totalCostUSD = usage.total_cost || 0; snap.totalSavedUSD = usage.total_saved || 0; snap.cacheReadTokens = usage.cache_read || 0; snap.cacheWriteTokens = usage.cache_write || 0 } } catch (e: any) { log.error('snapshot:usage', e) }
-    try { const meta = getDB().getRunMeta(bookId); if (meta) { snap.provider = meta.provider || ''; snap.modelName = meta.model || '' } } catch (e: any) { log.error('snapshot:meta', e) }
+    try { const meta = getDB().getRunMeta(bookId); if (meta) { snap.provider = meta.provider || ''; snap.modelName = meta.model || ''; snap.pendingSteer = meta.pending_steer || '' } } catch (e: any) { log.error('snapshot:meta', e) }
     try { const prog = getDB().database.prepare('SELECT * FROM progress WHERE book_id=?').get(bookId); if (prog) { snap.layered = !!prog.layered; if (prog.total_chapters > 0) snap.totalChapters = prog.total_chapters; snap.completedCount = (() => { try { return JSON.parse(prog.completed_chapters || '[]').length } catch { return 0 } })() } } catch (e: any) { log.error('snapshot:prog', e) }
   } catch (e: any) { log.error('snapshot:db', e) }
 }
@@ -308,7 +357,24 @@ function fillFallbackData(snap: any) {
     const bookId = books[0].id
     try { const fullBook = getDB().getBook(bookId); if (fullBook?.premise && !snap.premise) snap.premise = fullBook.premise.slice(0, 200) } catch (e: any) { log.error('snapshot:fallback-premise', e) }
     try { const chars = getDB().getCharacters(bookId); if (chars?.length && !snap.characters.length) snap.characters = chars.map((c: any) => c.name + (c.role ? `（${c.role}）` : '')) } catch (e: any) { log.error('snapshot:fallback-chars', e) }
-    try { if (!snap.outline.length) { const entries = getDB().getOutlineEntries(bookId); if (entries?.length) { snap.totalOutlineCount = entries.length; snap.outline = entries.slice(-30).map((e: any) => ({ chapter: e.chapter || 0, title: e.title || '', coreEvent: e.core_event || '' })) } } } catch (e: any) { log.error('snapshot:fallback-outline', e) }
+    try { if (!snap.outline.length) {
+      const dbChapters = getDB().listChapters(bookId)
+      if (dbChapters?.length) {
+        snap.outline = dbChapters.slice(-30).map((c: any) => ({ chapter: c.num, title: c.title || `第${c.num}章`, coreEvent: '' }))
+      }
+      const dbEntries = getDB().getOutlineEntries(bookId)
+      if (dbEntries?.length) {
+        const chMap = new Map<number, any>(snap.outline.map((o: any) => [o.chapter, o]))
+        for (const e of dbEntries) {
+          const ch = e.chapter || 0
+          const existing = chMap.get(ch)
+          if (existing) { if (e.core_event) existing.coreEvent = e.core_event }
+          else { chMap.set(ch, { chapter: ch, title: e.title || '', coreEvent: e.core_event || '' }) }
+        }
+        snap.outline = Array.from(chMap.values()).sort((a: any, b: any) => a.chapter - b.chapter).slice(-30)
+      }
+      snap.totalOutlineCount = snap.outline.length
+    } } catch (e: any) { log.error('snapshot:fallback-outline', e) }
     try { if (!snap.compassDirection) { const compass = getDB().getCompass(bookId); if (compass) { snap.compassDirection = compass.endingDirection || ''; snap.compassScale = compass.estimatedScale || '' } } } catch (e: any) { log.error('snapshot:fallback-compass', e) }
     try { if (!snap.lastReviewSummary) { const reviews = getDB().getReviews(bookId); if (reviews?.length) { const last = reviews[reviews.length - 1]; snap.lastReviewSummary = last.summary ? `第${last.chapter}章: ${last.summary.slice(0, 80)}` : '' } } } catch (e: any) { log.error('snapshot:fallback-review', e) }
     try { const usage = getDB().getUsageStats(bookId); if (usage) { if (!snap.totalInputTokens) snap.totalInputTokens = usage.total_input || 0; if (!snap.totalOutputTokens) snap.totalOutputTokens = usage.total_output || 0; if (!snap.totalCostUSD) snap.totalCostUSD = usage.total_cost || 0; if (!snap.totalSavedUSD) snap.totalSavedUSD = usage.total_saved || 0; if (!snap.cacheReadTokens) snap.cacheReadTokens = usage.cache_read || 0; if (!snap.cacheWriteTokens) snap.cacheWriteTokens = usage.cache_write || 0 } } catch (e: any) { log.error('snapshot:fallback-usage', e) }
@@ -406,17 +472,51 @@ function startRuntimeSync() {
           for (const file of files) {
             const num = parseInt(file.replace('.md', ''), 10)
             if (!isNaN(num)) {
-              const existing = db.getChapter(bookId, num)
-              if (!existing) {
-                const content = readFileSync(join(chDir, file), 'utf8')
-                const title = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || `第${num}章`
-                db.saveChapter(bookId, num, content, title)
-              }
+              const content = readFileSync(join(chDir, file), 'utf8')
+              const title = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || `第${num}章`
+              db.saveChapter(bookId, num, content, title)
             }
           }
           chapterCache = { files, mtime: currentMtime }
         }
       } catch (e: any) { log.error('runtime-sync:chapters', e) }
+    }
+
+    // 同步 progress.json → SQLite progress 表（确保书籍列表/DB 快照数据最新）
+    if (bookId) {
+      try {
+        const progJson = readStoreJSON('meta/progress.json')
+        if (progJson) {
+          const completed = JSON.stringify(progJson.completed_chapters || [])
+          const wcMap = JSON.stringify(progJson.chapter_word_counts || {})
+          db.database.prepare(`INSERT OR REPLACE INTO progress 
+            (book_id, novel_name, phase, current_chapter, total_chapters, completed_chapters, 
+             total_word_count, chapter_word_counts, in_progress_chapter, flow, 
+             pending_rewrites, rewrite_reason, current_volume, current_arc, layered,
+             reopened_from_complete, strand_history, hook_history) 
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+            .run(
+              bookId,
+              progJson.novel_name || '',
+              progJson.phase || 'init',
+              progJson.current_chapter || 0,
+              progJson.total_chapters || 0,
+              completed,
+              progJson.total_word_count || 0,
+              wcMap,
+              progJson.in_progress_chapter || 0,
+              progJson.flow || 'writing',
+              JSON.stringify(progJson.pending_rewrites || []),
+              progJson.rewrite_reason || '',
+              progJson.current_volume || 0,
+              progJson.current_arc || 0,
+              progJson.layered ? 1 : 0,
+              progJson.reopened_from_complete ? 1 : 0,
+              JSON.stringify(progJson.strand_history || []),
+              JSON.stringify(progJson.hook_history || []),
+            )
+        }
+      } catch (e: any) { log.error('runtime-sync:progress', e) }
     }
 
     // 推送最新快照到渲染进程（替代前端轮询）

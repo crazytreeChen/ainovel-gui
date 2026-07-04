@@ -27,7 +27,7 @@ export function mixinContent(proto: any) {
     const ins = this.database.prepare('INSERT INTO world_rules (book_id, category, rule_text, boundary) VALUES (?,?,?,?)')
     const tx = this.database.transaction(() => {
       del.run(bookId)
-      for (const r of rules || []) ins.run(bookId, r.category || '', r.rule_text || '', r.boundary || '')
+      for (const r of rules || []) ins.run(bookId, r.category || '', r.rule_text || r.rule || '', r.boundary || '')
     })
     tx()
   }
