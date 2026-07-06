@@ -48,9 +48,16 @@ export function useIPCListeners() {
 
   useEffect(() => {
     if (!window.electronAPI) return
-    const cleanup = window.electronAPI.onProcessExited(() => {
-      useAppStore.getState().setMode('welcome')
-      refreshSnapshot()
+    const cleanup = window.electronAPI.onProcessExited(async () => {
+      await refreshSnapshot()
+      const snap = useAppStore.getState().snapshot
+      if (snap.isRunning) {
+        useAppStore.getState().setMode('running')
+      } else if (snap.phase === 'complete') {
+        useAppStore.getState().setMode('completed')
+      } else {
+        useAppStore.getState().setMode('idle')
+      }
     })
     return cleanup
   }, [refreshSnapshot])

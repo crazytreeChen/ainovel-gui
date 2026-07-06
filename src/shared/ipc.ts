@@ -61,6 +61,12 @@ export interface DownloadProgress {
   percent: number; bytesPerSecond: number; downloaded: number; total: number
 }
 
+export interface ProcessExitEvent {
+  code: number | null
+  bookId: string
+  pendingUserConfirm?: boolean
+}
+
 export interface SearchResults {
   chapters: { type: 'chapter'; num: number; title: string; match: string }[]
   characters: { type: 'character'; name: string; role: string; match: string }[]
@@ -265,7 +271,7 @@ export interface ElectronAPI {
   restoreData: () => Promise<{ success: boolean; error?: string }>
 
   // 事件监听
-  onProcessExited: (callback: () => void) => () => void
+  onProcessExited: (callback: (data: ProcessExitEvent) => void) => () => void
   onSnapshotUpdate: (callback: (data: UISnapshot) => void) => () => void
   onStreamOutput: (callback: (data: string) => void) => () => void
   onRuntimeUpdate: (callback: () => void) => () => void

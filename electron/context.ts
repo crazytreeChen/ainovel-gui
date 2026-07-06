@@ -21,6 +21,10 @@ const state = {
   db: null,
   /** 引擎事件缓冲区（从 stderr 实时捕获，供前端轮询） */
   engineEvents: [],
+  /** 当前运行中的书籍 ID，用于运行时文件同步归属 */
+  activeWritingBookId: '',
+  /** 最近一次创作进程退出码 */
+  lastWritingExitCode: null,
   /** 检查点文件替代路径 */
   cpPathAlt: null,
   /** 质量审查取消标记 */

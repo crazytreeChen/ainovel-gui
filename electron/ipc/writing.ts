@@ -25,18 +25,52 @@ function register(ipcMain: Electron.IpcMain) {
     }
     if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true })
     state.outputDir = cwd
+    state.activeWritingBookId = bookId || ''
+    state.lastWritingExitCode = null
     const args = ['--headless']
     if (state.configPath) args.push('--config', state.configPath)
     try {
       state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
+      let stderrData = ''
+      state.ainovelProcess.stderr.on('data', (data: any) => {
+        const text = data.toString(); stderrData += text
+        for (const line of text.split('\n').filter(Boolean)) {
+          const match = line.match(/\[(\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(.*)/)
+          if (match) {
+            const now = new Date()
+            const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${match[1]}`
+            state.engineEvents.push({ time: timeStr, category: match[2], summary: match[3], detail: '', agent: '', depth: 0, level: match[2] === 'ERROR' ? 'error' : match[2] === 'WARN' ? 'warn' : 'info', duration: 0 })
+          }
+        }
+        if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
+      })
+      let streamMode = 'content', streamBuf = '', streamTimer: ReturnType<typeof setTimeout> | null = null
+      state.ainovelProcess.stdout.on('data', (data: any) => {
+        const text = data.toString()
+        const clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
+        const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
+        if (tIdx >= 0 || cIdx >= 0) {
+          if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
+          if (tIdx >= 0) streamMode = 'thinking'
+          if (cIdx >= 0) streamMode = 'content'
+          const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
+          const rest = clean.substring(idx).trim()
+          if (rest) streamBuf = rest
+        } else { streamBuf += clean }
+        if (streamBuf.length > 100) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
+        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' } }, 500) }
+      })
       state.ainovelProcess.on('exit', (code: number | null) => {
+        state.lastWritingExitCode = code
         state.ainovelProcess = null
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', code)
+        sendProcessExited(code)
       })
       state.ainovelProcess.on('error', (err: Error) => {
         log.error('start-writing:error', err.message)
+        state.lastWritingExitCode = -1
         state.ainovelProcess = null
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', -1)
+        sendProcessExited(-1)
       })
       startRuntimeSync()
       return true
@@ -61,6 +95,8 @@ function register(ipcMain: Electron.IpcMain) {
     const outputParent = cwd.replace(outputPattern, '')
     if (outputParent !== cwd && existsSync(join(outputParent, 'output'))) cwd = outputParent
     state.outputDir = cwd
+    state.activeWritingBookId = bookId || ''
+    state.lastWritingExitCode = null
     const args = ['--headless']
     if (state.configPath) args.push('--config', state.configPath)
     try {
@@ -97,13 +133,15 @@ function register(ipcMain: Electron.IpcMain) {
       })
       state.ainovelProcess.on('exit', (code: number | null) => {
         if (code !== 0 && stderrData) log.error('resume exit:', code, stderrData)
+        state.lastWritingExitCode = code
         stopRuntimeSync(); state.ainovelProcess = null
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', code)
+        sendProcessExited(code)
       })
       state.ainovelProcess.on('error', (err: Error) => {
         log.error('resume-writing:error', err.message)
+        state.lastWritingExitCode = -1
         stopRuntimeSync(); state.ainovelProcess = null
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', -1)
+        sendProcessExited(-1)
       })
       startRuntimeSync()
       return true
@@ -111,14 +149,60 @@ function register(ipcMain: Electron.IpcMain) {
   })
 
   ipcMain.handle('send-input', async (_e: Electron.IpcMainInvokeEvent, text: string) => {
-    if (!state.ainovelProcess || !state.ainovelProcess.stdin || state.ainovelProcess.exitCode !== null) return false
-    try {
-      state.ainovelProcess.stdin.write(text + '\n')
-      const now = new Date()
-      const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
-      state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0 })
-      return true
-    } catch (e: any) { log.error('send-input', e); return false }
+    const now = new Date()
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
+
+    // 进程正在运行：写入 stdin
+    if (state.ainovelProcess && state.ainovelProcess.stdin && state.ainovelProcess.exitCode === null) {
+      try {
+        // 先 SIGINT 暂停当前工作，再发送干预
+        try {
+          if (state.ainovelProcess.exitCode === null) {
+            state.ainovelProcess.kill('SIGINT')
+          }
+        } catch (e: any) { /* 进程可能已退出，忽略 */ }
+        // 短暂等待让 CLI 进入输入处理状态
+        await new Promise(r => setTimeout(r, 100))
+        state.ainovelProcess.stdin.write(text + '\n')
+        state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0 })
+        return true
+      } catch (e: any) { log.error('send-input', e); return false }
+    }
+
+    // 进程未运行（规划暂停/已退出）：保存为 pending_steer，下次恢复时生效
+    const bookId = getActiveWritingBookId()
+    if (bookId) {
+      try {
+        const db = getDB()
+        const existing = db.getRunMeta(bookId) || {}
+        db.saveRunMeta(bookId, { ...existing, pending_steer: text, pending_steer_at: timeStr })
+        // 同时写入 JSON 文件（CLI 从 meta/run.json 读取）
+        const { join: pJoin } = require('path')
+        const { existsSync: fExists, writeFileSync: fWrite } = require('fs')
+        const { homedir } = require('os')
+        const dir = pJoin(homedir(), '.ainovel-gui', 'books', bookId)
+        const runJsonPath = pJoin(dir, 'meta', 'run.json')
+        if (fExists(runJsonPath)) {
+          try {
+            const raw = JSON.parse(require('fs').readFileSync(runJsonPath, 'utf8'))
+            raw.pending_steer = text
+            raw.pending_steer_at = timeStr
+            fWrite(runJsonPath, JSON.stringify(raw, null, 2), 'utf8')
+          } catch (e: any) { /* 文件可能不存在，忽略 */ }
+        } else {
+          // 创建 meta 目录和 run.json
+          const { mkdirSync } = require('fs')
+          const metaDir = pJoin(dir, 'meta')
+          if (!fExists(metaDir)) mkdirSync(metaDir, { recursive: true })
+          fWrite(runJsonPath, JSON.stringify({ pending_steer: text, pending_steer_at: timeStr }, null, 2), 'utf8')
+        }
+        state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0 })
+        log.info('send-input:saved-as-pending-steer', { bookId, text: text.slice(0, 60) })
+        return true
+      } catch (e: any) { log.error('send-input:save-pending-steer', e); return false }
+    }
+
+    return false
   })
 
   ipcMain.handle('pause-writing', async () => {
@@ -148,6 +232,8 @@ function register(ipcMain: Electron.IpcMain) {
     }
     if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }); return false }
     state.outputDir = cwd
+    state.activeWritingBookId = bookId || ''
+    state.lastWritingExitCode = null
     const args = ['--headless']
     if (state.configPath) args.push('--config', state.configPath)
     try {
@@ -185,13 +271,15 @@ function register(ipcMain: Electron.IpcMain) {
       })
       state.ainovelProcess.on('exit', (code: number | null) => {
         if (code !== 0 && stderrData) log.error('confirm-continue-writing exit:', code, stderrData)
+        state.lastWritingExitCode = code
         stopRuntimeSync(); state.ainovelProcess = null; pendingUserConfirm = false
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', code)
+        sendProcessExited(code)
       })
       state.ainovelProcess.on('error', (err: Error) => {
         log.error('confirm-continue-writing:error', err.message)
+        state.lastWritingExitCode = -1
         stopRuntimeSync(); state.ainovelProcess = null; pendingUserConfirm = false
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', -1)
+        sendProcessExited(-1)
       })
       startRuntimeSync()
       return true
@@ -272,6 +360,8 @@ function register(ipcMain: Electron.IpcMain) {
     
     try {
       state.outputDir = bookDir
+      state.activeWritingBookId = id
+      state.lastWritingExitCode = null
       state.ainovelProcess = spawn(binary, args, {
         cwd: bookDir,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -317,8 +407,9 @@ function register(ipcMain: Electron.IpcMain) {
       })
       
       state.ainovelProcess.on('exit', (code: number | null) => {
+        state.lastWritingExitCode = code
         stopRuntimeSync(); state.ainovelProcess = null
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', code)
+        sendProcessExited(code)
         // 尝试读取生成的书籍名称更新 SQLite
         try {
           const progJson = readStoreJSON('meta/progress.json')
@@ -329,8 +420,9 @@ function register(ipcMain: Electron.IpcMain) {
       })
       state.ainovelProcess.on('error', (err: Error) => {
         log.error('create-book-auto:error', err.message)
+        state.lastWritingExitCode = -1
         stopRuntimeSync(); state.ainovelProcess = null
-        if (state.mainWindow && !state.mainWindow.isDestroyed()) state.mainWindow.webContents.send('process-exited', -1)
+        sendProcessExited(-1)
       })
       
       startRuntimeSync()
@@ -395,11 +487,18 @@ function getBookForSnapshot(bookId?: string) {
     const book = db.getBook(bookId)
     if (book) return book
   }
+  if (state.activeWritingBookId) {
+    const book = db.getBook(state.activeWritingBookId)
+    if (book) return book
+  }
   return db.listBooks()?.[0] || null
 }
 
 function getBookRuntimeDir(bookId?: string) {
   const book = getBookForSnapshot(bookId)
+  if (book?.id && state.activeWritingBookId && book.id === state.activeWritingBookId) {
+    return findActiveBookDir() || state.outputDir || book.workspace_dir || null
+  }
   return book?.workspace_dir || state.outputDir || null
 }
 
@@ -672,10 +771,10 @@ function createEmptySnapshot() {
 }
 
 function deriveStatusLabel(snap: any) {
+  if (snap.phase === 'complete') return 'COMPLETE'
   if (!snap.isRunning) return 'READY'
   if (snap.flow === 'reviewing') return 'REVIEW'
   if (snap.flow === 'rewriting') return 'REWRITE'
-  if (snap.phase === 'complete') return 'COMPLETE'
   return 'RUNNING'
 }
 
@@ -719,6 +818,21 @@ function stopAinovelProcess() {
   })
 }
 
+function getActiveWritingBookId() {
+  if (state.activeWritingBookId) return state.activeWritingBookId
+  try { return getDB().listBooks()?.[0]?.id || '' }
+  catch (e: any) { log.error('getActiveWritingBookId', e); return '' }
+}
+
+function sendProcessExited(code: number | null) {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) return
+  state.mainWindow.webContents.send('process-exited', {
+    code,
+    bookId: state.activeWritingBookId || '',
+    pendingUserConfirm,
+  })
+}
+
 let snapshotTimer: ReturnType<typeof setInterval> | null = null
 let runtimeSyncActive = false
 let chapterCache: { files: string[]; mtime: number } | null = null
@@ -742,7 +856,7 @@ function startRuntimeSync() {
     const bookDir = findActiveBookDir()
     if (!bookDir) return
     const db = getDB()
-    const bookId = getDB().listBooks()?.[0]?.id
+    const bookId = getActiveWritingBookId()
 
     // 自动导入新章节（带目录 mtime 缓存，避免每次全扫）
     const chDir = join(bookDir, 'chapters')

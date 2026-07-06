@@ -56,7 +56,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
       return result
     } catch (e: any) {
       useUIStore.getState().setError(e.message)
-      useUIStore.getState().setMode('welcome')
+      useUIStore.getState().setMode(bookId ? 'idle' : 'welcome')
       return false
     }
   },
@@ -71,7 +71,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
       return result
     } catch (e: any) {
       useUIStore.getState().setError(e.message)
-      useUIStore.getState().setMode('welcome')
+      useUIStore.getState().setMode('idle')
       return false
     }
   },
@@ -80,7 +80,15 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     const api = window.electronAPI
     if (!api) return false
     get().pushToHistory(text)
-    return api.sendInput(text)
+    const ok = await api.sendInput(text)
+    if (!ok) {
+      useUIStore.getState().addToast({
+        id: Date.now(),
+        message: '发送干预失败：创作进程未运行或已退出',
+        type: 'error',
+      })
+    }
+    return ok
   },
 
   pauseWriting: async () => {
@@ -93,7 +101,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     const api = window.electronAPI
     if (!api) return false
     await api.stopWriting()
-    useUIStore.getState().setMode('welcome')
+    useUIStore.getState().setMode('idle')
     return true
   },
 

@@ -1,20 +1,20 @@
 {
-  "version": "0.6.3",
-  "release_notes": "## v0.6.3 更新内容\n\n### 质量审查\n- 审查列表滚动时，右侧详情会自动跟随当前滚动到的章节\n- 保留点击左侧章节查看详情的交互，不影响原有手动切换\n- 继续支持审查结果查看、修复应用与差异对照\n\n### 验证\n- typecheck 已通过",
+  "version": "0.6.4",
+  "release_notes": "## v0.6.4 更新内容\n\n### 创作工作台\n- 修复运行期同步错误归属到第一本书的问题，当前书籍会作为 run/usage/progress 同步目标\n- 即使尚未生成 progress.json，也会继续读取 run.json 与 usage.json，用于显示当前模型和 token\n- 修复创作进程退出后强制返回欢迎页的问题，保留当前工作台上下文并按快照状态切换\n- 修复完成态状态标签误显示为 READY 的问题\n\n### 验证\n- typecheck 已通过",
   "release_date": "2026-07-06",
   "downloads": {
     "mac-arm64": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.3/AINovel-0.6.3-mac-arm64.dmg",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.4/AINovel-0.6.4-mac-arm64.dmg",
       "size": 0,
       "sha256": ""
     },
     "win-x64": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.3/AINovel-0.6.3-win-x64.exe",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.4/AINovel-0.6.4-win-x64.exe",
       "size": 0,
       "sha256": ""
     },
     "mac-arm64-zip": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.3/AINovel-0.6.3-mac-arm64.zip",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.4/AINovel-0.6.4-mac-arm64.zip",
       "size": 0,
       "sha256": ""
     }

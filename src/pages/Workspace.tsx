@@ -66,7 +66,7 @@ export default function Workspace() {
 
   const handleDecline = useCallback(() => {
     setPlanningComplete(false)
-    setMode('welcome')
+    setMode('idle')
   }, [setMode])
 
   // 同步运行状态
@@ -76,6 +76,7 @@ export default function Workspace() {
     refreshSnapshot().then(() => {
       const snap = useAppStore.getState().snapshot
       if (snap.isRunning && mode !== 'running') setMode('running')
+      if (!snap.isRunning && mode === 'welcome') setMode('idle')
     })
   }, [id, setActiveBookId]) // eslint-disable-line react-hooks/exhaustive-deps
 

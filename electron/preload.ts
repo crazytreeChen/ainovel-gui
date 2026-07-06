@@ -148,9 +148,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   restoreData: () => ipcRenderer.invoke('restore-data'),
 
   // 事件监听
-  onProcessExited: (callback: () => void) => {
-    ipcRenderer.on('process-exited', callback)
-    return () => ipcRenderer.removeListener('process-exited', callback)
+  onProcessExited: (callback: (data: any) => void) => {
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('process-exited', handler)
+    return () => ipcRenderer.removeListener('process-exited', handler)
   },
   onSnapshotUpdate: (callback: (data: any) => void) => {
     ipcRenderer.on('snapshot-update', (_event, data) => callback(data))
