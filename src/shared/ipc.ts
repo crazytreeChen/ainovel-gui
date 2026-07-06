@@ -197,10 +197,10 @@ export interface ElectronAPI {
   }>
 
   // 全书评审修复 Agent
-  batchAuditBook: (id: string) => Promise<{
-    success: boolean; total: number; error?: string
+  batchAuditBook: (id: string, apply?: boolean, startChapter?: number, endChapter?: number, force?: boolean) => Promise<{
+    success: boolean; canceled?: boolean; total: number; error?: string
     stats: {
-      reviewed: number; titleUpdated: number
+      reviewed: number; contentCorrected: number; titleUpdated: number
       needsRewrite: number; needsTrimming: number
       errors: number; skipped: number
       avgTitleScore: number; avgAiFlavorScore: number
@@ -237,4 +237,13 @@ export interface ElectronAPI {
   onSnapshotUpdate: (callback: (data: UISnapshot) => void) => () => void
   onStreamOutput: (callback: (data: string) => void) => () => void
   onRuntimeUpdate: (callback: () => void) => () => void
+
+  // 全书审查进度
+  onAuditProgress: (callback: (data: { current: number; total: number; chapter: number; elapsed: number; remaining: number }) => void) => () => void
+
+  // 取消全书审查
+  cancelAudit: () => Promise<boolean>
+
+  // 应用审查修复（从保存的审查结果中执行修复，不重新调用 LLM）
+  batchApplyFixes: (id: string) => Promise<{ success: boolean; titleUpdated: number; contentFixed: number; error?: string }>
 }

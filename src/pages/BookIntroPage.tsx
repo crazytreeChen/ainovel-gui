@@ -17,6 +17,11 @@ export default function BookIntroPage() {
   const [page, setPage] = useState(1)
   const [cleaning, setCleaning] = useState(false)
   const [auditing, setAuditing] = useState(false)
+  const [auditStep, setAuditStep] = useState<'idle' | 'choose' | 'running' | 'done'>('idle')
+  const [auditProgress, setAuditProgress] = useState<{ current: number; total: number; chapter: number; elapsed: number; remaining: number } | null>(null)
+  const [auditResult, setAuditResult] = useState<any>(null)
+  const [auditStartCh, setAuditStartCh] = useState('')
+  const [auditEndCh, setAuditEndCh] = useState('')
 
   useEffect(() => {
     if (!id || !window.electronAPI) return
@@ -49,49 +54,70 @@ export default function BookIntroPage() {
 
   async function handleAuditBook() {
     if (!id || !window.electronAPI || auditing) return
-    if (!confirm('将启动全书评审修复 Agent：\n\n' +
-      '• 逐章检查：标题质量、AI 味、节奏、大纲对齐、字数\n' +
-      '• 自动修复：不合格标题将被重写\n' +
-      '• 标记问题：需重写或删减的章节会被标注\n' +
-      '• 耗时较长：每章约 10-15 秒，50 章约 10 分钟\n\n' +
-      '确认开始全面审查？')) return
+    setAuditStep('choose')
+    setAuditResult(null)
+    setAuditProgress(null)
+  }
+
+  async function startAudit(apply: boolean, force: boolean = false) {
+    if (!id || !window.electronAPI) return
     setAuditing(true)
+    setAuditStep('running')
+    setAuditResult(null)
+    const chStart = parseInt(auditStartCh) || 0
+    const chEnd = parseInt(auditEndCh) || 0
+    const cleanup = window.electronAPI.onAuditProgress((data) => {
+      setAuditProgress(data)
+    })
     try {
-      const result = await window.electronAPI.batchAuditBook(id)
+      const result = await window.electronAPI.batchAuditBook(id, apply, chStart, chEnd, force)
+      cleanup()
       if (!result.success) {
         alert('审查失败: ' + (result.error || '未知错误'))
       } else {
-        const s = result.stats
-        let msg = `📊 全书审查报告\n\n`
-        msg += `已审 ${s.reviewed}/${result.total} 章`
-        if (s.skipped) msg += `（${s.skipped} 章跳过）`
-        msg += `\n\n`
-        msg += `📈 平均分\n`
-        msg += `  标题质量:    ${s.avgTitleScore}/10\n`
-        msg += `  AI 味:      ${s.avgAiFlavorScore}/10\n`
-        msg += `  节奏结构:   ${s.avgPacingScore}/10\n`
-        msg += `  大纲对齐:   ${s.avgOutlineScore}/10\n`
-        msg += `  角色连续性: ${s.avgCharContinuityScore}/10\n`
-        msg += `  时间线连贯: ${s.avgTimelineScore}/10\n`
-        msg += `  线索管理:   ${s.avgPlotThreadScore}/10\n\n`
-        msg += `🛠 处理结果\n`
-        if (s.titleUpdated) msg += `  ✅ 标题已更新: ${s.titleUpdated} 章\n`
-        if (s.needsRewrite) msg += `  ⚠️ 建议重写: ${s.needsRewrite} 章\n`
-        if (s.needsTrimming) msg += `  ✂️ 建议删减: ${s.needsTrimming} 章\n`
-        if (s.totalMissingIntros) msg += `  👤 缺角色交代: ${s.totalMissingIntros} 处\n`
-        if (s.totalCharStateInconsistencies) msg += `  ☠️ 状态冲突(死而复生): ${s.totalCharStateInconsistencies} 处\n`
-        if (s.totalTimelineGaps) msg += `  ⏱ 时间线跳跃: ${s.totalTimelineGaps} 处\n`
-        if (s.totalDroppedThreads) msg += `  🧵 丢弃线索: ${s.totalDroppedThreads} 处\n`
-        if (s.errors) msg += `  ❌ 失败: ${s.errors} 章\n`
-        alert(msg)
+        setAuditResult(result)
+        setAuditStep('done')
       }
-      // 重新加载章节列表
       const chs = await window.electronAPI.getBookChapters(id)
       setChapters(chs || [])
     } catch (e: any) {
+      cleanup()
       alert('审查失败: ' + (e.message || e))
     }
     setAuditing(false)
+  }
+
+  async function handleApplyFixes() {
+    if (!id || !window.electronAPI || !auditResult) return
+    try {
+      const result = await window.electronAPI.batchApplyFixes(id)
+      if (!result.success) {
+        alert('应用修复失败: ' + (result.error || '未知错误'))
+      } else {
+        alert(`修复完成：标题更新 ${result.titleUpdated} 章，正文修正 ${result.contentFixed} 章`)
+        // 刷新章节列表
+        const chs = await window.electronAPI.getBookChapters(id)
+        setChapters(chs || [])
+        // 更新审计结果标记已修复
+        setAuditResult((prev: any) => prev ? { ...prev, stats: { ...prev.stats, fixApplied: true } } : prev)
+      }
+    } catch (e: any) {
+      alert('应用修复失败: ' + (e.message || e))
+    }
+  }
+
+  async function handleCancelAudit() {
+    if (window.electronAPI) {
+      await window.electronAPI.cancelAudit()
+      setAuditStep('idle')
+    }
+  }
+
+  function formatTime(seconds: number): string {
+    if (seconds < 60) return `${seconds}秒`
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}分${s}秒`
   }
 
   const totalPages = Math.ceil(chapters.length / PAGE_SIZE)
@@ -122,12 +148,36 @@ export default function BookIntroPage() {
                 <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/outline`)}>📋 大纲</button>
                 <button className="welcome-mode-btn" onClick={() => navigate(`/books/${id}/characters`)}>👤 角色</button>
                 <button className="welcome-mode-btn" onClick={() => navigate('/settings/models')}>⚙️ 模型</button>
-                <button className="welcome-mode-btn" onClick={handleBatchCleanTitles} disabled={cleaning} style={{ borderColor: 'var(--color-accent)' }}>
-                  {cleaning ? '⏳ 清洗中...' : '🧹 清洗标题'}
+                <button className="welcome-mode-btn" onClick={handleBatchCleanTitles} disabled={cleaning || auditing} style={{ borderColor: 'var(--color-accent)' }}>
+                  {cleaning ? '⏳ 清洗中...' : auditing ? '审查中...' : '🧹 清洗标题'}
                 </button>
-                <button className="welcome-mode-btn" onClick={handleAuditBook} disabled={auditing} style={{ borderColor: 'var(--color-success)' }}>
-                  {auditing ? '⏳ 审查中...' : '🔍 全书审查'}
+                <button className="welcome-mode-btn" onClick={handleAuditBook} disabled={auditing || auditStep !== 'idle'} style={{ borderColor: 'var(--color-success)' }}>
+                  {auditing || auditStep !== 'idle' ? '⏳ 审查中...' : '🔍 全书审查'}
                 </button>
+                {auditStep === 'running' && (
+                  <div className="flex-row items-center gap-6 ml-auto mono text-xs" style={{ minWidth: 220 }}>
+                    {auditProgress ? (
+                      <>
+                    <span className="text-dim">{auditProgress.current}/{auditProgress.total}</span>
+                    <div className="flex-1" style={{ maxWidth: 100, height: 4, background: 'var(--color-surface-2)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${(auditProgress.current / auditProgress.total) * 100}%`,
+                        height: '100%', background: 'var(--color-accent)',
+                        borderRadius: 2, transition: 'width 0.5s',
+                      }} />
+                    </div>
+                    <span className="text-dim">{Math.round((auditProgress.current / auditProgress.total) * 100)}%</span>
+                    <span className="text-dim">{formatTime(auditProgress.elapsed)}</span>
+                      </>
+                    ) : (
+                      <span className="text-dim">准备中...</span>
+                    )}
+                    <button className="welcome-mode-btn" onClick={handleCancelAudit}
+                      style={{ padding: '1px 8px', fontSize: 10, borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>
+                      停止
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -173,6 +223,106 @@ export default function BookIntroPage() {
           )}
         </div>
       </div>
+
+      {/* 全书审查模态框 */}
+      {auditStep === 'choose' && (
+        <div className="modal-overlay" onClick={() => setAuditStep('idle')}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ minWidth: 420, maxWidth: 480 }}>
+            <button className="modal-close" onClick={() => setAuditStep('idle')}>✕</button>
+            <div className="modal-title">🔍 全书审查</div>
+            <div className="mb-12 text-sm" style={{ lineHeight: 1.8 }}>
+              <p>逐章检查以下 9 个维度：</p>
+              <p className="text-dim text-xs">
+                标题质量 · AI 味 · 节奏结构 · 大纲对齐 · 字数合规<br/>
+                角色连续性（含死而复生） · 时间线连贯 · 线索管理 · 内容跨度
+              </p>
+              <div className="flex-row items-center gap-8 mt-8">
+                <span className="text-dim text-xs">章节范围：</span>
+                <input className="input-field mono text-xs" style={{ width: 60, padding: '2px 6px' }}
+                  placeholder="起始" value={auditStartCh}
+                  onChange={e => setAuditStartCh(e.target.value.replace(/\D/g, ''))} />
+                <span className="text-dim text-xs">—</span>
+                <input className="input-field mono text-xs" style={{ width: 60, padding: '2px 6px' }}
+                  placeholder="结束" value={auditEndCh}
+                  onChange={e => setAuditEndCh(e.target.value.replace(/\D/g, ''))} />
+                <span className="text-dim text-xs">（留空=全部）</span>
+              </div>
+              <p className="text-dim text-xs mt-8">
+                每章约 10-15 秒 · {chapters.length} 章预计约 {formatTime(chapters.length * 12)}
+              </p>
+              <p className="text-dim text-xs">
+                预估消耗 ~{(chapters.length * 800).toLocaleString()} tokens (~${((chapters.length * 800 * 0.000002)).toFixed(4)})
+              </p>
+            </div>
+            <div className="flex-row gap-8" style={{ justifyContent: 'flex-end' }}>
+              <button className="welcome-mode-btn" onClick={() => setAuditStep('idle')}>取消</button>
+              <button className="welcome-mode-btn active" onClick={() => startAudit(true, true)}
+                style={{ background: 'var(--color-accent)', color: '#fff', border: '1px solid var(--color-accent)' }}>
+                🔍 开始审查
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 审查报告 */}
+      {auditStep === 'done' && auditResult && (
+        <div className="modal-overlay" onClick={() => setAuditStep('idle')}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ minWidth: 440, maxWidth: 520, maxHeight: '80vh', overflow: 'auto' }}>
+            <button className="modal-close" onClick={() => setAuditStep('idle')}>✕</button>
+            <div className="modal-title">📊 全书审查报告</div>
+            {(() => {
+              const s = auditResult.stats
+              return (
+                <div className="text-sm" style={{ lineHeight: 1.8 }}>
+                  <p className="text-dim">已审 {s.reviewed}/{auditResult.total} 章{s.skipped ? `（${s.skipped} 章跳过）` : ''}</p>
+                  <div className="sidebar-section-header mt-12 mb-4">📈 平均分</div>
+                  <div className="mono text-xs" style={{ columns: 2, columnGap: 16 }}>
+                    <div>标题质量: {s.avgTitleScore}/10</div>
+                    <div>AI 味: {s.avgAiFlavorScore}/10</div>
+                    <div>节奏结构: {s.avgPacingScore}/10</div>
+                    <div>大纲对齐: {s.avgOutlineScore}/10</div>
+                    <div>角色连续性: {s.avgCharContinuityScore}/10</div>
+                    <div>时间线连贯: {s.avgTimelineScore}/10</div>
+                    <div>线索管理: {s.avgPlotThreadScore}/10</div>
+                  </div>
+                  {s.contentCorrected || s.titleUpdated || s.needsRewrite || s.needsTrimming || s.totalMissingIntros || s.totalCharStateInconsistencies || s.totalTimelineGaps || s.totalDroppedThreads || s.errors ? (
+                    <>
+                      <div className="sidebar-section-header mt-12 mb-4">🛠 处理结果</div>
+                      <div className="text-xs">
+                        {s.contentCorrected ? <div>📝 正文已修正: {s.contentCorrected} 章</div> : null}
+                        {s.titleUpdated ? <div>✅ 标题已更新: {s.titleUpdated} 章</div> : null}
+                        {s.needsRewrite ? <div>⚠️ 建议重写: {s.needsRewrite} 章</div> : null}
+                        {s.needsTrimming ? <div>✂️ 建议删减: {s.needsTrimming} 章</div> : null}
+                        {s.totalMissingIntros ? <div>👤 缺角色交代: {s.totalMissingIntros} 处</div> : null}
+                        {s.totalCharStateInconsistencies ? <div>☠️ 状态冲突: {s.totalCharStateInconsistencies} 处</div> : null}
+                        {s.totalTimelineGaps ? <div>⏱ 时间线跳跃: {s.totalTimelineGaps} 处</div> : null}
+                        {s.totalDroppedThreads ? <div>🧵 丢弃线索: {s.totalDroppedThreads} 处</div> : null}
+                        {s.errors ? <div>❌ 失败: {s.errors} 章</div> : null}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )
+            })()}
+            <div className="flex-row mt-16" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              {!auditResult?.stats?.fixApplied && (auditResult?.stats?.titleUpdated > 0 || auditResult?.stats?.contentCorrected > 0) ? (
+                <button className="welcome-mode-btn active" onClick={handleApplyFixes}
+                  style={{ background: 'var(--color-accent)', color: '#fff', border: '1px solid var(--color-accent)' }}>
+                  🔧 应用修复
+                </button>
+              ) : null}
+              {auditResult?.stats?.fixApplied ? (
+                <button className="welcome-mode-btn active" onClick={handleApplyFixes}
+                  style={{ background: 'var(--color-accent)', color: '#fff', border: '1px solid var(--color-accent)' }}>
+                  🔄 重新修复
+                </button>
+              ) : null}
+              <button className="welcome-mode-btn" onClick={() => setAuditStep('idle')}>关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -5,6 +5,7 @@ const { mixinBooks } = require('./db/books')
 const { mixinOutline } = require('./db/outline')
 const { mixinEntities } = require('./db/entities')
 const { mixinContent } = require('./db/content')
+const { mixinAudit } = require('./db/audit')
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT);
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS user_rules (book_id TEXT PRIMARY KEY REFERENCES books
 CREATE TABLE IF NOT EXISTS simulation_profiles (book_id TEXT PRIMARY KEY REFERENCES books(id), profile TEXT DEFAULT '{}');
 CREATE TABLE IF NOT EXISTS user_directives (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id TEXT NOT NULL REFERENCES books(id), text TEXT NOT NULL, chapter INTEGER DEFAULT 0, total_chapters INTEGER DEFAULT 0, created_at TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS chapter_audits (book_id TEXT NOT NULL, chapter INTEGER NOT NULL, reviewed_at TEXT NOT NULL, review_data TEXT DEFAULT '{}', PRIMARY KEY (book_id, chapter));
 CREATE INDEX IF NOT EXISTS idx_outline_book ON outline_entries(book_id, chapter);
 CREATE INDEX IF NOT EXISTS idx_chapters_book ON chapters(book_id, num);
 CREATE INDEX IF NOT EXISTS idx_characters_book ON characters_t(book_id, name);
@@ -56,6 +58,11 @@ class AppDatabase {
   migrate() {
     const row = this.database.prepare('SELECT value FROM _meta WHERE key = ?').get('schema_version') as any
     let version = row ? parseInt(row.value) : 0
+
+    const hasColumn = (table: string, col: string) => {
+      const cols = this.database.prepare(`PRAGMA table_info(${table})`).all() as any[]
+      return cols.some((c: any) => c.name === col)
+    }
 
     if (version < 1) {
       this.database.exec(SCHEMA_SQL)
@@ -79,10 +86,6 @@ class AppDatabase {
       this.database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_chapter_plans_book_chapter ON chapter_plans(book_id, chapter)`)
 
       // 新增列（若不存在则添加）
-      const hasColumn = (table: string, col: string) => {
-        const cols = this.database.prepare(`PRAGMA table_info(${table})`).all() as any[]
-        return cols.some((c: any) => c.name === col)
-      }
       if (!hasColumn('books', 'tags')) this.database.exec('ALTER TABLE books ADD COLUMN tags TEXT DEFAULT ""')
       if (!hasColumn('characters_t', 'avatar')) this.database.exec('ALTER TABLE characters_t ADD COLUMN avatar TEXT DEFAULT ""')
 
@@ -98,6 +101,13 @@ class AppDatabase {
       version = 3
     }
 
+    if (version < 4) {
+      // 创建 chapter_audits 表（兼容旧库）
+      this.database.exec(`CREATE TABLE IF NOT EXISTS chapter_audits (book_id TEXT NOT NULL, chapter INTEGER NOT NULL, reviewed_at TEXT NOT NULL, review_data TEXT DEFAULT '{}', content_hash TEXT DEFAULT '', PRIMARY KEY (book_id, chapter))`)
+      if (!hasColumn('chapter_audits', 'content_hash')) this.database.exec('ALTER TABLE chapter_audits ADD COLUMN content_hash TEXT DEFAULT ""')
+      version = 4
+    }
+
     this.database.prepare('INSERT OR REPLACE INTO _meta VALUES (?, ?)').run('schema_version', String(version))
   }
 
@@ -109,5 +119,6 @@ mixinBooks(AppDatabase.prototype)
 mixinOutline(AppDatabase.prototype)
 mixinEntities(AppDatabase.prototype)
 mixinContent(AppDatabase.prototype)
+mixinAudit(AppDatabase.prototype)
 
 module.exports = { AppDatabase }

@@ -74,17 +74,19 @@ export function mixinOutline(proto: any) {
     return { ...row, open_threads: typeof row.open_threads === 'string' ? JSON.parse(row.open_threads) : row.open_threads }
   }
 
-  proto.saveChapter = function (bookId: string, num: number, content: string, title: string) {
+  proto.saveChapter = function (bookId: string, num: number, content: string, title: string, status?: string) {
     const now = new Date().toISOString()
     const wc = content.trim() ? content.trim().length : 0
     const cleanTitle = cleanChapterTitle(title || '', num)
+    // CLI 抓回的章节为终稿，前端手动保存视为草稿；显式传入则尊重
+    const finalStatus = status || (content.trim() ? 'completed' : 'draft')
     // 先尝试 UPDATE，只有 (book_id, num) 不存在时才 INSERT
     // 避免 INSERT OR REPLACE 因自增主键导致重复行
     const upd = this.database.prepare(`UPDATE chapters SET title=?, content=?, word_count=?, status=?, updated_at=? WHERE book_id=? AND num=?`)
-      .run(cleanTitle, content || '', wc, 'draft', now, bookId, num)
+      .run(cleanTitle, content || '', wc, finalStatus, now, bookId, num)
     if (upd.changes === 0) {
       this.database.prepare(`INSERT INTO chapters (book_id, num, title, content, word_count, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`)
-        .run(bookId, num, cleanTitle, content || '', wc, 'draft', now, now)
+        .run(bookId, num, cleanTitle, content || '', wc, finalStatus, now, now)
     }
   }
 

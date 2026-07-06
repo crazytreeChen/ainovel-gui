@@ -98,7 +98,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 批量操作
   batchCleanTitles: (id: string) => ipcRenderer.invoke('batch-clean-titles', id),
   batchGenerateTitles: (id: string) => ipcRenderer.invoke('batch-generate-titles', id),
-  batchAuditBook: (id: string) => ipcRenderer.invoke('batch-audit-book', id),
+  batchAuditBook: (id: string, apply?: boolean, startChapter?: number, endChapter?: number, force?: boolean) =>
+    ipcRenderer.invoke('batch-audit-book', id, apply, startChapter, endChapter, force),
 
   // 调试
   debugDb: () => ipcRenderer.invoke('debug-db'),
@@ -164,4 +165,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('runtime-update', handler)
     return () => ipcRenderer.removeListener('runtime-update', handler)
   },
+
+  // 全书审查进度推送
+  onAuditProgress: (callback: (data: { current: number; total: number; chapter: number; elapsed: number; remaining: number }) => void) => {
+    const handler = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('audit-progress', handler)
+    return () => ipcRenderer.removeListener('audit-progress', handler)
+  },
+
+  // 取消全书审查
+  cancelAudit: () => ipcRenderer.invoke('cancel-audit'),
+
+  // 应用审查修复
+  batchApplyFixes: (id: string) => ipcRenderer.invoke('batch-apply-fixes', id),
 })

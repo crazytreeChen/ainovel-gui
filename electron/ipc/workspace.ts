@@ -567,22 +567,27 @@ function register(ipcMain: Electron.IpcMain) {
   })
 
   // ── 全书评审修复 Agent ──
-  ipcMain.handle('batch-audit-book', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+  ipcMain.handle('batch-audit-book', async (_e: Electron.IpcMainInvokeEvent, bookId: string, apply: boolean = false, startChapter: number = 0, endChapter: number = 0, force: boolean = false) => {
+    log.info(`batch-audit:start bookId=${bookId} apply=${apply} range=${startChapter}-${endChapter} force=${force}`)
     const dir = getBookDirById(bookId)
     if (!dir) return { success: false, error: '未找到书籍目录' }
     const db = getDB()
     const chDir = join(dir, 'chapters')
     if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
 
+    // 重置取消标记
+    state.auditCanceled = false
+
     // 读取 provider 配置
     let providerConfig: any
     try { providerConfig = db.getConfig('provider_config') } catch (e: any) { log.error('batch-audit:config', e) }
-    if (!providerConfig) return { success: false, error: '未配置 API Provider' }
+    if (!providerConfig) { log.error('batch-audit:no-provider-config'); return { success: false, error: '未配置 API Provider' } }
     const providerKey = providerConfig.provider || ''
     const model = providerConfig.model || ''
-    if (!providerKey || !model) return { success: false, error: '未配置写作 Provider/Model' }
+    if (!providerKey || !model) { log.error('batch-audit:no-provider-model', providerKey, model); return { success: false, error: '未配置写作 Provider/Model' } }
     const provider = providerConfig.providers?.[providerKey]
-    if (!provider?.api_key) return { success: false, error: 'API Key 未设置' }
+    if (!provider?.api_key) { log.error('batch-audit:no-api-key', providerKey); return { success: false, error: 'API Key 未设置' } }
+    log.info(`batch-audit:provider ok key=${providerKey} model=${model}`)
 
     const baseUrl = (provider.base_url || '').replace(/\/+$/, '')
     const apiUrl = baseUrl + '/chat/completions'
@@ -604,6 +609,7 @@ function register(ipcMain: Electron.IpcMain) {
       castEntries = db.getCastEntries(bookId) || []
       stateChanges = db.getStateChanges(bookId) || []
     } catch (e: any) { log.error('batch-audit:context', e) }
+    log.info(`batch-audit:context loaded outline=${outline.length} chars=${characters.length} timeline=${timelineEvents.length} foreshadow=${foreshadowEntries.length} cast=${castEntries.length} state=${stateChanges.length}`)
 
     // 按章节构建状态变化索引 + 角色生死状态追踪
     const stateChangesByChapter = new Map<number, any[]>()
@@ -636,15 +642,69 @@ function register(ipcMain: Electron.IpcMain) {
     const flashbackChapters = new Set<number>()
 
     const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+    const chapterNums = files.map((f: string) => parseInt(f.replace('.md', ''), 10)).filter((n: number) => !isNaN(n)).sort((a: number, b: number) => a - b)
+    const rangeStart = startChapter > 0 ? startChapter : chapterNums[0] || 1
+    const rangeEnd = endChapter > 0 ? endChapter : chapterNums[chapterNums.length - 1] || 9999
+    const filteredNums = chapterNums.filter((n: number) => n >= rangeStart && n <= rangeEnd)
+    const total = filteredNums.length
     const results: any[] = []
+    const startTime = Date.now()
+    log.info(`batch-audit:range chapters=${chapterNums.length} filtered=${total} range=${rangeStart}-${rangeEnd}`)
 
-    for (const file of files) {
-      const num = parseInt(file.replace('.md', ''), 10)
-      if (isNaN(num)) continue
+    // 加载已审查记录，跳过已审查（除非 force）
+    const auditedChapters = new Map<number, any>()
+    if (!force) {
+      try {
+        const audits = db.getAuditedChapters(bookId) || []
+        for (const a of audits) auditedChapters.set(a.chapter, a)
+      } catch (e: any) { log.error('batch-audit:load-audits', e) }
+    }
 
+    let prevAuditSummary = ''
+
+    for (const [idx, num] of filteredNums.entries()) {
+      // 检查取消标记
+      if (state.auditCanceled) {
+        results.push({ chapter: num, oldTitle: `第${num}章`, skipped: true, reason: '用户取消' })
+        break
+      }
+
+      // 推送进度（在每一步开始前立即发送，即使用于已审查/跳过的章节）
+      const elapsed = (Date.now() - startTime) / 1000
+      const avgPerItem = idx > 0 ? elapsed / idx : 15
+      const remaining = Math.round(avgPerItem * (total - idx))
+      try {
+        if (state.mainWindow && !state.mainWindow.isDestroyed()) {
+          state.mainWindow.webContents.send('audit-progress', {
+            current: idx + 1, total, chapter: num,
+            elapsed: Math.round(elapsed),
+            remaining,
+          })
+        }
+      } catch (e: any) { /* window gone, ignore */ }
+
+      const file = String(num).padStart(2, '0') + '.md'
       const filePath = join(chDir, file)
       const fullContent = readFileSync(filePath, 'utf8')
       const lines = fullContent.split('\n')
+      const crypto = require('crypto')
+      const contentHash = crypto.createHash('sha256').update(fullContent, 'utf8').digest('hex')
+
+      // 内容哈希跳过：仅当内容未变更时才跳过
+      if (auditedChapters.has(num)) {
+        const existing = auditedChapters.get(num)
+        if (existing.content_hash === contentHash) {
+          log.info(`batch-audit:ch${num} skip (unchanged hash=${contentHash.slice(0,8)})`)
+          results.push({
+            chapter: num, oldTitle: `第${num}章`, skipped: true, reason: '已审查',
+            reviewedAt: existing.reviewed_at,
+            review: JSON.parse(existing.review_data || '{}').review || {},
+          })
+          continue
+        }
+        // 内容已变更，需要重审
+        log.info(`batch-audit:chapter ${num} content changed, re-reviewing`)
+      }
       const firstLine = lines[0] || ''
       const titleMatch = firstLine.match(/^#\s+(.+)/)
       const oldTitle = titleMatch ? titleMatch[1].trim() : `第${num}章`
@@ -700,6 +760,13 @@ function register(ipcMain: Electron.IpcMain) {
         }
       }
 
+      // 前一章审查摘要（跨章上下文）
+      if (!prevAuditSummary) {
+        // 尝试从上一章加载已保存的审查摘要
+        const prevAudit = db.getAuditSummary(bookId, num - 1)
+        if (prevAudit?.summary) prevAuditSummary = `第${num-1}章审查结论: ${prevAudit.summary}`
+      }
+
       // 取正文前 3000 字 + 后 1000 字评审用
       const reviewContent = bodyText.length > 4000
         ? bodyText.slice(0, 3000) + '\n\n...（中间省略）...\n\n' + bodyText.slice(-1000)
@@ -728,6 +795,9 @@ ${deadOrGoneChars.length > 0 ? deadOrGoneChars.join('\n') : '无'}
 ## 前一章末尾（衔接参考）
 ${prevChapterEnding || '无（第一章）'}
 
+## 前一章审查结论
+${prevAuditSummary || '无'}
+
 ## 角色
 ${characters.join('\n') || '无'}
 
@@ -747,32 +817,40 @@ ${reviewContent}
 
 ## 输出格式
 
-请严格按以下 JSON 格式输出，不要任何多余文字：
+请严格按以下 JSON Schema 输出（各字段评分范围见下方说明），不要任何多余文字和 Markdown 代码块标记：
+
+评分范围：
+- corrected_content: 只有当 issues 不为空或有建议修改时，必须输出完整修正后的章节正文（含 Markdown 标题行）。没有修改时留空。不要省略此字段——有修改就必须输出完整正文。
+- title_score / ai_flavor_score / pacing_score / outline_alignment_score / character_continuity_score / timeline_consistency_score / plot_thread_score: 1 到 10 的整数（10=最优）
+- word_count_ok: true 或 false
 
 {
   "review": {
-    "title_score": 1-10,
-    "ai_flavor_score": 1-10（10=完全无 AI 味）,
-    "pacing_score": 1-10,
-    "outline_alignment_score": 1-10,
-    "word_count_ok": true/false,
-    "character_continuity_score": 1-10（10=角色出场衔接完美）,
-    "timeline_consistency_score": 1-10（10=时间线完全连贯）,
-    "plot_thread_score": 1-10（10=情节线索管理完美）
+    "title_score": 10,
+    "ai_flavor_score": 10,
+    "pacing_score": 10,
+    "outline_alignment_score": 10,
+    "word_count_ok": true,
+    "character_continuity_score": 10,
+    "timeline_consistency_score": 10,
+    "plot_thread_score": 10
   },
-  "issues": ["问题1（严重度：高/中/低）"],
-  "strengths": ["优点1"],
-  "suggested_title": "根据本章核心主题提炼的新标题（若原标题合格则留空）",
-  "needs_trimming": true/false,
-  "trimming_suggestion": "如需删减，说明具体删哪些部分（段落/场景/对话），只删冗余不伤主干",
-  "needs_rewrite": true/false,
-  "rewrite_reason": "如需重写，说明原因",
-  "missing_introductions": ["本章突然出现但未在前文交代的角色名"],
-  "character_state_inconsistencies": ["已死亡/重伤/退场的角色重新出现且未交代的具体位置"，如"第15章已战死的张三在第20章再次出场无解释"],
-  "timeline_gaps": ["时间线跳跃或不连贯的具体位置"],
-  "dropped_threads": ["被无故丢弃的伏笔或情节线索"],
-  "summary": "本章一句话评审结论"
-}`
+  "issues": [],
+  "strengths": [],
+  "suggested_title": "",
+  "needs_trimming": false,
+  "trimming_suggestion": "",
+  "needs_rewrite": false,
+  "rewrite_reason": "",
+  "missing_introductions": [],
+  "character_state_inconsistencies": [],
+  "timeline_gaps": [],
+  "dropped_threads": [],
+  "summary": "",
+  "corrected_content": "完整的修正后章节正文，包含修正后的标题行和内容"
+}
+`
+        log.info(`batch-audit:ch${num} reviewing wordCount=${wordCount}`)
 
       try {
         const resp = await fetch(apiUrl, {
@@ -782,7 +860,7 @@ ${reviewContent}
             model,
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.3,
-            max_tokens: 1000,
+            max_tokens: 4096,
             response_format: { type: 'json_object' },
           }),
           signal: AbortSignal.timeout(60000),
@@ -796,6 +874,7 @@ ${reviewContent}
         const raw = data?.choices?.[0]?.message?.content || '{}'
         let parsed: any
         try { parsed = JSON.parse(raw) } catch { parsed = {} }
+        log.info(`batch-audit:ch${num} api done title_score=${parsed?.review?.title_score || '?'} issues=${(parsed?.issues || []).length}`)
 
         const review = parsed.review || {}
         const issues = parsed.issues || []
@@ -806,20 +885,26 @@ ${reviewContent}
 
         // 应用修复：标题
         if (suggestedTitle && suggestedTitle !== oldTitle) {
-          lines[0] = `# ${suggestedTitle}`
-          writeFileSync(filePath, lines.join('\n'), 'utf8')
-          try { db.saveChapter(bookId, num, fullContent, suggestedTitle) } catch (e: any) { log.error('batch-audit:save-title', e) }
+          if (apply) {
+            lines[0] = `# ${suggestedTitle}`
+            writeFileSync(filePath, lines.join('\n'), 'utf8')
+            try { db.saveChapter(bookId, num, fullContent, suggestedTitle) } catch (e: any) { log.error('batch-audit:save-title', e) }
+          }
           applied.push(`标题: "${oldTitle}" → "${suggestedTitle}"`)
         }
 
-        // 标记需要重写的章节
-        if (needsRewrite) {
-          applied.push(`需重写（原因: ${parsed.rewrite_reason || '未说明'}）`)
-        }
-
-        // 标记需要删减的章节
-        if (needsTrimming) {
-          applied.push(`需删减: ${parsed.trimming_suggestion || '未说明'}`)
+        // 应用修复：修正正文
+        const correctedContent = parsed.corrected_content || ''
+        if (correctedContent && correctedContent.trim() !== fullContent.trim()) {
+          if (apply) {
+            writeFileSync(filePath, correctedContent, 'utf8')
+            const correctedLines = correctedContent.split('\n')
+            const correctedTitleLine = correctedLines[0] || ''
+            const correctedTitleMatch = correctedTitleLine.match(/^#\s+(.+)/)
+            const correctedTitle = correctedTitleMatch ? correctedTitleMatch[1].trim() : suggestedTitle || oldTitle
+            try { db.saveChapter(bookId, num, correctedContent, correctedTitle) } catch (e: any) { log.error('batch-audit:save-content', e) }
+          }
+          applied.push('正文修正')
         }
 
         results.push({
@@ -839,6 +924,11 @@ ${reviewContent}
           summary: parsed.summary || '',
           error: undefined,
         })
+
+        // 保存审查结果到数据库
+        try {
+          db.saveAuditResult(bookId, num, { review, issues, strengths: parsed.strengths, suggested_title: suggestedTitle, missing_introductions: parsed.missing_introductions, character_state_inconsistencies: parsed.character_state_inconsistencies, timeline_gaps: parsed.timeline_gaps, dropped_threads: parsed.dropped_threads, summary: parsed.summary }, contentHash)
+        } catch (e: any) { log.error('batch-audit:save', e) }
       } catch (e: any) {
         results.push({ chapter: num, oldTitle, error: e.message || '请求失败' })
       }
@@ -846,12 +936,14 @@ ${reviewContent}
 
     return {
       success: true,
+      canceled: state.auditCanceled,
       total: files.length,
       // 统计
       stats: (() => {
         const valid = results.filter(r => !r.error && !r.skipped && r.review)
         return {
           reviewed: valid.length,
+          contentCorrected: results.filter(r => r.applied?.includes('正文修正')).length,
           titleUpdated: results.filter(r => r.applied?.length > 0 && r.applied[0]?.startsWith('标题')).length,
           needsRewrite: results.filter(r => r.needsRewrite).length,
           needsTrimming: results.filter(r => r.needsTrimming).length,
@@ -872,6 +964,71 @@ ${reviewContent}
       })(),
       results,
     }
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+    const skipped = results.filter(r => r.skipped).length
+    const errors = results.filter(r => r.error).length
+    log.info(`batch-audit:done total=${total} reviewed=${results.length - skipped - errors} skipped=${skipped} errors=${errors} elapsed=${elapsed}s`)
+  })
+
+  // ── 取消审查 ──
+  ipcMain.handle('cancel-audit', async () => {
+    state.auditCanceled = true
+    return true
+  })
+
+  // ── 应用审查修复（不重新调用 LLM，直接从已保存的审查结果中读取并执行）──
+  ipcMain.handle('batch-apply-fixes', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+    const dir = getBookDirById(bookId)
+    if (!dir) return { success: false, error: '未找到书籍目录' }
+    const db = getDB()
+    const chDir = join(dir, 'chapters')
+    if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
+
+    const audits = db.getAuditedChapters(bookId) || []
+    let titleUpdated = 0
+    let contentFixed = 0
+
+    for (const audit of audits) {
+      const num = audit.chapter
+      const data = JSON.parse(audit.review_data || '{}')
+      const suggestedTitle = data.suggested_title || ''
+      const correctedContent = data.corrected_content || ''
+
+      if (!suggestedTitle && !correctedContent) continue
+
+      const file = String(num).padStart(2, '0') + '.md'
+      const filePath = join(chDir, file)
+      if (!existsSync(filePath)) continue
+
+      const fullContent = readFileSync(filePath, 'utf8')
+      const lines = fullContent.split('\n')
+      const firstLine = lines[0] || ''
+      const titleMatch = firstLine.match(/^#\s+(.+)/)
+      const oldTitle = titleMatch ? titleMatch[1].trim() : ''
+
+      // 应用标题修复
+      if (suggestedTitle && suggestedTitle !== oldTitle) {
+        lines[0] = `# ${suggestedTitle}`
+        const newContent = lines.join('\n')
+        writeFileSync(filePath, newContent, 'utf8')
+        try { db.saveChapter(bookId, num, newContent, suggestedTitle) } catch (e: any) { log.error('batch-apply:save-title', e) }
+        titleUpdated++
+      }
+
+      // 应用正文修复
+      if (correctedContent && correctedContent.trim() !== fullContent.trim()) {
+        writeFileSync(filePath, correctedContent, 'utf8')
+        const correctedLines = correctedContent.split('\n')
+        const correctedTitleLine = correctedLines[0] || ''
+        const correctedTitleMatch = correctedTitleLine.match(/^#\s+(.+)/)
+        const correctedTitle = correctedTitleMatch ? correctedTitleMatch[1].trim() : suggestedTitle || oldTitle
+        try { db.saveChapter(bookId, num, correctedContent, correctedTitle) } catch (e: any) { log.error('batch-apply:save-content', e) }
+        contentFixed++
+      }
+    }
+
+    log.info(`batch-apply:done bookId=${bookId} titleUpdated=${titleUpdated} contentFixed=${contentFixed}`)
+    return { success: true, titleUpdated, contentFixed }
   })
 }
 
