@@ -10,6 +10,8 @@ import type { Character, CastEntry, Relation } from '@/types/characters'
 import { TIER_COLORS, TIER_LABELS, PLACEHOLDER_FACES } from '@/types/characters'
 import { useBookId } from '@/hooks/useBookId'
 import BackButton from '@/components/BackButton'
+import { confirmAction } from '@/components/ConfirmModal'
+import { showToast } from '@/components/Toast'
 
 export default function CharactersPage() {
   const id = useBookId()
@@ -62,7 +64,7 @@ export default function CharactersPage() {
     setChars(updated)
   }, [id])
 
-  function handleSave(char: Character) {
+  async function handleSave(char: Character) {
     const idx = chars.findIndex(c => c.name === char.name)
     let updated: Character[]
     if (idx >= 0) {
@@ -71,18 +73,38 @@ export default function CharactersPage() {
     } else {
       updated = [...chars, char]
     }
-    saveChars(updated)
-    setSelected(char)
-    setEditChar(null)
-    setEditorOpen(false)
+    try {
+      await saveChars(updated)
+      setSelected(char)
+      setEditChar(null)
+      setEditorOpen(false)
+      showToast(idx >= 0 ? '角色已保存' : '角色已创建', 'success')
+    } catch (e: any) {
+      showToast('保存角色失败: ' + (e.message || e), 'error')
+    }
   }
 
-  function handleDelete(name: string) {
+  async function handleDelete(name: string) {
     const updated = chars.filter(c => c.name !== name)
-    saveChars(updated)
-    if (selected?.name === name) setSelected(null)
-    setEditChar(null)
-    setEditorOpen(false)
+    try {
+      await saveChars(updated)
+      if (selected?.name === name) setSelected(null)
+      setEditChar(null)
+      setEditorOpen(false)
+      showToast('角色已删除', 'success')
+    } catch (e: any) {
+      showToast('删除角色失败: ' + (e.message || e), 'error')
+    }
+  }
+
+  async function confirmDelete(name: string) {
+    const ok = await confirmAction({
+      title: '删除角色',
+      message: `确认删除角色「${name}」？`,
+      confirmText: '删除',
+      tone: 'danger',
+    })
+    if (ok) await handleDelete(name)
   }
 
   const filtered = filterTier === 'all' ? chars : chars.filter(c => c.tier === filterTier)
@@ -210,7 +232,7 @@ export default function CharactersPage() {
                         </button>
                         <button className="welcome-mode-btn text-xs"
                           style={{ color: 'var(--color-error)' }}
-                          onClick={() => { if (confirm(`确认删除角色「${selected.name}」？`)) handleDelete(selected.name) }}>
+                          onClick={() => confirmDelete(selected.name)}>
                           删除
                         </button>
                       </div>

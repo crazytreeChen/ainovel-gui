@@ -68,6 +68,14 @@ export interface SearchResults {
   outline: { type: 'outline'; chapter: number; title: string; match: string }[]
 }
 
+export interface CleanTitleChange {
+  chapter: number; oldTitle: string; newTitle: string
+}
+
+export interface ApplyFixChange {
+  chapter: number; type: 'title' | 'content'; oldTitle?: string; newTitle?: string
+}
+
 export interface ElectronAPI {
   // 书籍
   listBooks: () => Promise<BookItem[]>
@@ -188,6 +196,7 @@ export interface ElectronAPI {
   searchBook: (id: string, query: string) => Promise<SearchResults>
 
   // 批量清洗
+  previewCleanTitles: (id: string) => Promise<{ changes: CleanTitleChange[]; total: number; error?: string }>
   batchCleanTitles: (id: string) => Promise<{ cleaned: number; total: number; error?: string }>
 
   // AI 批量生成标题
@@ -245,5 +254,7 @@ export interface ElectronAPI {
   cancelAudit: () => Promise<boolean>
 
   // 应用审查修复（从保存的审查结果中执行修复，不重新调用 LLM）
-  batchApplyFixes: (id: string) => Promise<{ success: boolean; titleUpdated: number; contentFixed: number; error?: string }>
+  batchApplyFixes: (id: string) => Promise<{
+    success: boolean; titleUpdated: number; contentFixed: number; error?: string; applied?: ApplyFixChange[]
+  }>
 }

@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/useAppStore'
 import type { ThemeMode } from '@/stores/useAppStore'
 import { showToast } from '@/components/Toast'
 import BackButton from '@/components/BackButton'
+import { confirmAction } from '@/components/ConfirmModal'
 
 export default function SettingsPage() {
   const navigate = useNavigate()
@@ -110,7 +111,13 @@ export default function SettingsPage() {
 
   async function handleRestore() {
     if (!window.electronAPI) return
-    if (!confirm('⚠️ 恢复数据将覆盖当前所有数据，确认继续？')) return
+    const ok = await confirmAction({
+      title: '恢复数据',
+      message: '恢复数据将覆盖当前所有数据，确认继续？',
+      confirmText: '恢复',
+      tone: 'danger',
+    })
+    if (!ok) return
     setRestoreBusy(true)
     setRestoreMsg('')
     try {

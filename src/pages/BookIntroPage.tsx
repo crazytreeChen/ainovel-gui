@@ -5,6 +5,8 @@ import BookCover from '@/components/BookCover'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 import { useBookId } from '@/hooks/useBookId'
 import BackButton from '@/components/BackButton'
+import { confirmAction } from '@/components/ConfirmModal'
+import { showToast } from '@/components/Toast'
 
 const PAGE_SIZE = 60
 
@@ -38,16 +40,35 @@ export default function BookIntroPage() {
 
   async function handleBatchCleanTitles() {
     if (!id || !window.electronAPI || cleaning) return
-    if (!confirm('将批量清洗所有章节标题：\n- 移除描述性括号内容\n- 截断超长标题（≤30字）\n- 更新章节文件与数据库\n\n确认继续？')) return
+    const preview = await window.electronAPI.previewCleanTitles(id)
+    if (preview.error) {
+      showToast(`清洗预览失败: ${preview.error}`, 'error')
+      return
+    }
+    if (preview.changes.length === 0) {
+      showToast('没有需要清洗的标题', 'info')
+      return
+    }
+    const sample = preview.changes.slice(0, 12).map(change => (
+      `#${change.chapter} ${change.oldTitle} -> ${change.newTitle}`
+    ))
+    if (preview.changes.length > sample.length) sample.push(`...另有 ${preview.changes.length - sample.length} 章`)
+    const confirmed = await confirmAction({
+      title: '确认清洗章节标题',
+      message: `将更新 ${preview.changes.length}/${preview.total} 章标题。此操作会写入数据库和章节文件。`,
+      confirmText: '开始清洗',
+      details: sample,
+    })
+    if (!confirmed) return
     setCleaning(true)
     try {
       const result = await window.electronAPI.batchCleanTitles(id)
-      alert(`清洗完成：${result.cleaned}/${result.total} 章标题已更新`)
-      // 重新加载章节列表
+      if (result.error) showToast(`清洗失败: ${result.error}`, 'error')
+      else showToast(`清洗完成：${result.cleaned}/${result.total} 章标题已更新`, 'success')
       const chs = await window.electronAPI.getBookChapters(id)
       setChapters(chs || [])
     } catch (e: any) {
-      alert('清洗失败: ' + (e.message || e))
+      showToast('清洗失败: ' + (e.message || e), 'error')
     }
     setCleaning(false)
   }
@@ -73,42 +94,57 @@ export default function BookIntroPage() {
       const result = await window.electronAPI.batchAuditBook(id, apply, chStart, chEnd, force)
       cleanup()
       if (!result.success) {
-        alert('审查失败: ' + (result.error || '未知错误'))
+        showToast('审查失败: ' + (result.error || '未知错误'), 'error')
       } else {
         setAuditResult(result)
         setAuditStep('done')
+        showToast('全书审查完成，修复建议已保存', 'success')
       }
       const chs = await window.electronAPI.getBookChapters(id)
       setChapters(chs || [])
     } catch (e: any) {
       cleanup()
-      alert('审查失败: ' + (e.message || e))
+      showToast('审查失败: ' + (e.message || e), 'error')
     }
     setAuditing(false)
   }
 
   async function handleApplyFixes() {
     if (!id || !window.electronAPI || !auditResult) return
+    const titleCount = auditResult.stats?.titleUpdated || 0
+    const contentCount = auditResult.stats?.contentCorrected || 0
+    const candidates = auditResult.results
+      ?.filter((item: any) => item.newTitle || item.applied?.includes('content_corrected'))
+      ?.slice(0, 12)
+      ?.map((item: any) => item.newTitle
+        ? `#${item.chapter} 标题: ${item.oldTitle} -> ${item.newTitle}`
+        : `#${item.chapter} 正文修正`) || []
+    const confirmed = await confirmAction({
+      title: '确认应用审查修复',
+      message: `将根据已保存的审查结果应用修复：标题 ${titleCount} 章，正文 ${contentCount} 章。`,
+      confirmText: '应用修复',
+      details: candidates,
+    })
+    if (!confirmed) return
     try {
       const result = await window.electronAPI.batchApplyFixes(id)
       if (!result.success) {
-        alert('应用修复失败: ' + (result.error || '未知错误'))
+        showToast('应用修复失败: ' + (result.error || '未知错误'), 'error')
       } else {
-        alert(`修复完成：标题更新 ${result.titleUpdated} 章，正文修正 ${result.contentFixed} 章`)
-        // 刷新章节列表
+        showToast(`修复完成：标题更新 ${result.titleUpdated} 章，正文修正 ${result.contentFixed} 章`, 'success')
         const chs = await window.electronAPI.getBookChapters(id)
         setChapters(chs || [])
-        // 更新审计结果标记已修复
         setAuditResult((prev: any) => prev ? { ...prev, stats: { ...prev.stats, fixApplied: true } } : prev)
       }
     } catch (e: any) {
-      alert('应用修复失败: ' + (e.message || e))
+      showToast('应用修复失败: ' + (e.message || e), 'error')
     }
   }
 
   async function handleCancelAudit() {
     if (window.electronAPI) {
-      await window.electronAPI.cancelAudit()
+      const ok = await window.electronAPI.cancelAudit()
+      showToast(ok ? '已请求停止审查' : '停止审查失败', ok ? 'info' : 'error')
       setAuditStep('idle')
     }
   }
@@ -256,7 +292,7 @@ export default function BookIntroPage() {
             </div>
             <div className="flex-row gap-8" style={{ justifyContent: 'flex-end' }}>
               <button className="welcome-mode-btn" onClick={() => setAuditStep('idle')}>取消</button>
-              <button className="welcome-mode-btn active" onClick={() => startAudit(true, true)}
+              <button className="welcome-mode-btn active" onClick={() => startAudit(false, true)}
                 style={{ background: 'var(--color-accent)', color: '#fff', border: '1px solid var(--color-accent)' }}>
                 🔍 开始审查
               </button>
@@ -288,10 +324,10 @@ export default function BookIntroPage() {
                   </div>
                   {s.contentCorrected || s.titleUpdated || s.needsRewrite || s.needsTrimming || s.totalMissingIntros || s.totalCharStateInconsistencies || s.totalTimelineGaps || s.totalDroppedThreads || s.errors ? (
                     <>
-                      <div className="sidebar-section-header mt-12 mb-4">🛠 处理结果</div>
+                      <div className="sidebar-section-header mt-12 mb-4">🛠 可应用修复与风险</div>
                       <div className="text-xs">
-                        {s.contentCorrected ? <div>📝 正文已修正: {s.contentCorrected} 章</div> : null}
-                        {s.titleUpdated ? <div>✅ 标题已更新: {s.titleUpdated} 章</div> : null}
+                        {s.contentCorrected ? <div>📝 正文可修正: {s.contentCorrected} 章</div> : null}
+                        {s.titleUpdated ? <div>✅ 标题可更新: {s.titleUpdated} 章</div> : null}
                         {s.needsRewrite ? <div>⚠️ 建议重写: {s.needsRewrite} 章</div> : null}
                         {s.needsTrimming ? <div>✂️ 建议删减: {s.needsTrimming} 章</div> : null}
                         {s.totalMissingIntros ? <div>👤 缺角色交代: {s.totalMissingIntros} 处</div> : null}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Character } from '@/types/characters'
 import { TIER_COLORS, TIER_LABELS } from '@/types/characters'
 import ImageViewer from '@/components/ImageViewer'
+import { confirmAction } from '@/components/ConfirmModal'
 
 interface Props {
   character: Character | null       // null = 新建模式
@@ -83,6 +84,17 @@ export default function CharacterEditor({ character, onSave, onDelete, onClose }
       traits: traits.split(',').map(s => s.trim()).filter(Boolean),
       avatar: avatar || undefined,
     })
+  }
+
+  async function handleDelete() {
+    if (!character) return
+    const ok = await confirmAction({
+      title: '删除角色',
+      message: `确认删除角色「${character.name}」？`,
+      confirmText: '删除',
+      tone: 'danger',
+    })
+    if (ok) onDelete(character.name)
   }
 
   return (
@@ -179,7 +191,7 @@ export default function CharacterEditor({ character, onSave, onDelete, onClose }
           <div className="flex-row gap-8 mt-8">
             {!isNew && (
               <button className="btn btn-danger btn-sm"
-                onClick={() => { if (confirm(`确认删除角色「${character!.name}」？`)) onDelete(character!.name) }}>
+                onClick={handleDelete}>
                 删除角色
               </button>
             )}

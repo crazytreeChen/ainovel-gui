@@ -519,7 +519,31 @@ function register(ipcMain: Electron.IpcMain) {
     } catch (e: any) { log.error('search-book', e); return { chapters: [], characters: [], events: [], outline: [] } }
   })
 
+  function collectTitleCleanPlan(bookId: string) {
+    const dir = getBookDirById(bookId)
+    if (!dir) return { changes: [], total: 0, error: 'book dir not found' }
+    const chDir = join(dir, 'chapters')
+    if (!existsSync(chDir)) return { changes: [], total: 0, error: 'chapters dir not found' }
+    const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+    const changes: any[] = []
+    for (const file of files) {
+      const num = parseInt(file.replace('.md', ''), 10)
+      if (isNaN(num)) continue
+      const filePath = join(chDir, file)
+      const content = readFileSync(filePath, 'utf8')
+      const firstLine = content.split('\n')[0] || ''
+      const titleMatch = firstLine.match(/^#\s+(.+)/)
+      if (!titleMatch) continue
+      const oldTitle = titleMatch[1].trim()
+      const newTitle = cleanChapterTitle(oldTitle, num)
+      if (newTitle !== oldTitle) changes.push({ chapter: num, oldTitle, newTitle })
+    }
+    return { changes, total: files.length }
+  }
+
   // ── 批量清洗章节标题 ──
+  ipcMain.handle('preview-clean-titles', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => collectTitleCleanPlan(bookId))
+
   ipcMain.handle('batch-clean-titles', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
     const dir = getBookDirById(bookId)
     if (!dir) return { cleaned: 0, total: 0, error: 'book dir not found' }
@@ -888,7 +912,7 @@ ${reviewContent}
           if (apply) {
             lines[0] = `# ${suggestedTitle}`
             writeFileSync(filePath, lines.join('\n'), 'utf8')
-            try { db.saveChapter(bookId, num, fullContent, suggestedTitle) } catch (e: any) { log.error('batch-audit:save-title', e) }
+            try { db.saveChapter(bookId, num, lines.join('\n'), suggestedTitle) } catch (e: any) { log.error('batch-audit:save-title', e) }
           }
           applied.push(`标题: "${oldTitle}" → "${suggestedTitle}"`)
         }
@@ -927,7 +951,18 @@ ${reviewContent}
 
         // 保存审查结果到数据库
         try {
-          db.saveAuditResult(bookId, num, { review, issues, strengths: parsed.strengths, suggested_title: suggestedTitle, missing_introductions: parsed.missing_introductions, character_state_inconsistencies: parsed.character_state_inconsistencies, timeline_gaps: parsed.timeline_gaps, dropped_threads: parsed.dropped_threads, summary: parsed.summary }, contentHash)
+          db.saveAuditResult(bookId, num, {
+            review,
+            issues,
+            strengths: parsed.strengths,
+            suggested_title: suggestedTitle,
+            corrected_content: correctedContent,
+            missing_introductions: parsed.missing_introductions,
+            character_state_inconsistencies: parsed.character_state_inconsistencies,
+            timeline_gaps: parsed.timeline_gaps,
+            dropped_threads: parsed.dropped_threads,
+            summary: parsed.summary,
+          }, contentHash)
         } catch (e: any) { log.error('batch-audit:save', e) }
       } catch (e: any) {
         results.push({ chapter: num, oldTitle, error: e.message || '请求失败' })
@@ -987,6 +1022,7 @@ ${reviewContent}
     const audits = db.getAuditedChapters(bookId) || []
     let titleUpdated = 0
     let contentFixed = 0
+    const applied: any[] = []
 
     for (const audit of audits) {
       const num = audit.chapter
@@ -1000,23 +1036,14 @@ ${reviewContent}
       const filePath = join(chDir, file)
       if (!existsSync(filePath)) continue
 
-      const fullContent = readFileSync(filePath, 'utf8')
-      const lines = fullContent.split('\n')
+      const originalContent = readFileSync(filePath, 'utf8')
+      const lines = originalContent.split('\n')
       const firstLine = lines[0] || ''
       const titleMatch = firstLine.match(/^#\s+(.+)/)
       const oldTitle = titleMatch ? titleMatch[1].trim() : ''
 
-      // 应用标题修复
-      if (suggestedTitle && suggestedTitle !== oldTitle) {
-        lines[0] = `# ${suggestedTitle}`
-        const newContent = lines.join('\n')
-        writeFileSync(filePath, newContent, 'utf8')
-        try { db.saveChapter(bookId, num, newContent, suggestedTitle) } catch (e: any) { log.error('batch-apply:save-title', e) }
-        titleUpdated++
-      }
-
-      // 应用正文修复
-      if (correctedContent && correctedContent.trim() !== fullContent.trim()) {
+      // 优先应用完整正文修复，避免标题和正文分别写入时互相覆盖。
+      if (correctedContent && correctedContent.trim() !== originalContent.trim()) {
         writeFileSync(filePath, correctedContent, 'utf8')
         const correctedLines = correctedContent.split('\n')
         const correctedTitleLine = correctedLines[0] || ''
@@ -1024,11 +1051,26 @@ ${reviewContent}
         const correctedTitle = correctedTitleMatch ? correctedTitleMatch[1].trim() : suggestedTitle || oldTitle
         try { db.saveChapter(bookId, num, correctedContent, correctedTitle) } catch (e: any) { log.error('batch-apply:save-content', e) }
         contentFixed++
+        applied.push({ chapter: num, type: 'content', oldTitle, newTitle: correctedTitle })
+        if (suggestedTitle && suggestedTitle !== oldTitle && suggestedTitle === correctedTitle) {
+          titleUpdated++
+          applied.push({ chapter: num, type: 'title', oldTitle, newTitle: suggestedTitle })
+        }
+        continue
+      }
+
+      if (suggestedTitle && suggestedTitle !== oldTitle) {
+        lines[0] = `# ${suggestedTitle}`
+        const newContent = lines.join('\n')
+        writeFileSync(filePath, newContent, 'utf8')
+        try { db.saveChapter(bookId, num, newContent, suggestedTitle) } catch (e: any) { log.error('batch-apply:save-title', e) }
+        titleUpdated++
+        applied.push({ chapter: num, type: 'title', oldTitle, newTitle: suggestedTitle })
       }
     }
 
     log.info(`batch-apply:done bookId=${bookId} titleUpdated=${titleUpdated} contentFixed=${contentFixed}`)
-    return { success: true, titleUpdated, contentFixed }
+    return { success: true, titleUpdated, contentFixed, applied }
   })
 }
 

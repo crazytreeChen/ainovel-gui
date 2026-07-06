@@ -13,6 +13,7 @@ import ExportModal from '@/components/ExportModal'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useAppStore } from '@/stores/useAppStore'
 import { useBookId } from '@/hooks/useBookId'
+import { showToast } from '@/components/Toast'
 
 export default function Workspace() {
   const id = useBookId()
@@ -42,7 +43,7 @@ export default function Workspace() {
   const handleResume = async () => {
     if (!id) return
     const ok = await resumeWriting(id)
-    if (!ok) alert('恢复失败，请检查控制台错误信息')
+    showToast(ok ? '创作已恢复' : '恢复失败，请检查控制台错误信息', ok ? 'success' : 'error')
   }
 
   const processAlive = snapshot.runtimeState === 'running'

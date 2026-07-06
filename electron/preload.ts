@@ -96,6 +96,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkBinary: () => ipcRenderer.invoke('check-binary'),
 
   // 批量操作
+  previewCleanTitles: (id: string) => ipcRenderer.invoke('preview-clean-titles', id),
   batchCleanTitles: (id: string) => ipcRenderer.invoke('batch-clean-titles', id),
   batchGenerateTitles: (id: string) => ipcRenderer.invoke('batch-generate-titles', id),
   batchAuditBook: (id: string, apply?: boolean, startChapter?: number, endChapter?: number, force?: boolean) =>

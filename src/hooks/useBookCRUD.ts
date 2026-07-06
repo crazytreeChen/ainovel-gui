@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { BookItem } from '@/shared/ipc'
+import { confirmAction } from '@/components/ConfirmModal'
+import { showToast } from '@/components/Toast'
 
 export interface UseBookCRUDReturn {
   books: BookItem[]
@@ -109,22 +111,28 @@ export function useBookCRUD(): UseBookCRUDReturn {
 
     const info = await window.electronAPI.scanWorkspace(dir)
     if (!info) {
-      alert('所选目录不是有效的 ainovel-cli 工作目录（缺少 output/ 子目录）')
+      showToast('所选目录不是有效的 ainovel-cli 工作目录（缺少 output/ 子目录）', 'error')
       return
     }
 
-    const msg = `检测到作品：${info.name || '未命名'}\n` +
-      `阶段: ${info.phase || 'init'}\n` +
-      `章节: ${info.chapterCount || 0}\n` +
-      `字数: ${(info.totalWordCount || 0).toLocaleString()}\n\n` +
-      `确认导入此作品？`
-    if (!confirm(msg)) return
+    const confirmed = await confirmAction({
+      title: '导入作品',
+      message: `确认导入作品「${info.name || '未命名'}」？`,
+      confirmText: '导入',
+      details: [
+        `阶段: ${info.phase || 'init'}`,
+        `章节: ${info.chapterCount || 0}`,
+        `字数: ${(info.totalWordCount || 0).toLocaleString()}`,
+      ],
+    })
+    if (!confirmed) return
 
     const book = await window.electronAPI.importWorkspace(dir)
     if (book) {
       await loadBooks()
+      showToast('作品已导入', 'success')
     } else {
-      alert('导入失败')
+      showToast('导入失败', 'error')
     }
   }, [loadBooks])
 

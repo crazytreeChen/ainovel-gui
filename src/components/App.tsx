@@ -7,6 +7,7 @@ import Workspace from '@/pages/Workspace'
 import NewBook from '@/pages/NewBook'
 import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, SettingsPage, ModelsPage, SimulationPage, UserRulesPage, WorldRulesPage, SummaryPage, BookIntroPage, DashboardPage } from '@/pages'
 import ToastContainer from './Toast'
+import ConfirmModalHost from './ConfirmModal'
 import ErrorBoundary from './ErrorBoundary'
 import SearchModal from './SearchModal'
 import ShortcutHelpModal from './ShortcutHelpModal'
@@ -106,6 +107,7 @@ export default function App() {
     <HashRouter>
       <ErrorBoundary>
         <AppRoutes />
+        <ConfirmModalHost />
         <ToastContainer />
       </ErrorBoundary>
     </HashRouter>
