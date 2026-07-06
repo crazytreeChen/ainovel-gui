@@ -7,7 +7,7 @@ const { state, getDB, getAinovelBinary, GUI_DATA_DIR, home } = require('../conte
 const { validatePath } = require('../path-validator')
 const { createLogger } = require('../logger')
 const { join, dirname, resolve, extname, sep } = require('path')
-const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync, statSync } = require('fs')
+const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, cpSync, rmSync, unlinkSync, statSync } = require('fs')
 const { execFileSync, spawn } = require('child_process')
 import { ExecFileSyncOptions } from 'child_process'
 const os = require('os')
@@ -122,12 +122,308 @@ function register(ipcMain: Electron.IpcMain) {
     catch (e: any) { return e.stdout || e.stderr || e.message || '仿写分析执行失败' }
   })
 
-  ipcMain.handle('run-export', async (_e: Electron.IpcMainInvokeEvent, args: string) => {
-    const binary = getAinovelBinary()
-    const cwd = state.outputDir || require('electron').app.getPath('documents')
-    const argv = ['--headless', '/export', ...args.split(' ').filter(Boolean)]
-    try { return await runCli(binary, argv, { cwd, timeout: 60000 }) }
-    catch (e: any) { return e.stdout || e.stderr || e.message || '导出失败' }
+  ipcMain.handle('run-export', async (_e: Electron.IpcMainInvokeEvent, bookId: string, args: string) => {
+    try {
+      // 解析 args：/format txt [/metadata] [/chapters range]
+      const parts = (args || '').split(/\s+/).filter(Boolean)
+      const fmtIdx = parts.indexOf('/format')
+      const fmt = fmtIdx >= 0 && fmtIdx + 1 < parts.length ? parts[fmtIdx + 1] : 'txt'
+      const hasMeta = parts.includes('/metadata')
+      const chIdx = parts.indexOf('/chapters')
+      const chRange = chIdx >= 0 && chIdx + 1 < parts.length ? parts[chIdx + 1] : 'all'
+      if (!['txt', 'epub', 'markdown', 'full'].includes(fmt)) return `导出失败: 不支持的格式 ${fmt}`
+
+      const db = getDB()
+      if (!db) return '导出失败: 数据库未初始化'
+
+      const book = db.getBook(bookId)
+      if (!book) return '导出失败: 未找到书籍'
+
+      const bookDir = join(GUI_DATA_DIR, 'books', bookId)
+      if (!existsSync(bookDir)) mkdirSync(bookDir, { recursive: true })
+
+      // 读取章节列表和内容
+      const chapters = (db.listChapters(bookId) || []) as any[]
+      const completedChapters = chapters.filter(c => c.status === 'completed' || c.status === 'draft')
+      if (completedChapters.length === 0) {
+        // 尝试从 JSON 文件中读取章节
+        const chDir = join(bookDir, 'chapters')
+        if (existsSync(chDir)) {
+          const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+          for (const f of files) {
+            const num = parseInt(f.replace('.md', ''), 10)
+            if (!isNaN(num)) {
+              const content = readFileSync(join(chDir, f), 'utf8')
+              const title = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || `第${num}章`
+              completedChapters.push({ num, title, content, word_count: content.length, status: 'completed' })
+            }
+          }
+        }
+      }
+      if (completedChapters.length === 0) return '导出失败: 没有已完成的章节'
+
+      // 填充每章的 content（listChapters 不返回 content）
+      for (const ch of completedChapters) {
+        if (!ch.content) {
+          try {
+            const full = db.getChapter(bookId, ch.num)
+            ch.content = full?.content || ''
+          } catch (e: any) { ch.content = '' }
+        }
+        // 尝试从 JSON 文件补充
+        if (!ch.content) {
+          const chFile = join(bookDir, 'chapters', `${String(ch.num).padStart(2, '0')}.md`)
+          if (existsSync(chFile)) ch.content = readFileSync(chFile, 'utf8')
+        }
+        ch.title = ch.title || `第${ch.num}章`
+      }
+
+      // 处理章节范围过滤
+      let exportChapters = completedChapters
+      if (chRange !== 'all') {
+        const [fromStr, toStr] = chRange.split('-')
+        const fromN = parseInt(fromStr, 10)
+        const toN = parseInt(toStr, 10)
+        if (!isNaN(fromN)) exportChapters = completedChapters.filter(c => c.num >= fromN && c.num <= (isNaN(toN) ? fromN : toN))
+      }
+
+      const bookName = book.name || '未命名'
+
+      // ── 弹出保存对话框让用户选择位置 ──
+      const { dialog } = require('electron')
+      if (fmt === 'full') {
+        // 完整项目导出到目录
+        const dirResult = await dialog.showOpenDialog({
+          title: '选择导出目录',
+          properties: ['openDirectory', 'createDirectory'],
+        })
+        if (dirResult.canceled || dirResult.filePaths.length === 0) return '导出已取消'
+        const outDir = join(dirResult.filePaths[0], `${bookName}_完整项目`)
+        if (existsSync(outDir)) {
+          for (const f of readdirSync(outDir)) rmSync(join(outDir, f), { recursive: true, force: true })
+        } else mkdirSync(outDir, { recursive: true })
+        // 拷贝 bookDir 下所有文件
+        if (existsSync(bookDir)) {
+          for (const f of readdirSync(bookDir)) {
+            const src = join(bookDir, f)
+            const dst = join(outDir, f)
+            try {
+              const st = statSync(src)
+              if (st.isDirectory()) cpSync(src, dst, { recursive: true })
+              else copyFileSync(src, dst)
+            } catch (e: any) { log.warn('export-full:copy', e?.message || e) }
+          }
+        }
+        // 写章节到 chapters/ 子目录
+        const chOutDir = join(outDir, 'chapters')
+        if (!existsSync(chOutDir)) mkdirSync(chOutDir, { recursive: true })
+        for (const ch of exportChapters) {
+          writeFileSync(join(chOutDir, `${String(ch.num).padStart(2, '0')}.md`), ch.content || '', 'utf8')
+        }
+        writeFileSync(join(outDir, 'book.json'), JSON.stringify({ id: bookId, name: bookName, premise: book.premise || '', style: book.style || 'default' }, null, 2), 'utf8')
+        return `导出成功: ${outDir}`
+      }
+
+      const extMap: Record<string, string> = { txt: '.txt', markdown: '.md', epub: '.epub' }
+      const ext = extMap[fmt] || '.txt'
+      const filterName: Record<string, string> = { txt: 'TXT 文本', markdown: 'Markdown', epub: 'EPUB 电子书' }
+      const saveResult = await dialog.showSaveDialog({
+        title: '导出小说',
+        defaultPath: `${bookName}${ext}`,
+        filters: [{ name: filterName[fmt] || '文件', extensions: [fmt === 'markdown' ? 'md' : fmt] }],
+      })
+      if (saveResult.canceled || !saveResult.filePath) return '导出已取消'
+      const outPath = saveResult.filePath
+
+      // ── TXT / Markdown ──
+      if (fmt === 'txt' || fmt === 'markdown') {
+        const lines: string[] = []
+        if (fmt === 'markdown') {
+          lines.push(`# ${bookName}`)
+          if (book.premise) lines.push('', `> ${book.premise}`, '')
+        } else {
+          lines.push(`《${bookName}》`)
+          if (book.premise) lines.push('', book.premise, '')
+          lines.push('', '='.repeat(40), '')
+        }
+        for (const ch of exportChapters) {
+          if (fmt === 'markdown') lines.push('', `## ${ch.title}`, '')
+          else lines.push('', ch.title, '-'.repeat(20), '')
+          if (ch.content) lines.push(ch.content)
+        }
+        if (hasMeta) {
+          const totalWC = exportChapters.reduce((s: number, c: any) => s + (c.word_count || c.content?.length || 0), 0)
+          lines.push('', '---', `章节数: ${exportChapters.length}  总字数: ${totalWC}  导出时间: ${new Date().toLocaleString('zh-CN')}`)
+        }
+        writeFileSync(outPath, lines.join('\n'), 'utf8')
+        return `导出成功: ${outPath}`
+      }
+
+      // ── EPUB ──
+      if (fmt === 'epub') {
+        const { ZipArchive } = require('archiver')
+        const fse = require('fs')
+        // 清理 EPUB 标题标记（# 标题行），保留纯文本
+        function stripTitleMarkers(text: string): string {
+          return text.replace(/^#+\s*/gm, '').trim()
+        }
+        // 转义 XHTML 特殊字符
+        function xhtmlEscape(text: string): string {
+          return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        }
+        // 将 Markdown 段落转换为 XHTML 段落
+        function mdToHtml(text: string): string {
+          const lines = text.split('\n')
+          const html: string[] = []
+          let inPara = false
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed) {
+              if (inPara) { html.push('</p>'); inPara = false }
+              continue
+            }
+            // 标题
+            if (/^#{1,6}\s/.test(trimmed)) {
+              if (inPara) { html.push('</p>'); inPara = false }
+              const level = trimmed.match(/^#+/)![0].length
+              const title = xhtmlEscape(trimmed.replace(/^#+\s*/, ''))
+              html.push(`<h${level}>${title}</h${level}>`)
+              continue
+            }
+            // 分隔线
+            if (/^[-*_]{3,}$/.test(trimmed)) {
+              if (inPara) { html.push('</p>'); inPara = false }
+              html.push('<hr/>')
+              continue
+            }
+            if (!inPara) { html.push('<p>'); inPara = true }
+            // 加粗/斜体
+            let processed = xhtmlEscape(trimmed)
+            processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            processed = processed.replace(/\*(.+?)\*/g, '<em>$1</em>')
+            html.push(processed)
+          }
+          if (inPara) html.push('</p>')
+          return html.join('\n')
+        }
+
+        const safeName = bookName.replace(/[<>:"/\\|?*]/g, '_').trim() || 'novel'
+        const stream = fse.createWriteStream(outPath)
+        const archive = new ZipArchive({ zlib: { level: 9 } })
+        archive.pipe(stream)
+
+        // mimetype 必须第一个添加且不压缩（EPUB 规范）
+        archive.append('application/epub+zip', { name: 'mimetype', store: true })
+
+        // META-INF/container.xml
+        archive.append(
+          `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`,
+          { name: 'META-INF/container.xml' }
+        )
+
+        // CSS
+        archive.append(
+          `body { font-family: serif; line-height: 1.8; margin: 1em 2em; }
+h1 { text-align: center; margin: 2em 0 1em; font-size: 1.6em; }
+h2 { text-align: center; margin: 1.5em 0 0.8em; font-size: 1.3em; }
+p { text-indent: 2em; margin: 0; }
+hr { margin: 1.5em 0; }`,
+          { name: 'OEBPS/stylesheet.css' }
+        )
+
+        // 生成 chapter XHTML
+        const chapterFiles: string[] = []
+        for (let i = 0; i < exportChapters.length; i++) {
+          const ch = exportChapters[i]
+          const fn = `chapter-${String(i + 1).padStart(3, '0')}.xhtml`
+          chapterFiles.push(fn)
+          const bodyLines: string[] = []
+          // 使用 h1 而非 h2（EPUB 视觉层级）
+          bodyLines.push(`<h1>${xhtmlEscape(ch.title || `第${ch.num}章`)}</h1>`)
+          if (ch.content) bodyLines.push(mdToHtml(ch.content))
+          archive.append(
+            `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>${xhtmlEscape(ch.title || `第${ch.num}章`)}</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css"/></head>
+<body>
+${bodyLines.join('\n')}
+</body>
+</html>`,
+            { name: `OEBPS/${fn}` }
+          )
+        }
+
+        // content.opf
+        const uid = `urn:uuid:${bookId || safeName}`
+        const manifestItems = chapterFiles.map((fn, i) =>
+          `    <item id="ch${i + 1}" href="${fn}" media-type="application/xhtml+xml"/>`
+        ).join('\n')
+        const spineOrder = chapterFiles.map((_, i) =>
+          `    <itemref idref="ch${i + 1}"/>`
+        ).join('\n')
+        archive.append(
+          `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="book-id">${uid}</dc:identifier>
+    <dc:title>${xhtmlEscape(bookName)}</dc:title>
+    <dc:language>zh-CN</dc:language>
+    <dc:creator>AINovel</dc:creator>
+    <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</meta>
+  </metadata>
+  <manifest>
+    <item id="css" href="stylesheet.css" media-type="text/css"/>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+${manifestItems}
+  </manifest>
+  <spine>
+${spineOrder}
+  </spine>
+</package>`,
+          { name: 'OEBPS/content.opf' }
+        )
+
+        // nav.xhtml（EPUB3 导航）
+        const navItems = exportChapters.map((ch, i) =>
+          `          <li><a href="chapter-${String(i + 1).padStart(3, '0')}.xhtml">${xhtmlEscape(ch.title || `第${ch.num}章`)}</a></li>`
+        ).join('\n')
+        archive.append(
+          `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>目录</title></head>
+<body>
+  <nav epub:type="toc">
+    <h1>目录</h1>
+    <ol>
+${navItems}
+    </ol>
+  </nav>
+</body>
+</html>`,
+          { name: 'OEBPS/nav.xhtml' }
+        )
+
+        await archive.finalize()
+        await new Promise<void>((resolve, reject) => {
+          stream.on('close', () => resolve())
+          stream.on('error', (err: Error) => reject(err))
+        })
+        return `导出成功: ${outPath}`
+      }
+
+      return `导出失败: 不支持的格式 ${fmt}`
+    } catch (e: any) {
+      log.error('run-export:error', e?.message || e)
+      return '导出失败: ' + (e?.message || '未知错误')
+    }
   })
 
   // ── 配置管理 ──
@@ -360,7 +656,7 @@ function register(ipcMain: Electron.IpcMain) {
   // ── 数据备份与恢复 ──
   ipcMain.handle('backup-data', async () => {
     try {
-      const archiver = require('archiver')
+      const { ZipArchive: ArchiverClass } = require('archiver')
       const { dialog } = require('electron')
       const defaultName = `ainovel-backup-${new Date().toISOString().slice(0, 10)}.zip`
       const result = await dialog.showSaveDialog({
@@ -371,7 +667,7 @@ function register(ipcMain: Electron.IpcMain) {
       if (result.canceled || !result.filePath) return { success: false, error: '取消' }
       return new Promise<{ success: boolean; path?: string; error?: string }>((resolve) => {
         const output = require('fs').createWriteStream(result.filePath!)
-        const archive = archiver('zip', { zlib: { level: 6 } })
+        const archive = new ArchiverClass({ zlib: { level: 6 } })
         output.on('close', () => resolve({ success: true, path: result.filePath!, error: undefined }))
         archive.on('error', (err: Error) => resolve({ success: false, error: err.message }))
         archive.pipe(output)

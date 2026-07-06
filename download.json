@@ -1,20 +1,20 @@
 {
-  "version": "0.6.1",
-  "release_notes": "## v0.6.1 更新内容\n\n### 🚀 技术升级\n- Electron 31 → 41\n- Vite 5 → 8\n- React Router 7 / Zustand 4 / Lucide React 1.x\n- 状态管理重构：useAppStore 拆分为 4 个领域 store\n- 自定义 hooks 提取：useBookCRUD / useIPCListeners / useKeyboardShortcuts / useCommandPalette\n\n### 🔧 修复\n- TopBar 版本号从 package.json 动态读取\n- forceGraph.ts 类型安全修正\n- scripts/*.js → *.cjs（ESM/CJS 兼容）\n- 构建流程修复（Electron 主进程 + scripts）\n- 修正发布元数据版本与下载地址不一致问题\n\n### 📦 构建\n- macOS arm64: DMG + zip\n- Windows x64: NSIS 安装包 + zip",
-  "release_date": "2026-07-03",
+  "version": "0.6.3",
+  "release_notes": "## v0.6.3 更新内容\n\n### 质量审查\n- 审查列表滚动时，右侧详情会自动跟随当前滚动到的章节\n- 保留点击左侧章节查看详情的交互，不影响原有手动切换\n- 继续支持审查结果查看、修复应用与差异对照\n\n### 验证\n- typecheck 已通过",
+  "release_date": "2026-07-06",
   "downloads": {
     "mac-arm64": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.1/AINovel-0.6.1-mac-arm64.dmg",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.3/AINovel-0.6.3-mac-arm64.dmg",
       "size": 0,
       "sha256": ""
     },
     "win-x64": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.1/AINovel-0.6.1-win-x64.exe",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.3/AINovel-0.6.3-win-x64.exe",
       "size": 0,
       "sha256": ""
     },
     "mac-arm64-zip": {
-      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.1/AINovel-0.6.1-mac-arm64.zip",
+      "url": "https://github.com/crazytreeChen/ainovel-gui/releases/download/v0.6.3/AINovel-0.6.3-mac-arm64.zip",
       "size": 0,
       "sha256": ""
     }

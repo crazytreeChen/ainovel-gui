@@ -31,8 +31,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getBookTimeline: (id: string) => ipcRenderer.invoke('get-book-timeline', id),
   saveBookTimeline: (id: string, data: any) => ipcRenderer.invoke('save-book-timeline', id, data),
 
-  // 评审管理
+  // 历史评审兼容 + 质量审查
   getBookReviews: (id: string) => ipcRenderer.invoke('get-book-reviews', id),
+  getBookAudits: (id: string) => ipcRenderer.invoke('get-book-audits', id),
   saveBookReview: (id: string, review: any) => ipcRenderer.invoke('save-book-review', id, review),
 
   // 图片生成
@@ -82,7 +83,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   runSimulate: (bookId: string) => ipcRenderer.invoke('run-simulate', bookId),
 
   // 导出
-  runExport: (args: string) => ipcRenderer.invoke('run-export', args),
+  runExport: (bookId: string, args: string) => ipcRenderer.invoke('run-export', bookId, args),
 
   // 目录管理
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
@@ -167,16 +168,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('runtime-update', handler)
   },
 
-  // 全书审查进度推送
+  // 质量审查进度推送
   onAuditProgress: (callback: (data: { current: number; total: number; chapter: number; elapsed: number; remaining: number }) => void) => {
     const handler = (_event: any, data: any) => callback(data)
     ipcRenderer.on('audit-progress', handler)
     return () => ipcRenderer.removeListener('audit-progress', handler)
   },
 
-  // 取消全书审查
+  // 取消质量审查
   cancelAudit: () => ipcRenderer.invoke('cancel-audit'),
 
   // 应用审查修复
-  batchApplyFixes: (id: string) => ipcRenderer.invoke('batch-apply-fixes', id),
+  batchApplyFixes: (id: string, chapters?: number[]) => ipcRenderer.invoke('batch-apply-fixes', id, chapters),
 })

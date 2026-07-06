@@ -36,7 +36,7 @@ export default function ExportModal() {
     try {
       const api = window.electronAPI
       if (api) {
-        const result = await api.runExport(args)
+        const result = await api.runExport(id, args)
         setOutput(result || '导出完成')
       }
     } catch (e: any) {

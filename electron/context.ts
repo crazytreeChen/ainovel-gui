@@ -23,7 +23,7 @@ const state = {
   engineEvents: [],
   /** 检查点文件替代路径 */
   cpPathAlt: null,
-  /** 全书审查取消标记 */
+  /** 质量审查取消标记 */
   auditCanceled: false,
 }
 

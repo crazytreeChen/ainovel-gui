@@ -1,14 +1,17 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useUIStore } from '@/stores/useUIStore'
 
 interface NavItem {
   path: string
   label: string
   icon: string
+  action?: 'toggleExport'
 }
 
 export default function BookNavSidebar({ bookId }: { bookId: string }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const toggleExport = useUIStore((s) => s.toggleExport)
 
   const items: NavItem[] = [
     { path: `/books/${bookId}/workspace?mode=writing`, label: '创作工作台', icon: '⚡' },
@@ -16,12 +19,13 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
     { path: `/books/${bookId}/outline`, label: '大纲管理', icon: '📋' },
     { path: `/books/${bookId}/characters`, label: '角色管理', icon: '👤' },
     { path: `/books/${bookId}/timeline`, label: '时间线', icon: '⏳' },
-    { path: `/books/${bookId}/reviews`, label: '评审管理', icon: '📊' },
+    { path: `/books/${bookId}/reviews`, label: '质量审查', icon: '📊' },
     { path: `/books/${bookId}/simulation`, label: '仿写画像', icon: '🎨' },
     { path: `/books/${bookId}/rules`, label: '用户规则', icon: '📏' },
     { path: `/books/${bookId}/world`, label: '世界观/风格', icon: '🌍' },
     { path: `/books/${bookId}/summaries`, label: '摘要', icon: '📝' },
     { path: `/books/${bookId}/dashboard`, label: '写作统计', icon: '📊' },
+    { path: '', label: '导出管理', icon: '📤', action: 'toggleExport' },
   ]
 
   return (
@@ -52,9 +56,15 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
           })()
           return (
             <div
-              key={item.path}
+              key={item.path || item.label}
               className="cursor-clickable"
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                if (item.action === 'toggleExport') {
+                  toggleExport()
+                } else {
+                  navigate(item.path)
+                }
+              }}
               style={{
                 padding: '8px 14px', margin: '0 6px', borderRadius: 'var(--radius-sm)',
                 cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8,

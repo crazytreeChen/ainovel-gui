@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PostToolUse": {
+      "command": "npx tsc --noEmit",
+      "trigger": "on_file_save",
+      "glob": ["src/**/*.ts", "src/**/*.tsx", "electron/**/*.ts"]
+    },
+    "PreToolUse": {
+      "block_patterns": ["**/package-lock.json", "**/pnpm-lock.yaml"]
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(npm test:*)",
+      "Bash(npm run typecheck*)",
+      "Bash(npx tsc*)"
+    ]
+  }
+}

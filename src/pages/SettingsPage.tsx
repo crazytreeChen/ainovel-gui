@@ -174,7 +174,7 @@ export default function SettingsPage() {
               ['✍️', '章节管理', true] as const,
               ['👤', '角色管理', true] as const,
               ['⏳', '时间线', true] as const,
-              ['📊', '评审管理', true] as const,
+              ['📊', '质量审查', true] as const,
               ['🤖', 'AI 写作', !!binaryInfo?.available] as const,
               ['🔍', '诊断', !!binaryInfo?.available] as const,
               ['📦', '导出', !!binaryInfo?.available] as const,

@@ -7,7 +7,7 @@ const { state, getDB, getAinovelBinary, GUI_DATA_DIR } = require('../context')
 const { createLogger } = require('../logger')
 const { join } = require('path')
 const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } = require('fs')
-const { cleanChapterTitle } = require('../utils')
+const { normalizeChapterMarkdown, getFirstMarkdownTitle, cleanChapterTitle } = require('../utils')
 
 const log = createLogger('ipc:workspace')
 
@@ -37,6 +37,34 @@ function readStoreTextAt(dir: string, rel: string) {
   const f = join(dir, rel)
   if (!existsSync(f)) return null
   try { return readFileSync(f, 'utf8') } catch { return null }
+}
+
+function mapAuditRow(row: any) {
+  let data: any = {}
+  try { data = JSON.parse(row.review_data || '{}') } catch { data = {} }
+  return {
+    chapter: row.chapter,
+    reviewedAt: row.reviewed_at,
+    contentHash: row.content_hash || '',
+    review: data.review || {},
+    issues: data.issues || [],
+    strengths: data.strengths || [],
+    suggestedTitle: data.suggested_title || '',
+    correctedContent: data.corrected_content || '',
+    missingIntroductions: data.missing_introductions || [],
+    characterStateInconsistencies: data.character_state_inconsistencies || [],
+    timelineGaps: data.timeline_gaps || [],
+    droppedThreads: data.dropped_threads || [],
+    needsRewrite: !!data.needs_rewrite,
+    needsTrimming: !!data.needs_trimming,
+    summary: data.summary || '',
+    fixAppliedAt: data.fix_applied_at || '',
+    appliedChanges: data.applied_changes || [],
+  }
+}
+
+function hashContent(crypto: any, content: string) {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex')
 }
 
 function register(ipcMain: Electron.IpcMain) {
@@ -245,6 +273,16 @@ function register(ipcMain: Electron.IpcMain) {
     }).filter(Boolean).sort((a: any, b: any) => (a.chapter || 0) - (b.chapter || 0))
     try { if (reviews.length) getDB().saveReviews(id, reviews) } catch (e: any) { log.error('get-reviews:sync', e) }
     return reviews
+  })
+
+  ipcMain.handle('get-book-audits', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
+    try {
+      const audits = getDB().getAuditedChapters(id) || []
+      return audits.map(mapAuditRow)
+    } catch (e: any) {
+      log.error('get-book-audits', e)
+      return []
+    }
   })
 
   ipcMain.handle('save-book-review', async (_e: Electron.IpcMainInvokeEvent, id: string, review: any) => {
@@ -566,9 +604,10 @@ function register(ipcMain: Electron.IpcMain) {
       if (cleanTitle !== rawTitle) {
         // 更新 markdown 文件首行
         lines[0] = `# ${cleanTitle}`
-        writeFileSync(filePath, lines.join('\n'), 'utf8')
+        const cleanedContent = lines.join('\n')
+        writeFileSync(filePath, cleanedContent, 'utf8')
         // 更新 SQLite
-        try { db.saveChapter(bookId, num, content, cleanTitle) } catch (e: any) { log.error('batch-clean:save', e) }
+        try { db.saveChapter(bookId, num, cleanedContent, cleanTitle) } catch (e: any) { log.error('batch-clean:save', e) }
         cleaned++
       }
     }
@@ -588,6 +627,7 @@ function register(ipcMain: Electron.IpcMain) {
     try { providerConfig = db.getConfig('provider_config') } catch (e: any) { log.error('batch-gen:config', e) }
     if (!providerConfig) return { success: false, error: '未配置 API Provider，请先在模型管理中设置' }
     // batch-generate-titles 已合并进 batch-audit-book，此 handler 保留为兼容
+    return { success: false, updated: 0, total: 0, error: '批量生成标题已合并到质量审查，请前往质量审查页执行' }
   })
 
   // ── 全书评审修复 Agent ──
@@ -657,14 +697,6 @@ function register(ipcMain: Electron.IpcMain) {
       timelineByChapter.get(ch)!.push(ev)
     }
 
-    // 已出场角色集合（跨章追踪）
-    const appearedCharacters = new Set<string>()
-    // 后备：所有 core/important 角色默认为已出场
-    for (const c of castEntries) appearedCharacters.add(c.name)
-
-    // 闪回/倒叙标记
-    const flashbackChapters = new Set<number>()
-
     const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
     const chapterNums = files.map((f: string) => parseInt(f.replace('.md', ''), 10)).filter((n: number) => !isNaN(n)).sort((a: number, b: number) => a - b)
     const rangeStart = startChapter > 0 ? startChapter : chapterNums[0] || 1
@@ -720,9 +752,8 @@ function register(ipcMain: Electron.IpcMain) {
         if (existing.content_hash === contentHash) {
           log.info(`batch-audit:ch${num} skip (unchanged hash=${contentHash.slice(0,8)})`)
           results.push({
-            chapter: num, oldTitle: `第${num}章`, skipped: true, reason: '已审查',
-            reviewedAt: existing.reviewed_at,
-            review: JSON.parse(existing.review_data || '{}').review || {},
+            ...mapAuditRow(existing),
+            oldTitle: `第${num}章`, skipped: true, reason: '已审查',
           })
           continue
         }
@@ -961,6 +992,8 @@ ${reviewContent}
             character_state_inconsistencies: parsed.character_state_inconsistencies,
             timeline_gaps: parsed.timeline_gaps,
             dropped_threads: parsed.dropped_threads,
+            needs_rewrite: needsRewrite,
+            needs_trimming: needsTrimming,
             summary: parsed.summary,
           }, contentHash)
         } catch (e: any) { log.error('batch-audit:save', e) }
@@ -969,17 +1002,26 @@ ${reviewContent}
       }
     }
 
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+    const skipped = results.filter(r => r.skipped).length
+    const errors = results.filter(r => r.error).length
+    log.info(`batch-audit:done total=${total} reviewed=${results.length - skipped - errors} skipped=${skipped} errors=${errors} elapsed=${elapsed}s`)
+
     return {
       success: true,
       canceled: state.auditCanceled,
-      total: files.length,
+      total,
       // 统计
       stats: (() => {
         const valid = results.filter(r => !r.error && !r.skipped && r.review)
+        const contentFixCandidates = results.filter(r => r.applied?.includes('正文修正')).length
+        const titleFixCandidates = results.filter(r => r.applied?.some((item: string) => item.startsWith('标题'))).length
         return {
           reviewed: valid.length,
-          contentCorrected: results.filter(r => r.applied?.includes('正文修正')).length,
-          titleUpdated: results.filter(r => r.applied?.length > 0 && r.applied[0]?.startsWith('标题')).length,
+          contentCorrected: contentFixCandidates,
+          titleUpdated: titleFixCandidates,
+          contentFixCandidates,
+          titleFixCandidates,
           needsRewrite: results.filter(r => r.needsRewrite).length,
           needsTrimming: results.filter(r => r.needsTrimming).length,
           errors: results.filter(r => r.error).length,
@@ -999,10 +1041,6 @@ ${reviewContent}
       })(),
       results,
     }
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-    const skipped = results.filter(r => r.skipped).length
-    const errors = results.filter(r => r.error).length
-    log.info(`batch-audit:done total=${total} reviewed=${results.length - skipped - errors} skipped=${skipped} errors=${errors} elapsed=${elapsed}s`)
   })
 
   // ── 取消审查 ──
@@ -1012,50 +1050,93 @@ ${reviewContent}
   })
 
   // ── 应用审查修复（不重新调用 LLM，直接从已保存的审查结果中读取并执行）──
-  ipcMain.handle('batch-apply-fixes', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+  ipcMain.handle('batch-apply-fixes', async (_e: Electron.IpcMainInvokeEvent, bookId: string, chapters?: number[]) => {
     const dir = getBookDirById(bookId)
     if (!dir) return { success: false, error: '未找到书籍目录' }
     const db = getDB()
     const chDir = join(dir, 'chapters')
     if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
 
-    const audits = db.getAuditedChapters(bookId) || []
+    const selectedChapters = new Set((chapters || []).filter((num: number) => Number.isInteger(num) && num > 0))
+    const audits = (db.getAuditedChapters(bookId) || [])
+      .filter((audit: any) => selectedChapters.size === 0 || selectedChapters.has(audit.chapter))
     let titleUpdated = 0
     let contentFixed = 0
     const applied: any[] = []
+    const skipped: any[] = []
+    const crypto = require('crypto')
+
+    function skip(chapter: number, reason: string, detail = '') {
+      skipped.push({ chapter, reason, detail })
+    }
 
     for (const audit of audits) {
       const num = audit.chapter
       const data = JSON.parse(audit.review_data || '{}')
+      if (data.fix_applied_at) {
+        skip(num, 'already_applied', '修复已应用')
+        continue
+      }
       const suggestedTitle = data.suggested_title || ''
       const correctedContent = data.corrected_content || ''
 
-      if (!suggestedTitle && !correctedContent) continue
+      if (!suggestedTitle && !correctedContent) {
+        skip(num, 'no_fix', '审查记录没有可应用修复')
+        continue
+      }
 
       const file = String(num).padStart(2, '0') + '.md'
       const filePath = join(chDir, file)
-      if (!existsSync(filePath)) continue
+      if (!existsSync(filePath)) {
+        skip(num, 'missing_file', '章节文件不存在')
+        continue
+      }
 
       const originalContent = readFileSync(filePath, 'utf8')
+      const currentHash = hashContent(crypto, originalContent)
+      if (audit.content_hash && audit.content_hash !== currentHash) {
+        skip(num, 'stale', '章节已在审查后变更')
+        log.warn(`batch-apply:ch${num} skipped stale audit hash=${audit.content_hash.slice(0,8)} current=${currentHash.slice(0,8)}`)
+        continue
+      }
       const lines = originalContent.split('\n')
       const firstLine = lines[0] || ''
       const titleMatch = firstLine.match(/^#\s+(.+)/)
       const oldTitle = titleMatch ? titleMatch[1].trim() : ''
+      const handledAt = new Date().toISOString()
+
+      function markHandled(chapterChanges: any[], newContent: string) {
+        try {
+          db.saveAuditResult(bookId, num, {
+            ...data,
+            fix_applied_at: handledAt,
+            applied_changes: chapterChanges,
+          }, hashContent(crypto, newContent))
+        } catch (e: any) { log.error('batch-apply:mark-handled', e) }
+      }
 
       // 优先应用完整正文修复，避免标题和正文分别写入时互相覆盖。
-      if (correctedContent && correctedContent.trim() !== originalContent.trim()) {
-        writeFileSync(filePath, correctedContent, 'utf8')
-        const correctedLines = correctedContent.split('\n')
-        const correctedTitleLine = correctedLines[0] || ''
-        const correctedTitleMatch = correctedTitleLine.match(/^#\s+(.+)/)
-        const correctedTitle = correctedTitleMatch ? correctedTitleMatch[1].trim() : suggestedTitle || oldTitle
-        try { db.saveChapter(bookId, num, correctedContent, correctedTitle) } catch (e: any) { log.error('batch-apply:save-content', e) }
-        contentFixed++
-        applied.push({ chapter: num, type: 'content', oldTitle, newTitle: correctedTitle })
-        if (suggestedTitle && suggestedTitle !== oldTitle && suggestedTitle === correctedTitle) {
-          titleUpdated++
-          applied.push({ chapter: num, type: 'title', oldTitle, newTitle: suggestedTitle })
+      if (correctedContent) {
+        const preferredTitle = suggestedTitle || getFirstMarkdownTitle(correctedContent) || oldTitle
+        const normalizedContent = normalizeChapterMarkdown(correctedContent, preferredTitle, num)
+        const correctedTitle = getFirstMarkdownTitle(normalizedContent) || preferredTitle
+        const chapterChanges: any[] = []
+        if (normalizedContent.trim() !== originalContent.trim()) {
+          writeFileSync(filePath, normalizedContent, 'utf8')
+          try { db.saveChapter(bookId, num, normalizedContent, correctedTitle) } catch (e: any) { log.error('batch-apply:save-content', e) }
+          contentFixed++
+          chapterChanges.push({ chapter: num, type: 'content', oldTitle, newTitle: correctedTitle })
+          if (correctedTitle !== oldTitle) {
+            titleUpdated++
+            chapterChanges.push({ chapter: num, type: 'title', oldTitle, newTitle: correctedTitle })
+          }
+          applied.push(...chapterChanges)
+          markHandled(chapterChanges, normalizedContent)
+          continue
         }
+
+        markHandled([], originalContent)
+        skip(num, 'unchanged', '修复建议与当前章节一致，已标记为已处理')
         continue
       }
 
@@ -1067,10 +1148,22 @@ ${reviewContent}
         titleUpdated++
         applied.push({ chapter: num, type: 'title', oldTitle, newTitle: suggestedTitle })
       }
+
+      const chapterChanges = applied.filter(item => item.chapter === num)
+      if (chapterChanges.length) {
+        markHandled(chapterChanges, readFileSync(filePath, 'utf8'))
+      } else {
+        markHandled([], originalContent)
+        skip(num, 'unchanged', '修复建议与当前章节一致，已标记为已处理')
+      }
     }
 
-    log.info(`batch-apply:done bookId=${bookId} titleUpdated=${titleUpdated} contentFixed=${contentFixed}`)
-    return { success: true, titleUpdated, contentFixed, applied }
+    const skipStats = skipped.reduce((acc: any, item: any) => {
+      acc[item.reason] = (acc[item.reason] || 0) + 1
+      return acc
+    }, {})
+    log.info(`batch-apply:done bookId=${bookId} titleUpdated=${titleUpdated} contentFixed=${contentFixed} skipped=${skipped.length}`)
+    return { success: true, titleUpdated, contentFixed, skippedStale: skipStats.stale || 0, skipped, skipStats, applied }
   })
 }
 

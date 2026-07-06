@@ -1,0 +1,15 @@
+{
+  "schema": 2,
+  "updated_at": "2026-07-06T11:51:57.681466+08:00",
+  "overall": {
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_write": 0,
+    "cost_usd": 0,
+    "saved_usd": 0,
+    "cache_capable": false
+  },
+  "per_agent": {},
+  "missing_assistant_usage": 0
+}

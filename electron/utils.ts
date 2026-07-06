@@ -33,3 +33,26 @@ export function cleanChapterTitle(raw: string, chapterNum?: number): string {
 
   return title
 }
+
+export function getFirstMarkdownTitle(content: string): string {
+  const firstLine = content.replace(/^\uFEFF/, '').split('\n')[0] || ''
+  const match = firstLine.match(/^#\s+(.+)/)
+  return match ? match[1].trim() : ''
+}
+
+export function normalizeChapterMarkdown(content: string, fallbackTitle: string, chapterNum: number): string {
+  const lines = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').split('\n')
+  while (lines[0] !== undefined && !lines[0].trim()) lines.shift()
+
+  const leadingTitles: string[] = []
+  while (lines[0] !== undefined) {
+    const match = lines[0].match(/^#\s+(.+)/)
+    if (!match) break
+    leadingTitles.push(match[1].trim())
+    lines.shift()
+    while (lines[0] !== undefined && !lines[0].trim()) lines.shift()
+  }
+
+  const title = cleanChapterTitle(fallbackTitle || leadingTitles[0] || '', chapterNum)
+  return `# ${title}\n${lines.join('\n').replace(/^\n+/, '')}`
+}

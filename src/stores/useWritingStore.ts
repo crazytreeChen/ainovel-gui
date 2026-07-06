@@ -18,7 +18,7 @@ export interface WritingState {
   pauseWriting: () => Promise<boolean>
   stopWriting: () => Promise<boolean>
   runDiag: () => Promise<void>
-  runExport: (args: string) => Promise<void>
+  runExport: (bookId: string, args: string) => Promise<void>
   appendStreamOutput: (text: { type: string; text: string } | string) => void
   clearStreamOutput: () => void
   pushToHistory: (text: string) => void
@@ -106,10 +106,10 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     useUIStore.getState().toggleDiagnostics()
   },
 
-  runExport: async (args) => {
+  runExport: async (bookId, args) => {
     const api = window.electronAPI
     if (!api) return
     useUIStore.getState().toggleExport()
-    await api.runExport(args)
+    await api.runExport(bookId, args)
   },
 }))

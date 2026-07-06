@@ -76,6 +76,26 @@ export interface ApplyFixChange {
   chapter: number; type: 'title' | 'content'; oldTitle?: string; newTitle?: string
 }
 
+export type ApplyFixSkipReason = 'already_applied' | 'no_fix' | 'missing_file' | 'stale' | 'unchanged'
+
+export interface ApplyFixSkip {
+  chapter: number; reason: ApplyFixSkipReason; detail: string
+}
+
+export interface ChapterAuditItem {
+  chapter: number; reviewedAt: string; contentHash: string
+  review: {
+    title_score?: number; ai_flavor_score?: number; pacing_score?: number
+    outline_alignment_score?: number; word_count_ok?: boolean
+    character_continuity_score?: number; timeline_consistency_score?: number; plot_thread_score?: number
+  }
+  issues: string[]; strengths: string[]; suggestedTitle: string; correctedContent?: string
+  missingIntroductions: string[]; characterStateInconsistencies: string[]
+  timelineGaps: string[]; droppedThreads: string[]
+  needsRewrite: boolean; needsTrimming: boolean; summary: string
+  fixAppliedAt?: string; appliedChanges?: ApplyFixChange[]
+}
+
 export interface ElectronAPI {
   // 书籍
   listBooks: () => Promise<BookItem[]>
@@ -107,8 +127,9 @@ export interface ElectronAPI {
   getBookTimeline: (id: string) => Promise<any>
   saveBookTimeline: (id: string, data: any) => Promise<boolean>
 
-  // 评审
+  // 历史评审兼容 + 质量审查
   getBookReviews: (id: string) => Promise<any[]>
+  getBookAudits: (id: string) => Promise<ChapterAuditItem[]>
   saveBookReview: (id: string, review: any) => Promise<boolean>
 
   // 图片生成
@@ -158,7 +179,7 @@ export interface ElectronAPI {
   runSimulate: (bookId: string) => Promise<string>
 
   // 导出
-  runExport: (args: string) => Promise<string>
+  runExport: (bookId: string, args: string) => Promise<string>
 
   // 目录
   selectDirectory: () => Promise<string | null>
@@ -205,11 +226,12 @@ export interface ElectronAPI {
     results?: { chapter: number; oldTitle: string; newTitle: string; error?: string }[]
   }>
 
-  // 全书评审修复 Agent
+  // 质量审查修复 Agent
   batchAuditBook: (id: string, apply?: boolean, startChapter?: number, endChapter?: number, force?: boolean) => Promise<{
     success: boolean; canceled?: boolean; total: number; error?: string
     stats: {
       reviewed: number; contentCorrected: number; titleUpdated: number
+      contentFixCandidates?: number; titleFixCandidates?: number
       needsRewrite: number; needsTrimming: number
       errors: number; skipped: number
       avgTitleScore: number; avgAiFlavorScore: number
@@ -227,7 +249,7 @@ export interface ElectronAPI {
       issues?: string[]; strengths?: string[]
       missingIntroductions?: string[]; characterStateInconsistencies?: string[]; timelineGaps?: string[]; droppedThreads?: string[]
       applied?: string[]; needsRewrite?: boolean; needsTrimming?: boolean
-      summary?: string; error?: string; skipped?: boolean
+      summary?: string; error?: string; skipped?: boolean; reason?: string; reviewedAt?: string
     }[]
   }>
 
@@ -247,14 +269,16 @@ export interface ElectronAPI {
   onStreamOutput: (callback: (data: string) => void) => () => void
   onRuntimeUpdate: (callback: () => void) => () => void
 
-  // 全书审查进度
+  // 质量审查进度
   onAuditProgress: (callback: (data: { current: number; total: number; chapter: number; elapsed: number; remaining: number }) => void) => () => void
 
-  // 取消全书审查
+  // 取消质量审查
   cancelAudit: () => Promise<boolean>
 
   // 应用审查修复（从保存的审查结果中执行修复，不重新调用 LLM）
-  batchApplyFixes: (id: string) => Promise<{
-    success: boolean; titleUpdated: number; contentFixed: number; error?: string; applied?: ApplyFixChange[]
+  batchApplyFixes: (id: string, chapters?: number[]) => Promise<{
+    success: boolean; titleUpdated: number; contentFixed: number; skippedStale?: number
+    skipped?: ApplyFixSkip[]; skipStats?: Partial<Record<ApplyFixSkipReason, number>>
+    error?: string; applied?: ApplyFixChange[]
   }>
 }
