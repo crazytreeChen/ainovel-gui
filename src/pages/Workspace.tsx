@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import TopBar from '@/components/TopBar'
 import StatusSidebar from '@/components/StatusSidebar'
 import EventFlow from '@/components/EventFlow'
@@ -25,20 +25,59 @@ export default function Workspace() {
   const showCoCreate = useAppStore(s => s.showCoCreate)
   const showExport = useAppStore(s => s.showExport)
   const snapshot = useAppStore(s => s.snapshot)
+  const setActiveBookId = useAppStore(s => s.setActiveBookId)
   const resumeWriting = useAppStore(s => s.resumeWriting)
   const pauseWriting = useAppStore(s => s.pauseWriting)
   const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
   const [fullscreen, setFullscreen] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
 
-  // 同步运行状态
+  // ── 规划完成确认 ──
+  const [planningComplete, setPlanningComplete] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+
+  // 监听规划完成事件
   useEffect(() => {
     if (!window.electronAPI) return
+    const cleanup = window.electronAPI.onPlanningComplete((data) => {
+      if (!id || data.bookId !== id) return
+      setPlanningComplete(true)
+      showToast('大纲/角色等规划数据已生成，请确认后继续创作', 'info')
+    })
+    return cleanup
+  }, [id])
+
+  const handleConfirmContinue = useCallback(async () => {
+    if (!id || confirming) return
+    setConfirming(true)
+    try {
+      const ok = await window.electronAPI!.confirmContinueWriting(id)
+      if (ok) {
+        setPlanningComplete(false)
+        showToast('继续创作中...', 'success')
+      } else {
+        showToast('恢复创作失败，请检查配置', 'error')
+      }
+    } catch (e: any) {
+      showToast('恢复创作失败: ' + e.message, 'error')
+    }
+    setConfirming(false)
+  }, [id, confirming])
+
+  const handleDecline = useCallback(() => {
+    setPlanningComplete(false)
+    setMode('welcome')
+  }, [setMode])
+
+  // 同步运行状态
+  useEffect(() => {
+    if (!id || !window.electronAPI) return
+    setActiveBookId(id)
     refreshSnapshot().then(() => {
       const snap = useAppStore.getState().snapshot
       if (snap.isRunning && mode !== 'running') setMode('running')
     })
-  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, setActiveBookId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleResume = async () => {
     if (!id) return
@@ -58,7 +97,7 @@ export default function Workspace() {
         {/* 顶栏 */}
         <TopBar bookName={snapshot.novelName} />
 
-        {/* 控制栏 — 替代旧的 state-panel */}
+        {/* 控制栏 */}
         <div className="flex-row items-center gap-8 flex-shrink-0" style={{ padding: '4px 0', borderBottom: '1px solid var(--color-border)', minHeight: 32 }}>
           {!fullscreen && (
             <button className="welcome-mode-btn text-xs" onClick={() => setFullscreen(true)}>⊟ 全屏</button>
@@ -81,7 +120,7 @@ export default function Workspace() {
           </span>
         </div>
 
-        {/* 精简状态条 — 替代旧的 StateSidebar */}
+        {/* 精简状态条 */}
         <div className="flex-row items-center gap-12 flex-shrink-0 text-xs" style={{ padding: '2px 0', minHeight: 22, color: 'var(--color-dim)' }}>
           <span className="mono">
             {snapshot.runtimeState === 'running' ? '● 运行中' : snapshot.runtimeState === 'paused' ? '⏸ 已暂停' : '○ 空闲'}
@@ -108,7 +147,7 @@ export default function Workspace() {
           </button>
         </div>
 
-        {/* 可折叠状态面板 — 章节进度/缓存/上下文/用量等 */}
+        {/* 可折叠状态面板 */}
         {showStatus && (
           <div className="flex-shrink-0" style={{ maxHeight: 300, overflow: 'auto', borderBottom: '1px solid var(--color-border)', marginBottom: 4 }}>
             <StatusSidebar />
@@ -123,7 +162,7 @@ export default function Workspace() {
             <div className="stream-panel" style={{ flex: 5 }}><StreamOutput /></div>
           </div>
 
-          {/* 右侧详情（含 StatusSidebar 全部内容） — 全屏时隐藏 */}
+          {/* 右侧详情（全屏时隐藏） */}
           {!fullscreen && (
             <div className="detail-panel">
               <DetailPanel />
@@ -134,6 +173,42 @@ export default function Workspace() {
         {/* 底部输入 */}
         <InputBox />
       </div>
+
+      {/* ── 规划完成确认弹窗 ── */}
+      {planningComplete && (
+        <div className="modal-overlay" onClick={handleDecline}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ minWidth: 440, maxWidth: 520 }}>
+            <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              📋 规划已完成
+              <button className="modal-close" onClick={handleDecline} style={{ position: 'static' }}>✕</button>
+            </div>
+
+            <div className="mb-16 text-sm" style={{ lineHeight: 1.8 }}>
+              <p>AI 已为作品生成以下规划数据：</p>
+              <ul style={{ paddingLeft: 20, margin: '8px 0' }}>
+                <li><strong>书名</strong>：{snapshot.novelName || '—'}</li>
+                <li><strong>大纲</strong>：{snapshot.totalChapters || '...'} 章规划</li>
+                <li><strong>角色</strong>：{snapshot.characters?.length || '...'} 位</li>
+                <li><strong>指南针</strong>：{snapshot.compassDirection || '—'}{snapshot.compassScale ? `（${snapshot.compassScale}）` : ''}</li>
+              </ul>
+              <p className="text-dim mt-12" style={{ fontSize: 12 }}>
+                你可以通过左侧导航栏查看大纲、角色、时间线等详细信息。
+                确认无误后，AI 将开始章节创作。
+              </p>
+            </div>
+
+            <div className="flex-row gap-10" style={{ justifyContent: 'flex-end' }}>
+              <button className="welcome-mode-btn" onClick={handleDecline}>
+                🔍 再调整
+              </button>
+              <button className="welcome-mode-btn active" onClick={handleConfirmContinue} disabled={confirming}
+                style={{ fontSize: 13, padding: '8px 24px', opacity: confirming ? 0.6 : 1 }}>
+                {confirming ? '继续中...' : '✅ 确认，开始写作'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 模态框 */}
       {showHelp && <HelpModal />}

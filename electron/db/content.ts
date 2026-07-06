@@ -2,6 +2,55 @@
  * 评审/世界观/风格规则/摘要/运行元/用量/仿写画像/用户指令
  */
 export function mixinContent(proto: any) {
+  function readNumber(source: any, keys: string[]) {
+    for (const key of keys) {
+      const value = source?.[key]
+      if (typeof value === 'number') return value
+      if (typeof value === 'string' && value.trim() !== '') return Number(value) || 0
+    }
+    return 0
+  }
+
+  function normalizeUsageBucket(bucket: any = {}) {
+    return {
+      input: readNumber(bucket, ['input', 'input_tokens', 'total_input']),
+      output: readNumber(bucket, ['output', 'output_tokens', 'total_output']),
+      cacheRead: readNumber(bucket, ['cacheRead', 'cache_read', 'cache_read_tokens']),
+      cacheWrite: readNumber(bucket, ['cacheWrite', 'cache_write', 'cache_write_tokens']),
+      cost: readNumber(bucket, ['cost', 'total_cost']),
+      saved: readNumber(bucket, ['saved', 'total_saved']),
+      cacheCapable: !!bucket.cacheCapable,
+    }
+  }
+
+  function normalizeUsageStats(stats: any = {}) {
+    const overall = stats.overall || stats.totals || stats.total || {}
+    const perAgent = stats.per_agent || stats.perAgent || {}
+    const perModel = stats.per_model || stats.perModel || {}
+    return {
+      total_input: readNumber(stats, ['total_input', 'totalInput', 'input_tokens']) || normalizeUsageBucket(overall).input,
+      total_output: readNumber(stats, ['total_output', 'totalOutput', 'output_tokens']) || normalizeUsageBucket(overall).output,
+      total_cost: readNumber(stats, ['total_cost', 'totalCost', 'cost']) || normalizeUsageBucket(overall).cost,
+      total_saved: readNumber(stats, ['total_saved', 'totalSaved', 'saved']) || normalizeUsageBucket(overall).saved,
+      cache_read: readNumber(stats, ['cache_read', 'cacheRead', 'cache_read_tokens']) || normalizeUsageBucket(overall).cacheRead,
+      cache_write: readNumber(stats, ['cache_write', 'cacheWrite', 'cache_write_tokens']) || normalizeUsageBucket(overall).cacheWrite,
+      per_agent: Object.fromEntries(Object.entries(perAgent).map(([key, value]) => [key, normalizeUsageBucket(value)])),
+      per_model: Object.fromEntries(Object.entries(perModel).map(([key, value]) => [key, normalizeUsageBucket(value)])),
+    }
+  }
+
+  function normalizeRunMeta(meta: any = {}) {
+    return {
+      ...meta,
+      provider: meta.provider || meta.current_provider || meta.default_provider || '',
+      model: meta.model || meta.model_name || meta.current_model || meta.default_model || '',
+      started_at: meta.started_at || meta.startedAt || '',
+      planning_tier: meta.planning_tier || meta.planningTier || '',
+      pending_steer: meta.pending_steer || meta.pendingSteer || '',
+      steer_history: meta.steer_history || meta.steerHistory || [],
+    }
+  }
+
   proto.saveReviews = function (bookId: string, reviews: any[]) {
     const del = this.database.prepare('DELETE FROM reviews WHERE book_id = ?')
     const ins = this.database.prepare('INSERT INTO reviews (book_id, chapter, scope, issues, dimensions, contract_status, contract_misses, contract_notes, verdict, summary, affected_chapters) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
@@ -48,8 +97,9 @@ export function mixinContent(proto: any) {
   }
 
   proto.saveRunMeta = function (bookId: string, meta: any) {
+    const normalized = normalizeRunMeta(meta)
     this.database.prepare(`INSERT OR REPLACE INTO run_meta (book_id, started_at, provider, style, model, planning_tier, steer_history, pending_steer) VALUES (?,?,?,?,?,?,?,?)`)
-      .run(bookId, meta.started_at || '', meta.provider || '', meta.style || '', meta.model || '', meta.planning_tier || '', JSON.stringify(meta.steer_history || []), meta.pending_steer || '')
+      .run(bookId, normalized.started_at || '', normalized.provider || '', normalized.style || '', normalized.model || '', normalized.planning_tier || '', JSON.stringify(normalized.steer_history || []), normalized.pending_steer || '')
   }
 
   proto.getRunMeta = function (bookId: string) {
@@ -59,8 +109,9 @@ export function mixinContent(proto: any) {
   }
 
   proto.saveUsageStats = function (bookId: string, stats: any) {
+    const normalized = normalizeUsageStats(stats)
     this.database.prepare(`INSERT OR REPLACE INTO usage_stats (book_id, total_input, total_output, total_cost, total_saved, cache_read, cache_write, per_agent, per_model) VALUES (?,?,?,?,?,?,?,?,?)`)
-      .run(bookId, stats.total_input || 0, stats.total_output || 0, stats.total_cost || 0, stats.total_saved || 0, stats.cache_read || 0, stats.cache_write || 0, JSON.stringify(stats.per_agent || {}), JSON.stringify(stats.per_model || {}))
+      .run(bookId, normalized.total_input, normalized.total_output, normalized.total_cost, normalized.total_saved, normalized.cache_read, normalized.cache_write, JSON.stringify(normalized.per_agent), JSON.stringify(normalized.per_model))
   }
 
   proto.getUsageStats = function (bookId: string) {

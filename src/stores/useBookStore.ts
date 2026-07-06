@@ -50,11 +50,13 @@ const emptySnapshot: UISnapshot = {
 }
 
 export interface BookState {
+  activeBookId: string
   snapshot: UISnapshot
   events: EventItem[]
   chapters: ChapterInfo[]
   chapterContent: string
 
+  setActiveBookId: (bookId: string) => void
   refreshSnapshot: () => Promise<void>
   refreshEvents: () => Promise<void>
   refreshChapters: () => Promise<void>
@@ -62,15 +64,19 @@ export interface BookState {
 }
 
 export const useBookStore = create<BookState>((set) => ({
+  activeBookId: '',
   snapshot: emptySnapshot,
   events: [],
   chapters: [],
   chapterContent: '',
 
+  setActiveBookId: (activeBookId) => set({ activeBookId }),
+
   refreshSnapshot: async () => {
     const api = window.electronAPI
     if (!api) return
-    const snapshot = await api.getSnapshot()
+    const activeBookId = useBookStore.getState().activeBookId
+    const snapshot = await api.getSnapshot(activeBookId || undefined)
     set({ snapshot })
   },
 

@@ -4,8 +4,19 @@ import BookCover from '@/components/BookCover'
 import ImageViewer from '@/components/ImageViewer'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
+type Mode = 'quick' | 'detailed'
+
 export default function NewBook() {
   const navigate = useNavigate()
+  const [mode, setMode] = useState<Mode>('quick')
+
+  // ── 快速模式 ──
+  const [quickPremise, setQuickPremise] = useState('')
+  const [quickStyle, setQuickStyle] = useState('default')
+  const [quickCreating, setQuickCreating] = useState(false)
+  const [quickError, setQuickError] = useState('')
+
+  // ── 详细模式 ──
   const [name, setName] = useState('')
   const [style, setStyle] = useState('default')
   const [phase, setPhase] = useState('init')
@@ -36,6 +47,27 @@ export default function NewBook() {
     setShowGenCover(true)
   }
 
+  // ── 快速模式：一键自动创作 ──
+  const handleQuickCreate = async () => {
+    if (!quickPremise.trim()) { setQuickError('请输入创作需求'); return }
+    setQuickCreating(true)
+    setQuickError('')
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.createBookAuto(quickPremise.trim(), quickStyle)
+        if (result?.book?.id) {
+          navigate(`/books/${result.book.id}/workspace?mode=writing`)
+        } else {
+          setQuickError(result?.error || '创建失败')
+        }
+      }
+    } catch (e: any) {
+      setQuickError(e.message || '创建失败')
+    }
+    setQuickCreating(false)
+  }
+
+  // ── 详细模式：手动创建 ──
   const handleCreate = async () => {
     if (!name.trim()) { setError('请输入书名'); return }
     setCreating(true)
@@ -77,119 +109,197 @@ export default function NewBook() {
     setGeneratingCover(false)
   }
 
+  // ── 模式切换 ──
+  const switchMode = (m: Mode) => {
+    setMode(m)
+    setQuickError('')
+    setError('')
+  }
+
   return (
     <div className="flex-row" style={{ height: '100vh' }}>
-      {/* 左侧：基本信息 */}
+      {/* 左侧 */}
       <div className="flex-col p-32 scroll-y" style={{ width: 420, minWidth: 380, borderRight: '1px solid var(--color-border)' }}>
-        <h2 className="mono text-accent mb-24 text-lg" style={{ fontSize: 20 }}>+ 新建书籍</h2>
+        <h2 className="mono text-accent mb-16 text-lg" style={{ fontSize: 20 }}>+ 新建书籍</h2>
 
-        <div className="flex-row gap-24 mb-24">
-          <div className="flex-shrink-0">
-            {createdId ? (
-              <BookCover bookId={createdId} size="medium" editable />
-            ) : (
-              <div onClick={selectedImage ? () => setViewerOpen(true) : handleSelectCover}
-                className="cursor-clickable flex-col items-center justify-center"
-                style={{ width: 100, height: 140, borderRadius: 4,
-                  border: selectedImage ? '1px solid var(--color-border)' : '2px dashed var(--color-dim)',
-                  background: 'var(--color-surface-2)', cursor: selectedImage ? 'zoom-in' : 'pointer', gap: 6 }}>
-                {selectedImage ? (
-                  <img loading="lazy" src={selectedImage} alt="封面预览" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 3 }} />
-                ) : (
-                  <>
-                    <span style={{ fontSize: 28, opacity: 0.4 }}>📖</span>
-                    <span className="text-dim text-xs">添加封面</span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+        {/* 模式切换 */}
+        <div className="flex-row mb-20" style={{ gap: 4, background: 'var(--color-surface)', borderRadius: 6, padding: 3 }}>
+          <button className={`welcome-mode-btn ${mode === 'quick' ? 'active' : ''}`}
+            onClick={() => switchMode('quick')} style={{ flex: 1, fontSize: 12 }}>
+            ⚡ 快速创作
+          </button>
+          <button className={`welcome-mode-btn ${mode === 'detailed' ? 'active' : ''}`}
+            onClick={() => switchMode('detailed')} style={{ flex: 1, fontSize: 12 }}>
+            📝 详细设置
+          </button>
+        </div>
 
-          <div className="flex-1">
-            <div className="mb-16">
-              <label className="text-muted text-sm mb-8 d-block">书名</label>
-              <input value={name} onChange={e => setName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                className="input-field text-sm" style={{ padding: '10px 14px', fontSize: 14 }}
-                placeholder="输入书名，如「光斑」「星穹之旅」" autoFocus />
+        {/* ── 快速创作 ── */}
+        {mode === 'quick' && (
+          <>
+            <div className="mb-12">
+              <label className="text-muted text-sm mb-8 d-block">
+                一句话创作需求 <span className="text-error text-xs">*必填</span>
+              </label>
+              <textarea value={quickPremise} onChange={e => setQuickPremise(e.target.value)}
+                placeholder={'例如：「一个现代程序员穿越到修仙世界，用编程思维改写修炼规则的故事」\n\nAI 将自动生成书名、构建大纲、开始创作，全程无需手动填写。'}
+                className="textarea-field mono"
+                style={{ width: '100%', minHeight: 160, fontSize: 14, lineHeight: 1.8, padding: 14, resize: 'vertical' }} />
             </div>
 
-            <button className="welcome-mode-btn text-sm mb-12" onClick={handleSelectCover}>
-              {selectedImage ? '更换封面图片' : '选择封面图片'}
-            </button>
-            <button className="welcome-mode-btn text-sm mb-12" onClick={openGenCover}
-              style={{ color: 'var(--color-accent2)', borderColor: 'var(--color-accent2)' }}>
-              🤖 AI 生成封面
-            </button>
-          </div>
-        </div>
+            <div className="mb-16">
+              <label className="text-muted text-sm mb-8 d-block">写作风格（可选）</label>
+              <div className="flex-row flex-wrap" style={{ gap: 6 }}>
+                {[
+                  { key: 'default', label: '通用' },
+                  { key: 'fantasy', label: '仙侠/玄幻' },
+                  { key: 'suspense', label: '悬疑推理' },
+                  { key: 'romance', label: '言情' },
+                ].map(s => (
+                  <button key={s.key}
+                    className={`welcome-mode-btn ${quickStyle === s.key ? 'active' : ''}`}
+                    onClick={() => setQuickStyle(s.key)}>{s.label}</button>
+                ))}
+              </div>
+            </div>
 
-        <div className="mb-16">
-          <label className="text-muted text-sm mb-8 d-block">写作风格</label>
-          <div className="flex-row flex-wrap" style={{ gap: 6 }}>
-            {[
-              { key: 'default', label: '通用' },
-              { key: 'fantasy', label: '仙侠/玄幻' },
-              { key: 'suspense', label: '悬疑推理' },
-              { key: 'romance', label: '言情' },
-            ].map(s => (
-              <button key={s.key}
-                className={`welcome-mode-btn ${style === s.key ? 'active' : ''}`}
-                onClick={() => setStyle(s.key)}>{s.label}</button>
-            ))}
-          </div>
-        </div>
+            {quickError && (
+              <div className="text-error text-sm mono mb-12">{quickError}</div>
+            )}
 
-        <div className="mb-16">
-          <label className="text-muted text-sm mb-8 d-block">写作阶段</label>
-          <div className="flex-row flex-wrap" style={{ gap: 6 }}>
-            {[
-              { key: 'init', label: getPhaseLabel('init') },
-              { key: 'premise', label: getPhaseLabel('premise') },
-              { key: 'outline', label: getPhaseLabel('outline') },
-              { key: 'writing', label: getPhaseLabel('writing') },
-              { key: 'complete', label: getPhaseLabel('complete') },
-            ].map(s => (
-              <button key={s.key}
-                className={`welcome-mode-btn ${phase === s.key ? 'active' : ''}`}
-                onClick={() => setPhase(s.key)}>{s.label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-16">
-          <label className="text-muted text-sm mb-8 d-block">标签</label>
-          <input value={tags} onChange={e => setTags(e.target.value)}
-            placeholder="用逗号分隔，如: 玄幻, 后宫, 末日"
-            className="input-field" />
-        </div>
-
-        {error && (
-          <div className="text-error text-sm mono mb-12">{error}</div>
+            <div className="mt-auto" style={{ paddingTop: 16 }}>
+              <div className="flex-row gap-10">
+                <button className="welcome-mode-btn active" onClick={handleQuickCreate} disabled={quickCreating}
+                  style={{ flex: 1, fontSize: 14, padding: '10px 24px', opacity: quickCreating ? 0.6 : 1 }}>
+                  {quickCreating ? '🤖 AI 正在创作中...' : '⚡ 一键创作'}
+                </button>
+                <button className="welcome-mode-btn" onClick={() => navigate('/')}
+                  style={{ fontSize: 13, padding: '10px 24px' }}>
+                  取消
+                </button>
+              </div>
+              <div className="text-dim text-xs mt-12" style={{ lineHeight: 1.6 }}>
+                点击后 AI 将自动生成书名、大纲与框架，完成后自动进入创作工作台。
+                首次使用需确保已配置好 API 模型（<span className="cursor-clickable text-accent" onClick={() => navigate('/settings/models')}>模型管理</span>）。
+              </div>
+            </div>
+          </>
         )}
 
-        <div className="flex-row gap-10 mt-auto" style={{ paddingTop: 16 }}>
-          <button className="welcome-mode-btn active" onClick={handleCreate} disabled={creating}
-            style={{ fontSize: 13, padding: '8px 24px', opacity: creating ? 0.6 : 1 }}>
-            {creating ? '创建中...' : '创建书籍'}
-          </button>
-          <button className="welcome-mode-btn" onClick={() => navigate('/')}
-            style={{ fontSize: 13, padding: '8px 24px' }}>
-            取消
-          </button>
-        </div>
+        {/* ── 详细设置 ── */}
+        {mode === 'detailed' && (
+          <>
+            <div className="flex-row gap-24 mb-24">
+              <div className="flex-shrink-0">
+                {createdId ? (
+                  <BookCover bookId={createdId} size="medium" editable />
+                ) : (
+                  <div onClick={selectedImage ? () => setViewerOpen(true) : handleSelectCover}
+                    className="cursor-clickable flex-col items-center justify-center"
+                    style={{ width: 100, height: 140, borderRadius: 4,
+                      border: selectedImage ? '1px solid var(--color-border)' : '2px dashed var(--color-dim)',
+                      background: 'var(--color-surface-2)', cursor: selectedImage ? 'zoom-in' : 'pointer', gap: 6 }}>
+                    {selectedImage ? (
+                      <img loading="lazy" src={selectedImage} alt="封面预览" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 3 }} />
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 28, opacity: 0.4 }}>📖</span>
+                        <span className="text-dim text-xs">添加封面</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1">
+                <div className="mb-16">
+                  <label className="text-muted text-sm mb-8 d-block">书名</label>
+                  <input value={name} onChange={e => setName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                    className="input-field text-sm" style={{ padding: '10px 14px', fontSize: 14 }}
+                    placeholder="输入书名，如「光斑」「星穹之旅」" autoFocus />
+                </div>
+
+                <button className="welcome-mode-btn text-sm mb-12" onClick={handleSelectCover}>
+                  {selectedImage ? '更换封面图片' : '选择封面图片'}
+                </button>
+                <button className="welcome-mode-btn text-sm mb-12" onClick={openGenCover}
+                  style={{ color: 'var(--color-accent2)', borderColor: 'var(--color-accent2)' }}>
+                  🤖 AI 生成封面
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-16">
+              <label className="text-muted text-sm mb-8 d-block">写作风格</label>
+              <div className="flex-row flex-wrap" style={{ gap: 6 }}>
+                {[
+                  { key: 'default', label: '通用' },
+                  { key: 'fantasy', label: '仙侠/玄幻' },
+                  { key: 'suspense', label: '悬疑推理' },
+                  { key: 'romance', label: '言情' },
+                ].map(s => (
+                  <button key={s.key}
+                    className={`welcome-mode-btn ${style === s.key ? 'active' : ''}`}
+                    onClick={() => setStyle(s.key)}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-16">
+              <label className="text-muted text-sm mb-8 d-block">写作阶段</label>
+              <div className="flex-row flex-wrap" style={{ gap: 6 }}>
+                {[
+                  { key: 'init', label: getPhaseLabel('init') },
+                  { key: 'premise', label: getPhaseLabel('premise') },
+                  { key: 'outline', label: getPhaseLabel('outline') },
+                  { key: 'writing', label: getPhaseLabel('writing') },
+                  { key: 'complete', label: getPhaseLabel('complete') },
+                ].map(s => (
+                  <button key={s.key}
+                    className={`welcome-mode-btn ${phase === s.key ? 'active' : ''}`}
+                    onClick={() => setPhase(s.key)}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-16">
+              <label className="text-muted text-sm mb-8 d-block">标签</label>
+              <input value={tags} onChange={e => setTags(e.target.value)}
+                placeholder="用逗号分隔，如: 玄幻, 后宫, 末日"
+                className="input-field" />
+            </div>
+
+            {error && (
+              <div className="text-error text-sm mono mb-12">{error}</div>
+            )}
+
+            <div className="flex-row gap-10 mt-auto" style={{ paddingTop: 16 }}>
+              <button className="welcome-mode-btn active" onClick={handleCreate} disabled={creating}
+                style={{ fontSize: 13, padding: '8px 24px', opacity: creating ? 0.6 : 1 }}>
+                {creating ? '创建中...' : '创建书籍'}
+              </button>
+              <button className="welcome-mode-btn" onClick={() => navigate('/')}
+                style={{ fontSize: 13, padding: '8px 24px' }}>
+                取消
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* 右侧：内容简介 — 大编辑区 */}
-      <div className="flex-1 flex-col p-32">
-        <label className="text-muted text-sm mb-8" style={{ display: 'block', fontWeight: 'bold' }}>内容简介</label>
-        <textarea value={premise} onChange={e => setPremise(e.target.value)}
-          placeholder="输入书籍内容简介，描述故事核心设定、世界观、主线脉络等...
-          
+      {/* 右侧：内容简介（仅详细模式展示大编辑区） */}
+      {mode === 'detailed' && (
+        <div className="flex-1 flex-col p-32">
+          <label className="text-muted text-sm mb-8" style={{ display: 'block', fontWeight: 'bold' }}>内容简介</label>
+          <textarea value={premise} onChange={e => setPremise(e.target.value)}
+            placeholder="输入书籍内容简介，描述故事核心设定、世界观、主线脉络等...
+            
 可以在这里详细写下你的创作构想，AI 会基于此进行创作。"
-          className="textarea-field mono"
-          style={{ flex: 1, width: '100%', minHeight: 300, fontSize: 14, lineHeight: 1.8, padding: 16, resize: 'none' }} />
-      </div>
+            className="textarea-field mono"
+            style={{ flex: 1, width: '100%', minHeight: 300, fontSize: 14, lineHeight: 1.8, padding: 16, resize: 'none' }} />
+        </div>
+      )}
 
       {/* AI 生成封面弹窗 */}
       {showGenCover && (

@@ -33,6 +33,14 @@ function readStoreJSONAt(dir: string, rel: string) {
   try { return JSON.parse(readFileSync(f, 'utf8')) } catch { return null }
 }
 
+function readFirstStoreJSONAt(dir: string, rels: string[]) {
+  for (const rel of rels) {
+    const data = readStoreJSONAt(dir, rel)
+    if (data) return data
+  }
+  return null
+}
+
 function readStoreTextAt(dir: string, rel: string) {
   const f = join(dir, rel)
   if (!existsSync(f)) return null
@@ -440,13 +448,16 @@ function register(ipcMain: Electron.IpcMain) {
   // ── 运行元/用量 ──
   ipcMain.handle('get-run-meta', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
     const dir = getBookDirById(bookId)
+    const fileMeta = readFirstStoreJSONAt(dir, ['run.json', 'meta/run.json'])
+    if (fileMeta) {
+      try { getDB().saveRunMeta(bookId, fileMeta) } catch (e: any) { log.error('get-run-meta:sync', e) }
+      try { return getDB().getRunMeta(bookId) || fileMeta } catch { return fileMeta }
+    }
     try {
       const meta = getDB().getRunMeta(bookId)
       if (meta) return meta
     } catch (e: any) { log.error('get-run-meta:sqlite', e) }
-    const meta = readStoreJSONAt(dir, 'run.json')
-    if (meta) { try { getDB().saveRunMeta(bookId, meta) } catch (e: any) { log.error('get-run-meta:sync', e) } }
-    return meta
+    return null
   })
   ipcMain.handle('save-run-meta', async (_e: Electron.IpcMainInvokeEvent, bookId: string, meta: any) => {
     try {
@@ -459,13 +470,19 @@ function register(ipcMain: Electron.IpcMain) {
   })
   ipcMain.handle('get-usage-stats', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
     const dir = getBookDirById(bookId)
+    const fileStats = readFirstStoreJSONAt(dir, ['usage.json', 'meta/usage.json'])
+    if (fileStats) {
+      try {
+        getDB().saveUsageStats(bookId, fileStats)
+        return getDB().getUsageStats(bookId)
+      } catch (e: any) { log.error('get-usage-stats:sync', e) }
+      return fileStats
+    }
     try {
       const stats = getDB().getUsageStats(bookId)
       if (stats) return stats
     } catch (e: any) { log.error('get-usage-stats:sqlite', e) }
-    const stats = readStoreJSONAt(dir, 'usage.json')
-    if (stats) { try { getDB().saveUsageStats(bookId, stats) } catch (e: any) { log.error('get-usage-stats:sync', e) } }
-    return stats
+    return null
   })
   ipcMain.handle('save-usage-stats', async (_e: Electron.IpcMainInvokeEvent, bookId: string, stats: any) => {
     try {

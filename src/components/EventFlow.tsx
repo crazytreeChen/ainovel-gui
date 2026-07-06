@@ -85,7 +85,7 @@ export default function EventFlow() {
 
         return (
           <div
-            key={`${ev.time}-${ev.category}-${ev.summary}-${ev.agent}`}
+            key={`${ev.time}-${ev.category}-${ev.summary}-${ev.agent}-${i}`}
             className="event-line"
             style={{ color: lineColor }}
           >

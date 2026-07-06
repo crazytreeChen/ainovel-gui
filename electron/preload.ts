@@ -65,13 +65,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadConfigValue: (key: string) => ipcRenderer.invoke('load-config-value', key),
 
   // 快照和状态
-  getSnapshot: () => ipcRenderer.invoke('get-snapshot'),
+  getSnapshot: (bookId?: string) => ipcRenderer.invoke('get-snapshot', bookId),
   getEvents: () => ipcRenderer.invoke('get-events'),
   readChapter: (chapterNum: number) => ipcRenderer.invoke('read-chapter', chapterNum),
   listChapters: () => ipcRenderer.invoke('list-chapters'),
 
   // 创作控制
   startWriting: (prompt: string, bookId?: string) => ipcRenderer.invoke('start-writing', prompt, bookId),
+  createBookAuto: (premise: string, style?: string) => ipcRenderer.invoke('create-book-auto', premise, style),
   resumeWriting: (bookId: string) => ipcRenderer.invoke('resume-writing', bookId),
   sendInput: (text: string) => ipcRenderer.invoke('send-input', text),
   pauseWriting: () => ipcRenderer.invoke('pause-writing'),
@@ -167,6 +168,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('runtime-update', handler)
     return () => ipcRenderer.removeListener('runtime-update', handler)
   },
+
+  // 规划完成事件（确认继续写作）
+  onPlanningComplete: (callback: (data: { bookId: string }) => void) => {
+    const handler = (_event: any, data: { bookId: string }) => callback(data)
+    ipcRenderer.on('planning-complete', handler)
+    return () => ipcRenderer.removeListener('planning-complete', handler)
+  },
+  confirmContinueWriting: (bookId: string) => ipcRenderer.invoke('confirm-continue-writing', bookId),
 
   // 质量审查进度推送
   onAuditProgress: (callback: (data: { current: number; total: number; chapter: number; elapsed: number; remaining: number }) => void) => {

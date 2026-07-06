@@ -161,13 +161,14 @@ export interface ElectronAPI {
   loadConfigValue: (key: string) => Promise<any>
 
   // 快照/事件/章节
-  getSnapshot: () => Promise<UISnapshot>
+  getSnapshot: (bookId?: string) => Promise<UISnapshot>
   getEvents: () => Promise<EventItem[]>
   readChapter: (chapterNum: number) => Promise<string>
   listChapters: () => Promise<ChapterItem[]>
 
   // 创作控制
   startWriting: (prompt: string, bookId?: string) => Promise<boolean>
+  createBookAuto: (premise: string, style?: string) => Promise<{ book?: BookItem; error?: string | null }>
   resumeWriting: (bookId: string) => Promise<boolean>
   sendInput: (text: string) => Promise<boolean>
   pauseWriting: () => Promise<boolean>
@@ -268,6 +269,10 @@ export interface ElectronAPI {
   onSnapshotUpdate: (callback: (data: UISnapshot) => void) => () => void
   onStreamOutput: (callback: (data: string) => void) => () => void
   onRuntimeUpdate: (callback: () => void) => () => void
+
+  // 规划完成事件（确认继续写作）
+  onPlanningComplete: (callback: (data: { bookId: string }) => void) => () => void
+  confirmContinueWriting: (bookId: string) => Promise<boolean>
 
   // 质量审查进度
   onAuditProgress: (callback: (data: { current: number; total: number; chapter: number; elapsed: number; remaining: number }) => void) => () => void
