@@ -848,126 +848,131 @@ let plannedChapterTitles: string[] = []
 function startRuntimeSync() {
   if (runtimeSyncActive) return
   runtimeSyncActive = true
-  snapshotTimer = setInterval(() => {
-    if (!state.mainWindow || state.mainWindow.isDestroyed()) return
-    if (!state.outputDir || state.outputDir.trim() === '') { return }
-    const { existsSync, readFileSync, readdirSync, statSync } = require('fs')
-    const { join } = require('path')
-    const bookDir = findActiveBookDir()
-    if (!bookDir) return
-    const db = getDB()
-    const bookId = getActiveWritingBookId()
 
-    // 自动导入新章节（带目录 mtime 缓存，避免每次全扫）
-    const chDir = join(bookDir, 'chapters')
-    if (existsSync(chDir)) {
-      try {
-        const currentMtime = statSync(chDir).mtimeMs
-        if (chapterCache && chapterCache.mtime === currentMtime) {
-          // 目录未变更，跳过扫描
-        } else {
-          const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
-          for (const file of files) {
-            const num = parseInt(file.replace('.md', ''), 10)
-            if (!isNaN(num)) {
-              const content = readFileSync(join(chDir, file), 'utf8')
-              // 优先使用大纲定义的标题，其次用 markdown H1，最后用默认标题
-              const planned = num > 0 && num <= plannedChapterTitles.length ? plannedChapterTitles[num - 1] : ''
-              const fromContent = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || ''
-              const title = planned || fromContent || `第${num}章`
-              db.saveChapter(bookId, num, content, title)
-              if (planned && planned !== fromContent) {
-                log.debug('runtime-sync:chapters 使用预定标题', { num, planned, fromContent })
-              }
-            }
-          }
-          chapterCache = { files, mtime: currentMtime }
-        }
-      } catch (e: any) { log.error('runtime-sync:chapters', e) }
-    }
+  // 立即执行一次全量同步，不等 10s 定时器
+  try { doRuntimeSync() } catch (e: any) { log.error('runtime-sync:immediate', e) }
 
-    // 同步 progress.json → SQLite progress 表（确保书籍列表/DB 快照数据最新）
-    if (bookId) {
-      try {
-        const progJson = readStoreJSON('meta/progress.json')
-        if (progJson) {
-          const completed = JSON.stringify(progJson.completed_chapters || [])
-          const wcMap = JSON.stringify(progJson.chapter_word_counts || {})
-          db.database.prepare(`INSERT OR REPLACE INTO progress 
-            (book_id, novel_name, phase, current_chapter, total_chapters, completed_chapters, 
-             total_word_count, chapter_word_counts, in_progress_chapter, flow, 
-             pending_rewrites, rewrite_reason, current_volume, current_arc, layered,
-             reopened_from_complete, strand_history, hook_history) 
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-            .run(
-              bookId,
-              progJson.novel_name || '',
-              progJson.phase || 'init',
-              progJson.current_chapter || 0,
-              progJson.total_chapters || 0,
-              completed,
-              progJson.total_word_count || 0,
-              wcMap,
-              progJson.in_progress_chapter || 0,
-              progJson.flow || 'writing',
-              JSON.stringify(progJson.pending_rewrites || []),
-              progJson.rewrite_reason || '',
-              progJson.current_volume || 0,
-              progJson.current_arc || 0,
-              progJson.layered ? 1 : 0,
-              progJson.reopened_from_complete ? 1 : 0,
-              JSON.stringify(progJson.strand_history || []),
-              JSON.stringify(progJson.hook_history || []),
-            )
+  snapshotTimer = setInterval(() => doRuntimeSync(), 10000)
+}
 
-          // 书名自动更新：CLI 生成的名字覆盖 SQLite 暂用名
-          if (progJson.novel_name) {
-            const curBook = db.getBook(bookId)
-            if (curBook && curBook.name !== progJson.novel_name) {
-              db.updateBook(bookId, { name: progJson.novel_name })
-            }
-          }
-        }
+/** 执行一轮运行时同步：进度 + 规划文件 + 推送到渲染进程 */
+function doRuntimeSync() {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) return
+  if (!state.outputDir || state.outputDir.trim() === '') { return }
+  const { existsSync, readFileSync, readdirSync, statSync } = require('fs')
+  const { join } = require('path')
+  const bookDir = findActiveBookDir()
+  if (!bookDir) return
+  const db = getDB()
+  const bookId = getActiveWritingBookId()
 
-        // ── 规划完成检测：phase 从 init/outline 跃迁到 writing 时暂停，等待用户确认 ──
-        try {
-          const curPhase = progJson?.phase || ''
-          const isPlanningPhase = ['init', 'premise', 'outline'].includes(lastPhase)
-          const justEnteredWriting = curPhase === 'writing' && isPlanningPhase
-          if (justEnteredWriting && !pendingUserConfirm && state.ainovelProcess) {
-            pendingUserConfirm = true
-            log.info('runtime-sync:planning-complete 规划完成，暂停等待用户确认', { bookId })
-            // 暂停 CLI
-            try { state.ainovelProcess.kill('SIGINT') } catch {}
-            // 通知前端
-            if (state.mainWindow && !state.mainWindow.isDestroyed()) {
-              state.mainWindow.webContents.send('planning-complete', { bookId })
-            }
-          }
-          lastPhase = curPhase || ''
-        } catch (e: any) { log.error('runtime-sync:phase-detect', e) }
-      } catch (e: any) { log.error('runtime-sync:progress', e) }
-    }
-
-    // 同步规划数据 → SQLite（大纲/角色/时间线/世界观等）
-    syncPlanningData(bookDir, db, bookId)
-
-    // 推送最新快照到渲染进程（替代前端轮询）
+  // 自动导入新章节（带目录 mtime 缓存，避免每次全扫）
+  const chDir = join(bookDir, 'chapters')
+  if (existsSync(chDir)) {
     try {
-      const { ipcMain } = require('electron')
-      if (bookId && state.mainWindow && !state.mainWindow.isDestroyed()) {
-        state.mainWindow.webContents.send('runtime-update', {
-          type: 'sync',
-          timestamp: Date.now(),
-        })
+      const currentMtime = statSync(chDir).mtimeMs
+      if (chapterCache && chapterCache.mtime === currentMtime) {
+        // 目录未变更，跳过扫描
+      } else {
+        const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+        for (const file of files) {
+          const num = parseInt(file.replace('.md', ''), 10)
+          if (!isNaN(num)) {
+            const content = readFileSync(join(chDir, file), 'utf8')
+            const planned = num > 0 && num <= plannedChapterTitles.length ? plannedChapterTitles[num - 1] : ''
+            const fromContent = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || ''
+            const title = planned || fromContent || `第${num}章`
+            db.saveChapter(bookId, num, content, title)
+            if (planned && planned !== fromContent) {
+              log.debug('runtime-sync:chapters 使用预定标题', { num, planned, fromContent })
+            }
+          }
+        }
+        chapterCache = { files, mtime: currentMtime }
       }
-    } catch (e: any) { log.error('runtime-sync:push', e) }
-  }, 10000)
+    } catch (e: any) { log.error('runtime-sync:chapters', e) }
+  }
+
+  // 同步 progress.json → SQLite progress 表
+  if (bookId) {
+    try {
+      const progJson = readStoreJSON('meta/progress.json')
+      if (progJson) {
+        const completed = JSON.stringify(progJson.completed_chapters || [])
+        const wcMap = JSON.stringify(progJson.chapter_word_counts || {})
+        db.database.prepare(`INSERT OR REPLACE INTO progress 
+          (book_id, novel_name, phase, current_chapter, total_chapters, completed_chapters, 
+           total_word_count, chapter_word_counts, in_progress_chapter, flow, 
+           pending_rewrites, rewrite_reason, current_volume, current_arc, layered,
+           reopened_from_complete, strand_history, hook_history) 
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(
+            bookId,
+            progJson.novel_name || '',
+            progJson.phase || 'init',
+            progJson.current_chapter || 0,
+            progJson.total_chapters || 0,
+            completed,
+            progJson.total_word_count || 0,
+            wcMap,
+            progJson.in_progress_chapter || 0,
+            progJson.flow || 'writing',
+            JSON.stringify(progJson.pending_rewrites || []),
+            progJson.rewrite_reason || '',
+            progJson.current_volume || 0,
+            progJson.current_arc || 0,
+            progJson.layered ? 1 : 0,
+            progJson.reopened_from_complete ? 1 : 0,
+            JSON.stringify(progJson.strand_history || []),
+            JSON.stringify(progJson.hook_history || []),
+          )
+        // 书名自动更新
+        if (progJson.novel_name) {
+          const curBook = db.getBook(bookId)
+          if (curBook && curBook.name !== progJson.novel_name) {
+            db.updateBook(bookId, { name: progJson.novel_name })
+          }
+        }
+      }
+
+      // 规划完成检测
+      try {
+        const curPhase = progJson?.phase || ''
+        const isPlanningPhase = ['init', 'premise', 'outline'].includes(lastPhase)
+        const justEnteredWriting = curPhase === 'writing' && isPlanningPhase
+        if (justEnteredWriting && !pendingUserConfirm && state.ainovelProcess) {
+          pendingUserConfirm = true
+          log.info('runtime-sync:planning-complete 规划完成，暂停等待用户确认', { bookId })
+          try { state.ainovelProcess.kill('SIGINT') } catch {}
+          if (state.mainWindow && !state.mainWindow.isDestroyed()) {
+            state.mainWindow.webContents.send('planning-complete', { bookId })
+          }
+        }
+        lastPhase = curPhase || ''
+      } catch (e: any) { log.error('runtime-sync:phase-detect', e) }
+    } catch (e: any) { log.error('runtime-sync:progress', e) }
+  }
+
+  // 同步规划数据 → SQLite（大纲/角色/时间线/世界观/用户规则等）
+  syncPlanningData(bookDir, db, bookId)
+
+  // 推送最新快照到渲染进程
+  try {
+    if (bookId && state.mainWindow && !state.mainWindow.isDestroyed()) {
+      state.mainWindow.webContents.send('runtime-update', {
+        type: 'sync',
+        timestamp: Date.now(),
+      })
+    }
+  } catch (e: any) { log.error('runtime-sync:push', e) }
 }
 
 function stopRuntimeSync() {
   runtimeSyncActive = false
   if (snapshotTimer) { clearInterval(snapshotTimer); snapshotTimer = null }
+  // 清空文件缓存，确保下次启动时重新同步
+  planFileCache = {}
+  plannedChapterTitles = []
 }
 
 /**
