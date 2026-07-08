@@ -367,8 +367,8 @@ function register(ipcMain: Electron.IpcMain) {
       const row = getDB().getUserRules(bookId)
       if (row) return transform(row)
     } catch (e: any) { log.error('get-user-rules:sqlite', e) }
-    // JSON 回退
-    const json = readStoreJSONAt(dir, 'user_rules.json')
+    // JSON 回退（引擎写入 meta/user_rules.json）
+    const json = readStoreJSONAt(dir, 'meta/user_rules.json')
     if (json) {
       try { getDB().saveUserRules(bookId, json) } catch (e: any) { log.error('get-user-rules:sync', e) }
       return transform(json)

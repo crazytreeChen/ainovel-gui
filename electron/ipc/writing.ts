@@ -1081,9 +1081,9 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
       key: 'simulation_profile', path: join(bookDir, 'simulation_profile.json'),
       save: (data: any) => { if (data) db.saveSimulationProfile(bookId, data) },
     },
-    // 用户规则
+    // 用户规则（引擎写入 meta/user_rules.json）
     {
-      key: 'user_rules', path: join(bookDir, 'user_rules.json'),
+      key: 'user_rules', path: join(bookDir, 'meta', 'user_rules.json'),
       save: (data: any) => { if (data) db.saveUserRules(bookId, data) },
     },
   ]
