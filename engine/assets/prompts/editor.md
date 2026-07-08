@@ -34,6 +34,7 @@
 - 角色属性是否前后矛盾
 - 角色状态描述是否与 state_changes 记录一致
 - 注意角色别名，同一人不同称呼不要误判
+- **标题一致性**：检查 `chapter_plan.title` 是否与 `current_chapter_outline.title` 一致。如果不一致且 `chapter_plan.notes` 中无偏离理由，在 issues 中标记为 warning
 
 #### 维度二：人设一致性（character）
 - 角色行为是否符合性格设定和弧线
