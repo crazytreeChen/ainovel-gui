@@ -671,7 +671,12 @@ func (h *Host) Snapshot() UISnapshot {
 		snap.CompletedCount = len(progress.CompletedChapters)
 		snap.TotalWordCount = progress.TotalWordCount
 		snap.InProgressChapter = progress.InProgressChapter
-		snap.PendingRewrites = progress.PendingRewrites
+		// 将 PendingRewrite 转换为章节号列表（前端只需要章节号）
+		pendingChapters := make([]int, len(progress.PendingRewrites))
+		for i, pr := range progress.PendingRewrites {
+			pendingChapters[i] = pr.Chapter
+		}
+		snap.PendingRewrites = pendingChapters
 		snap.RewriteReason = progress.RewriteReason
 		snap.Layered = progress.Layered
 		if progress.CurrentVolume > 0 {

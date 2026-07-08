@@ -35,5 +35,8 @@ func LoadState(store *storepkg.Store) State {
 		}
 	}
 
+	// 加载需要立即审阅的章节
+	s.ImmediateReviewChapters = progress.ImmediateReviewChapters
+
 	return s
 }

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 	"time"
 
 	"github.com/voocel/agentcore/schema"
@@ -15,6 +14,16 @@ import (
 	"github.com/voocel/ainovel-cli/internal/rules"
 	"github.com/voocel/ainovel-cli/internal/store"
 )
+
+// isChapterInPendingRewrites 检查章节是否在待重写队列中。
+func isChapterInPendingRewrites(rewrites []domain.PendingRewrite, chapter int) bool {
+	for _, pr := range rewrites {
+		if pr.Chapter == chapter {
+			return true
+		}
+	}
+	return false
+}
 
 // CommitChapterTool 提交章节：加载正文 → 保存终稿 → 生成摘要 → 更新状态 → 更新进度。
 type CommitChapterTool struct {
@@ -121,7 +130,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 		}
 		// 打磨/重写路径：章节虽已完成，但仍在 pending_rewrites 中，允许覆盖并 drain 队列
 		progress, _ := t.store.Progress.Load()
-		if progress != nil && slices.Contains(progress.PendingRewrites, a.Chapter) {
+		if progress != nil && isChapterInPendingRewrites(progress.PendingRewrites, a.Chapter) {
 			return t.executeRewriteCommit(a.Chapter, a.Summary, a.Characters, a.KeyEvents,
 				a.HookType, a.DominantStrand, progress)
 		}
@@ -429,7 +438,9 @@ func (t *CommitChapterTool) executeRewriteCommit(
 	nextChapter := chapter + 1
 	flow := string(domain.FlowWriting)
 	if latest != nil {
-		remaining = append(remaining, latest.PendingRewrites...)
+		for _, pr := range latest.PendingRewrites {
+			remaining = append(remaining, pr.Chapter)
+		}
 		nextChapter = latest.NextChapter()
 		flow = string(latest.Flow)
 	}

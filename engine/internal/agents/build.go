@@ -468,7 +468,7 @@ func writerFallbackChapter(st *store.Store) int {
 		return 0
 	}
 	if len(progress.PendingRewrites) > 0 {
-		return progress.PendingRewrites[0]
+		return progress.PendingRewrites[0].Chapter
 	}
 	return progress.NextChapter()
 }

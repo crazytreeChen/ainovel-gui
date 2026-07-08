@@ -231,10 +231,20 @@ func (s *ProgressStore) Reopen(chapters []int, reason string) error {
 		if p.Phase != domain.PhaseComplete {
 			return fmt.Errorf("reopen 仅适用于已完结的书（当前 phase=%s）: %w", p.Phase, errs.ErrToolPrecondition)
 		}
-		normalized, err := normalizePendingRewrites(chapters, p.CompletedChapters)
+		// 将 []int 转换为 []domain.PendingRewrite
+		var rewrites []domain.PendingRewrite
+		for _, ch := range chapters {
+			rewrites = append(rewrites, domain.PendingRewrite{
+				Chapter:  ch,
+				Severity: "error", // reopen 时默认为 error 级别
+				Reason:   reason,
+			})
+		}
+		normalized, err := normalizePendingRewrites(rewrites, p.CompletedChapters)
 		if err != nil {
 			return err
 		}
+		sortPendingRewrites(normalized)
 		p.Phase = domain.PhaseWriting // 唯一合法回退，受上面 complete 前置约束保护
 		p.PendingRewrites = normalized
 		p.RewriteReason = reason
@@ -311,7 +321,8 @@ func (s *ProgressStore) SetFlow(flow domain.FlowState) error {
 
 // SetPendingRewrites 设置待重写章节队列和原因。
 // PendingRewrites 只允许包含已完成章节；未完成章节还没有终稿，不能进入重写/打磨队列。
-func (s *ProgressStore) SetPendingRewrites(chapters []int, reason string) error {
+// 队列按严重程度排序：critical > error > warning。
+func (s *ProgressStore) SetPendingRewrites(chapters []domain.PendingRewrite, reason string) error {
 	return s.io.WithWriteLock(func() error {
 		p, err := s.loadUnlocked()
 		if err != nil {
@@ -324,6 +335,7 @@ func (s *ProgressStore) SetPendingRewrites(chapters []int, reason string) error 
 		if err != nil {
 			return err
 		}
+		sortPendingRewrites(normalized)
 		p.PendingRewrites = normalized
 		p.RewriteReason = reason
 		return s.saveUnlocked(p)
@@ -331,7 +343,7 @@ func (s *ProgressStore) SetPendingRewrites(chapters []int, reason string) error 
 }
 
 // ValidatePendingRewrites 校验章节列表是否可进入返工队列，不修改状态。
-func (s *ProgressStore) ValidatePendingRewrites(chapters []int) error {
+func (s *ProgressStore) ValidatePendingRewrites(chapters []domain.PendingRewrite) error {
 	s.io.mu.RLock()
 	defer s.io.mu.RUnlock()
 
@@ -347,7 +359,7 @@ func (s *ProgressStore) ValidatePendingRewrites(chapters []int) error {
 	return err
 }
 
-// CompleteRewrite 从待重写队列中移除已完成的章节。
+// CompleteRewrite 从待重写队列中移除已完成的章节，并标记需要立即审阅。
 func (s *ProgressStore) CompleteRewrite(chapter int) error {
 	return s.io.WithWriteLock(func() error {
 		p, err := s.loadUnlocked()
@@ -357,13 +369,15 @@ func (s *ProgressStore) CompleteRewrite(chapter int) error {
 		if p == nil {
 			return nil
 		}
-		var remaining []int
-		for _, ch := range p.PendingRewrites {
-			if ch != chapter {
-				remaining = append(remaining, ch)
+		var remaining []domain.PendingRewrite
+		for _, pr := range p.PendingRewrites {
+			if pr.Chapter != chapter {
+				remaining = append(remaining, pr)
 			}
 		}
 		p.PendingRewrites = remaining
+		// 标记需要立即审阅
+		p.ImmediateReviewChapters = append(p.ImmediateReviewChapters, chapter)
 		if len(remaining) == 0 {
 			if err := domain.ValidateFlowTransition(p.Flow, domain.FlowWriting); err != nil {
 				return err
@@ -373,6 +387,54 @@ func (s *ProgressStore) CompleteRewrite(chapter int) error {
 		}
 		return s.saveUnlocked(p)
 	})
+}
+
+// PopImmediateReviewChapter 弹出一个需要立即审阅的章节。
+func (s *ProgressStore) PopImmediateReviewChapter() (int, error) {
+	var chapter int
+	err := s.io.WithWriteLock(func() error {
+		p, err := s.loadUnlocked()
+		if err != nil {
+			return err
+		}
+		if p == nil || len(p.ImmediateReviewChapters) == 0 {
+			return nil
+		}
+		chapter = p.ImmediateReviewChapters[0]
+		p.ImmediateReviewChapters = p.ImmediateReviewChapters[1:]
+		return s.saveUnlocked(p)
+	})
+	return chapter, err
+}
+
+// IncrementReviewRepairCycle 增加章节的审阅-修复循环次数。
+func (s *ProgressStore) IncrementReviewRepairCycle(chapter int) (int, error) {
+	var count int
+	err := s.io.WithWriteLock(func() error {
+		p, err := s.loadUnlocked()
+		if err != nil {
+			return err
+		}
+		if p == nil {
+			return nil
+		}
+		if p.ReviewRepairCycles == nil {
+			p.ReviewRepairCycles = make(map[int]int)
+		}
+		p.ReviewRepairCycles[chapter]++
+		count = p.ReviewRepairCycles[chapter]
+		return s.saveUnlocked(p)
+	})
+	return count, err
+}
+
+// GetReviewRepairCycle 获取章节的审阅-修复循环次数。
+func (s *ProgressStore) GetReviewRepairCycle(chapter int) int {
+	p, err := s.Load()
+	if err != nil || p == nil || p.ReviewRepairCycles == nil {
+		return 0
+	}
+	return p.ReviewRepairCycles[chapter]
 }
 
 // ClearPendingRewrites 强制清空重写队列。
@@ -411,18 +473,40 @@ func (s *ProgressStore) ValidateChapterWork(chapter int) error {
 	if _, err := normalizePendingRewrites(p.PendingRewrites, p.CompletedChapters); err != nil {
 		return err
 	}
-	if slices.Contains(p.PendingRewrites, chapter) {
-		return nil
+	for _, pr := range p.PendingRewrites {
+		if pr.Chapter == chapter {
+			return nil
+		}
 	}
 
 	verb := "重写"
 	if p.Flow == domain.FlowPolishing {
 		verb = "打磨"
 	}
-	return fmt.Errorf("第 %d 章不在待%s队列中，当前队列：%v。请先处理队列内章节，再动新章节: %w", chapter, verb, p.PendingRewrites, errs.ErrToolConflict)
+	chapters := make([]int, len(p.PendingRewrites))
+	for i, pr := range p.PendingRewrites {
+		chapters[i] = pr.Chapter
+	}
+	return fmt.Errorf("第 %d 章不在待%s队列中，当前队列：%v。请先处理队列内章节，再动新章节: %w", chapter, verb, chapters, errs.ErrToolConflict)
 }
 
-func normalizePendingRewrites(chapters, completed []int) ([]int, error) {
+// sortPendingRewrites 按严重程度排序：critical > error > warning。
+func sortPendingRewrites(rewrites []domain.PendingRewrite) {
+	severityOrder := map[string]int{
+		"critical": 0,
+		"error":    1,
+		"warning":  2,
+	}
+	slices.SortFunc(rewrites, func(a, b domain.PendingRewrite) int {
+		sa, sb := severityOrder[a.Severity], severityOrder[b.Severity]
+		if sa != sb {
+			return sa - sb
+		}
+		return a.Chapter - b.Chapter
+	})
+}
+
+func normalizePendingRewrites(chapters []domain.PendingRewrite, completed []int) ([]domain.PendingRewrite, error) {
 	if len(chapters) == 0 {
 		return nil, nil
 	}
@@ -432,22 +516,26 @@ func normalizePendingRewrites(chapters, completed []int) ([]int, error) {
 	}
 
 	seen := make(map[int]struct{}, len(chapters))
-	normalized := make([]int, 0, len(chapters))
+	normalized := make([]domain.PendingRewrite, 0, len(chapters))
 	var invalid []int
-	for _, ch := range chapters {
-		if ch <= 0 {
-			invalid = append(invalid, ch)
+	for _, pr := range chapters {
+		if pr.Chapter <= 0 {
+			invalid = append(invalid, pr.Chapter)
 			continue
 		}
-		if _, ok := completedSet[ch]; !ok {
-			invalid = append(invalid, ch)
+		if _, ok := completedSet[pr.Chapter]; !ok {
+			invalid = append(invalid, pr.Chapter)
 			continue
 		}
-		if _, ok := seen[ch]; ok {
+		if _, ok := seen[pr.Chapter]; ok {
 			continue
 		}
-		seen[ch] = struct{}{}
-		normalized = append(normalized, ch)
+		seen[pr.Chapter] = struct{}{}
+		// 确保 severity 有默认值
+		if pr.Severity == "" {
+			pr.Severity = "warning"
+		}
+		normalized = append(normalized, pr)
 	}
 	if len(invalid) > 0 {
 		return nil, fmt.Errorf("pending_rewrites 只能包含已完成章节，非法章节：%v，completed_chapters=%v: %w", invalid, completed, errs.ErrToolPrecondition)

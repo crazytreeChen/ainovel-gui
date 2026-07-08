@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 	"unicode/utf8"
 
 	"github.com/voocel/agentcore/schema"
@@ -75,7 +74,7 @@ func (t *DraftChapterTool) Execute(_ context.Context, args json.RawMessage) (jso
 	if t.store.Progress.IsChapterCompleted(a.Chapter) {
 		// 打磨/重写路径：章节虽已完成，但仍在 pending_rewrites 中，允许覆盖草稿
 		progress, _ := t.store.Progress.Load()
-		inRewriteQueue := progress != nil && slices.Contains(progress.PendingRewrites, a.Chapter)
+		inRewriteQueue := progress != nil && isChapterInPendingRewrites(progress.PendingRewrites, a.Chapter)
 		if !inRewriteQueue {
 			return json.Marshal(map[string]any{
 				"chapter":   a.Chapter,

@@ -33,6 +33,13 @@ const (
 	PlanningTierLong  PlanningTier = "long"
 )
 
+// PendingRewrite 待重写/打磨的章节信息。
+type PendingRewrite struct {
+	Chapter  int    `json:"chapter"`
+	Severity string `json:"severity"` // critical / error / warning
+	Reason   string `json:"reason,omitempty"`
+}
+
 // Progress 进度追踪，持久化到 meta/progress.json。
 type Progress struct {
 	NovelName         string      `json:"novel_name"`
@@ -45,10 +52,14 @@ type Progress struct {
 	InProgressChapter int         `json:"in_progress_chapter,omitempty"` // 正在写作的章节（场景级恢复）
 	CompletedScenes   []int       `json:"completed_scenes,omitempty"`    // 当前章节已完成的场景编号
 	Flow              FlowState   `json:"flow,omitempty"`                // 当前流程
-	PendingRewrites   []int       `json:"pending_rewrites,omitempty"`    // 待重写章节队列
+	PendingRewrites   []PendingRewrite `json:"pending_rewrites,omitempty"` // 待重写章节队列（按严重程度排序）
 	RewriteReason     string      `json:"rewrite_reason,omitempty"`      // 重写原因
 	StrandHistory     []string    `json:"strand_history,omitempty"`      // 按章节顺序记录 dominant_strand
 	HookHistory       []string    `json:"hook_history,omitempty"`        // 按章节顺序记录 hook_type
+	// 重写后自动审阅
+	ImmediateReviewChapters []int `json:"immediate_review_chapters,omitempty"` // 需要立即审阅的章节
+	// 审阅-修复循环追踪
+	ReviewRepairCycles map[int]int `json:"review_repair_cycles,omitempty"` // 每章的审阅-修复循环次数
 	// 长篇分层追踪（仅长篇模式使用，短篇/中篇为零值）
 	CurrentVolume int  `json:"current_volume,omitempty"`
 	CurrentArc    int  `json:"current_arc,omitempty"`

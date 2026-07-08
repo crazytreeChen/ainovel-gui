@@ -112,7 +112,11 @@ func (t *ContextTool) buildProgressStatus(result map[string]any) {
 		status["in_progress_chapter"] = progress.InProgressChapter
 	}
 	if len(progress.PendingRewrites) > 0 {
-		status["pending_rewrites"] = progress.PendingRewrites
+		pendingChapters := make([]int, len(progress.PendingRewrites))
+		for i, pr := range progress.PendingRewrites {
+			pendingChapters[i] = pr.Chapter
+		}
+		status["pending_rewrites"] = pendingChapters
 		status["rewrite_reason"] = progress.RewriteReason
 	}
 	if progress.Layered {
@@ -245,7 +249,7 @@ func (t *ContextTool) prepareChapterContext(chapter int, envelope *chapterContex
 	state.chapterPlan = chapterPlan
 
 	// 是否正在重写本章：决定 novel_context 是否补"重写专用"事实。
-	isRewrite := progress != nil && slices.Contains(progress.PendingRewrites, chapter)
+	isRewrite := progress != nil && isChapterInPendingRewrites(progress.PendingRewrites, chapter)
 
 	// 暴露 draft 是否已存在的事实：让 writer 被重派时能自行判断跳过重写还是覆盖。
 	// 只暴露 exists + word_count，不注入正文（正文让 writer 按需用 read_chapter 拉）。

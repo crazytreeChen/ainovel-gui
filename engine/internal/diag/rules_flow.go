@@ -19,15 +19,19 @@ func InvalidPendingRewrites(snap *Snapshot) []Finding {
 	slices.Sort(completed)
 
 	var invalid []int
-	for _, ch := range p.PendingRewrites {
-		if ch <= 0 || !slices.Contains(completed, ch) {
-			invalid = append(invalid, ch)
+	for _, pr := range p.PendingRewrites {
+		if pr.Chapter <= 0 || !slices.Contains(completed, pr.Chapter) {
+			invalid = append(invalid, pr.Chapter)
 		}
 	}
 	if len(invalid) == 0 {
 		return nil
 	}
 	slices.Sort(invalid)
+	pendingChapters := make([]int, len(p.PendingRewrites))
+	for i, pr := range p.PendingRewrites {
+		pendingChapters[i] = pr.Chapter
+	}
 	return []Finding{{
 		Rule:       "InvalidPendingRewrites",
 		Category:   CatFlow,
@@ -36,7 +40,7 @@ func InvalidPendingRewrites(snap *Snapshot) []Finding {
 		AutoLevel:  AutoSuggest,
 		Target:     "meta/progress.json",
 		Title:      fmt.Sprintf("返工队列包含未完成章节: [%s]", intsToStr(invalid)),
-		Evidence:   fmt.Sprintf("pending_rewrites=[%s], completed_chapters=[%s], flow=%s", intsToStr(p.PendingRewrites), intsToStr(completed), p.Flow),
+		Evidence:   fmt.Sprintf("pending_rewrites=[%s], completed_chapters=[%s], flow=%s", intsToStr(pendingChapters), intsToStr(completed), p.Flow),
 		Suggestion: "这是状态不变量损坏。请停止运行后编辑 meta/progress.json，移除 pending_rewrites 中未完成章节；若队列为空，将 flow 改为 writing 并清空 rewrite_reason。",
 	}}
 }
@@ -53,7 +57,11 @@ func RewritePendingPressure(snap *Snapshot) []Finding {
 	if p.Flow != domain.FlowRewriting && p.Flow != domain.FlowPolishing {
 		return nil
 	}
-	chapters := intsToStr(p.PendingRewrites)
+	pendingChapters := make([]int, len(p.PendingRewrites))
+	for i, pr := range p.PendingRewrites {
+		pendingChapters[i] = pr.Chapter
+	}
+	chapters := intsToStr(pendingChapters)
 	return []Finding{{
 		Rule:       "RewritePendingPressure",
 		Category:   CatFlow,

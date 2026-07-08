@@ -42,23 +42,26 @@ type State struct {
 
 	// 基础设定缺项（规划阶段的补齐信号）。
 	FoundationMissing []string
+
+	// 重写后需要立即审阅的章节
+	ImmediateReviewChapters []int
 }
 
 // Route 根据事实返回下一步指令；返回 nil 表示让 Coordinator LLM 自主裁定。
 //
 // 决策优先级（互斥，自上而下匹配第一个）：
-//  1. Phase=Complete        → nil（LLM 输出总结）
-//  2. Phase!=Writing        → nil（LLM 裁定规划师选型 / 规划补齐）
-//  3. PendingRewrites 非空  → writer 按队列重写/打磨
-//  4. Flow=Reviewing        → nil（editor 刚保存 review，verdict 分叉由工具层处理）
-//  5. Flow=Steering         → nil（用户干预处理中）
-//  6. 弧末评审缺失           → editor(arc review)
-//  7. 弧末评审有但弧摘要缺失  → editor(arc summary)
-//  8. 卷末弧摘要有但卷摘要缺失 → editor(volume summary)
-//  9. 下一弧是骨架           → architect_long(expand_arc)
-//
-// 10. 卷末需决策下一卷       → architect_long(append_volume / complete_book)
-// 11. 其它                  → writer(写 next_chapter)
+//  1. Phase=Complete            → nil（LLM 输出总结）
+//  2. Phase!=Writing            → nil（LLM 裁定规划师选型 / 规划补齐）
+//  3. PendingRewrites 非空      → writer 按队列重写/打磨（按严重程度排序）
+//  4. ImmediateReviewChapters 非空 → editor 立即审阅（重写后自动触发）
+//  5. Flow=Reviewing            → nil（editor 刚保存 review，verdict 分叉由工具层处理）
+//  6. Flow=Steering             → nil（用户干预处理中）
+//  7. 弧末评审缺失              → editor(arc review)
+//  8. 弧末评审有但弧摘要缺失     → editor(arc summary)
+//  9. 卷末弧摘要有但卷摘要缺失   → editor(volume summary)
+// 10. 下一弧是骨架              → architect_long(expand_arc)
+// 11. 卷末需决策下一卷           → architect_long(append_volume / complete_book)
+// 12. 其它                     → writer(写 next_chapter)
 func Route(s State) *Instruction {
 	p := s.Progress
 	if p == nil {
@@ -75,9 +78,9 @@ func Route(s State) *Instruction {
 		return nil
 	}
 
-	// 3. 重写/打磨队列优先（事实已在工具层落盘，Router 只照单派发）
+	// 3. 重写/打磨队列优先（按严重程度排序，事实已在工具层落盘，Router 只照单派发）
 	if len(p.PendingRewrites) > 0 {
-		ch := p.PendingRewrites[0]
+		ch := p.PendingRewrites[0].Chapter // 已按 severity 排序，取第一个
 		verb := "重写"
 		if p.Flow == domain.FlowPolishing {
 			verb = "打磨"
@@ -85,12 +88,22 @@ func Route(s State) *Instruction {
 		return &Instruction{
 			Agent:   "writer",
 			Task:    fmt.Sprintf("%s第 %d 章", verb, ch),
-			Reason:  fmt.Sprintf("PendingRewrites 队列剩余 %d 章", len(p.PendingRewrites)),
+			Reason:  fmt.Sprintf("PendingRewrites 队列剩余 %d 章，当前处理最严重的问题", len(p.PendingRewrites)),
 			Chapter: ch,
 		}
 	}
 
-	// 4. 审阅中：save_review 刚落盘，verdict 升级/降级由工具层处理，路由不介入
+	// 4. 重写后立即审阅
+	if len(s.ImmediateReviewChapters) > 0 {
+		ch := s.ImmediateReviewChapters[0]
+		return &Instruction{
+			Agent:  "editor",
+			Task:   fmt.Sprintf("审阅第 %d 章（重写后自动触发）", ch),
+			Reason: "重写完成后自动触发审阅",
+		}
+	}
+
+	// 5. 审阅中：save_review 刚落盘，verdict 升级/降级由工具层处理，路由不介入
 	if p.Flow == domain.FlowReviewing {
 		return nil
 	}

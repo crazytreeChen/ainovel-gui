@@ -108,13 +108,52 @@ func (t *SaveReviewTool) Execute(_ context.Context, args json.RawMessage) (json.
 		if len(affected) == 0 && r.Chapter > 0 {
 			affected = []int{r.Chapter}
 		}
-		if err := t.store.Progress.ValidatePendingRewrites(affected); err != nil {
+		// 构建 PendingRewrite 列表（按严重程度排序）
+		var rewrites []domain.PendingRewrite
+		for _, ch := range affected {
+			severity := "warning"
+			if finalVerdict == "rewrite" {
+				severity = "error"
+			}
+			// 从 issues 中提取最严重的 severity
+			for _, issue := range r.Issues {
+				if issue.Severity == "critical" {
+					severity = "critical"
+					break
+				}
+				if issue.Severity == "error" && severity != "critical" {
+					severity = "error"
+				}
+			}
+			rewrites = append(rewrites, domain.PendingRewrite{
+				Chapter:  ch,
+				Severity: severity,
+				Reason:   r.Summary,
+			})
+		}
+		if err := t.store.Progress.ValidatePendingRewrites(rewrites); err != nil {
 			return nil, fmt.Errorf("validate pending rewrites: %w", err)
 		}
 	}
 
 	if err := t.store.World.SaveReview(r); err != nil {
 		return nil, fmt.Errorf("save review: %w", err)
+	}
+
+	// 检查审阅-修复循环次数限制
+	const maxReviewRepairCycles = 3
+	cycle := t.store.Progress.GetReviewRepairCycle(r.Chapter)
+	if cycle >= maxReviewRepairCycles {
+		// 强制 accept，标记需要人工干预
+		finalVerdict = "accept"
+		escalationReason = fmt.Sprintf("已达最大审阅-修复循环次数 (%d)，强制 accept", maxReviewRepairCycles)
+		r.Issues = append(r.Issues, domain.ConsistencyIssue{
+			Type:        "system",
+			Severity:    "warning",
+			Description: fmt.Sprintf("该章节已达到最大审阅-修复循环次数 (%d)，需要人工干预", maxReviewRepairCycles),
+			Evidence:    fmt.Sprintf("review_repair_cycles=%d", cycle),
+			Suggestion:  "请人工审阅并决定是否需要进一步修改",
+		})
 	}
 
 	// 根据最终 verdict 更新 Progress。
@@ -126,12 +165,36 @@ func (t *SaveReviewTool) Execute(_ context.Context, args json.RawMessage) (json.
 		if finalVerdict == "polish" {
 			flow = domain.FlowPolishing
 		}
-		if err := t.store.Progress.SetPendingRewrites(affected, r.Summary); err != nil {
+		// 构建 PendingRewrite 列表
+		var rewrites []domain.PendingRewrite
+		for _, ch := range affected {
+			severity := "warning"
+			if finalVerdict == "rewrite" {
+				severity = "error"
+			}
+			for _, issue := range r.Issues {
+				if issue.Severity == "critical" {
+					severity = "critical"
+					break
+				}
+				if issue.Severity == "error" && severity != "critical" {
+					severity = "error"
+				}
+			}
+			rewrites = append(rewrites, domain.PendingRewrite{
+				Chapter:  ch,
+				Severity: severity,
+				Reason:   r.Summary,
+			})
+		}
+		if err := t.store.Progress.SetPendingRewrites(rewrites, r.Summary); err != nil {
 			return nil, fmt.Errorf("set pending rewrites: %w", err)
 		}
 		if err := t.store.Progress.SetFlow(flow); err != nil {
 			return nil, fmt.Errorf("set flow %s: %w", flow, err)
 		}
+		// 增加审阅-修复循环次数
+		t.store.Progress.IncrementReviewRepairCycle(r.Chapter)
 	} else {
 		if err := t.store.Progress.SetFlow(domain.FlowWriting); err != nil {
 			return nil, fmt.Errorf("set flow writing: %w", err)
