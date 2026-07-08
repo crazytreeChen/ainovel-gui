@@ -87,9 +87,34 @@ type Stats struct {
 	ForeshadowStale   int
 }
 
+// Metrics 是结构化的诊断指标，便于 GUI 展示和自动化处理。
+type Metrics struct {
+	// 进度指标
+	ProgressPercent float64 `json:"progress_percent"` // 完成百分比
+	DaysSinceStart  int     `json:"days_since_start"`  // 创作天数
+	AvgChaptersPerDay float64 `json:"avg_chapters_per_day"` // 日均章节
+	
+	// 质量指标
+	CriticalIssues int     `json:"critical_issues"` // 严重问题数
+	ErrorIssues    int     `json:"error_issues"`    // 错误问题数
+	WarningIssues  int     `json:"warning_issues"`  // 警告问题数
+	QualityScore   float64 `json:"quality_score"`   // 综合质量分（0-100）
+	
+	// 效率指标
+	TotalAPICalls  int     `json:"total_api_calls"`  // API 调用总数
+	TotalCostUSD   float64 `json:"total_cost_usd"`   // 总花费（美元）
+	AvgCostPerChapter float64 `json:"avg_cost_per_chapter"` // 章均花费
+	
+	// 一致性指标
+	TitleMismatches    int `json:"title_mismatches"`    // 标题不一致数
+	CharacterIssues    int `json:"character_issues"`    // 角色一致性问题数
+	TimelineIssues     int `json:"timeline_issues"`     // 时间线问题数
+}
+
 // Report 是一次诊断运行的完整输出。
 type Report struct {
 	Stats    Stats
+	Metrics  Metrics
 	Findings []Finding
 	Actions  []Action
 }
