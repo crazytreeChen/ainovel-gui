@@ -56,7 +56,7 @@ function run(cmd, opts = {}) {
 }
 
 function buildCliBinary() {
-  log('cli', 'Building ainovel-cli from submodule...')
+  log('cli', 'Building ainovel-cli from engine...')
   try {
     execSync('node scripts/build-cli.cjs', { cwd: ROOT, stdio: 'inherit' })
   } catch {

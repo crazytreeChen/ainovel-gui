@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * ainovel-cli 子模块编译脚本
+ * ainovel-cli 引擎编译脚本
  * 
- * 从 vendor/ainovel-cli/ 编译 Go 二进制到 build/ainovel-cli/bin/
+ * 从 engine/ 编译 Go 二进制到 build/ainovel-cli/bin/
  * 编译完成后尝试 UPX 压缩（需安装 upx），可将 11MB → ~3MB
  * 
  * 用法:
@@ -18,7 +18,7 @@ const { join } = require('path')
 const os = require('os')
 
 const ROOT = join(__dirname, '..')
-const SUBMODULE_DIR = join(ROOT, 'vendor', 'ainovel-cli')
+const ENGINE_DIR = join(ROOT, 'engine')
 const OUTPUT_DIR = join(ROOT, 'build', 'ainovel-cli', 'bin')
 const OUTPUT_BIN = os.platform() === 'win32'
   ? join(OUTPUT_DIR, 'ainovel-cli.exe')
@@ -48,10 +48,9 @@ function needsBuild() {
 }
 
 function build() {
-  if (!existsSync(SUBMODULE_DIR)) {
-    warn('Submodule not found at ' + SUBMODULE_DIR)
-    warn('Run: git submodule init && git submodule update')
-    warn('Or: git clone --recursive ...')
+  if (!existsSync(ENGINE_DIR)) {
+    warn('Engine not found at ' + ENGINE_DIR)
+    warn('Run: npm run build:cli to compile the engine')
     return false
   }
 
@@ -71,20 +70,20 @@ function build() {
   mkdirSync(OUTPUT_DIR, { recursive: true })
 
   // 编译
-  const srcDir = join(SUBMODULE_DIR, 'cmd', 'ainovel-cli')
+  const srcDir = join(ENGINE_DIR, 'cmd', 'ainovel-cli')
   if (!existsSync(srcDir)) {
     error('Source not found: ' + srcDir)
     return false
   }
 
-  log('Building ainovel-cli from submodule...')
+  log('Building ainovel-cli from engine...')
 
   const outputFlag = `-o ${JSON.stringify(OUTPUT_BIN)}`
 
   try {
     execSync(
       `${goBinary} build -ldflags="-s -w" ${outputFlag} ./cmd/ainovel-cli/`,
-      { cwd: SUBMODULE_DIR, stdio: 'inherit', timeout: 120000 }
+      { cwd: ENGINE_DIR, stdio: 'inherit', timeout: 120000 }
     )
 
     // 设置执行权限（仅非 Windows）
@@ -162,7 +161,7 @@ function main() {
   if (!needsBuild()) return
 
   console.log(`${GREEN}═══════════════════════════════════════${RESET}`)
-  console.log(`${GREEN}   ainovel-cli Submodule Build${RESET}`)
+  console.log(`${GREEN}   ainovel-cli Engine Build${RESET}`)
   console.log(`${GREEN}   Platform: ${os.platform()} ${os.arch()}${RESET}`)
   console.log(`${GREEN}═══════════════════════════════════════${RESET}`)
 

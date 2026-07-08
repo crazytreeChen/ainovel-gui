@@ -1,3 +1,0 @@
-[submodule "vendor/ainovel-cli"]
-	path = vendor/ainovel-cli
-	url = https://github.com/crazytreeChen/ainovel-cli.git
