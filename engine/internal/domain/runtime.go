@@ -1,6 +1,9 @@
 package domain
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Phase 表示小说创作阶段。
 type Phase string
@@ -68,6 +71,46 @@ type Progress struct {
 	// 不增减结构，故排空后应按"结构完整即重新完结"放行（避免终卷末伏笔被返工扰动后卡在
 	// writing → 越界续写死循环）；正向写作不置此标记，完结判定保持线索收束的保守语义。
 	ReopenedFromComplete bool `json:"reopened_from_complete,omitempty"`
+}
+
+// UnmarshalJSON 自定义反序列化，兼容旧格式（pending_rewrites 为 []int）和新格式（[]PendingRewrite）。
+func (p *Progress) UnmarshalJSON(data []byte) error {
+	// 使用别名避免无限递归
+	type Alias Progress
+	aux := &struct {
+		PendingRewritesRaw json.RawMessage `json:"pending_rewrites"`
+		*Alias
+	}{
+		Alias: (*Alias)(p),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	// 解析 pending_rewrites，兼容旧格式
+	if len(aux.PendingRewritesRaw) > 0 && aux.PendingRewritesRaw[0] == '[' {
+		// 尝试解析为新格式 []PendingRewrite
+		var newFormat []PendingRewrite
+		if err := json.Unmarshal(aux.PendingRewritesRaw, &newFormat); err == nil && len(newFormat) > 0 && newFormat[0].Chapter > 0 {
+			p.PendingRewrites = newFormat
+			return nil
+		}
+
+		// 尝试解析为旧格式 []int
+		var oldFormat []int
+		if err := json.Unmarshal(aux.PendingRewritesRaw, &oldFormat); err == nil {
+			p.PendingRewrites = make([]PendingRewrite, len(oldFormat))
+			for i, ch := range oldFormat {
+				p.PendingRewrites[i] = PendingRewrite{
+					Chapter:  ch,
+					Severity: "error", // 旧格式默认为 error 级别
+				}
+			}
+			return nil
+		}
+	}
+
+	return nil
 }
 
 // IsResumable 判断是否可以从断点恢复。
