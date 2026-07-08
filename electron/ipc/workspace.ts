@@ -75,6 +75,19 @@ function hashContent(crypto: any, content: string) {
   return crypto.createHash('sha256').update(content, 'utf8').digest('hex')
 }
 
+/** 获取书籍章节目录路径，兼容旧版 output/novel/chapters 结构 */
+function getChaptersDir(bookId: string): string | null {
+  const dir = getBookDirById(bookId)
+  if (!dir) return null
+  const { existsSync } = require('fs')
+  const { join } = require('path')
+  const primary = join(dir, 'chapters')
+  if (existsSync(primary)) return primary
+  const fallback = join(dir, 'output', 'novel', 'chapters')
+  if (existsSync(fallback)) return fallback
+  return null
+}
+
 function register(ipcMain: Electron.IpcMain) {
   // ── 大纲 ──
   ipcMain.handle('get-book-outline', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
@@ -150,8 +163,8 @@ function register(ipcMain: Electron.IpcMain) {
       const dbCh = getDB().listChapters(id)
       if (dbCh?.length) return dbCh.map((c: any) => ({ num: c.num, title: c.title || `第${c.num}章`, wordCount: c.word_count || 0, status: c.status || 'completed' }))
     } catch (e: any) { log.error('get-book-chapters:sqlite', e) }
-    const chDir = join(dir, 'chapters')
-    if (!existsSync(chDir)) return []
+    const chDir = getChaptersDir(id)
+    if (!chDir) return []
     return readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort().map((file: string) => {
       const num = parseInt(file.replace('.md', ''), 10)
       if (isNaN(num)) return null
@@ -575,10 +588,8 @@ function register(ipcMain: Electron.IpcMain) {
   })
 
   function collectTitleCleanPlan(bookId: string) {
-    const dir = getBookDirById(bookId)
-    if (!dir) return { changes: [], total: 0, error: 'book dir not found' }
-    const chDir = join(dir, 'chapters')
-    if (!existsSync(chDir)) return { changes: [], total: 0, error: 'chapters dir not found' }
+    const chDir = getChaptersDir(bookId)
+    if (!chDir) return { changes: [], total: 0, error: 'chapters dir not found' }
     const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
     const changes: any[] = []
     for (const file of files) {
@@ -603,8 +614,8 @@ function register(ipcMain: Electron.IpcMain) {
     const dir = getBookDirById(bookId)
     if (!dir) return { cleaned: 0, total: 0, error: 'book dir not found' }
     const db = getDB()
-    const chDir = join(dir, 'chapters')
-    if (!existsSync(chDir)) return { cleaned: 0, total: 0, error: 'chapters dir not found' }
+    const chDir = getChaptersDir(bookId)
+    if (!chDir) return { cleaned: 0, total: 0, error: 'chapters dir not found' }
     const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
     let cleaned = 0
     for (const file of files) {
@@ -653,8 +664,12 @@ function register(ipcMain: Electron.IpcMain) {
     const dir = getBookDirById(bookId)
     if (!dir) return { success: false, error: '未找到书籍目录' }
     const db = getDB()
-    const chDir = join(dir, 'chapters')
-    if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
+    let chDir = join(dir, 'chapters')
+    if (!existsSync(chDir)) {
+      // 兼容旧目录结构：CLI 输出在 output/novel/chapters/
+      chDir = join(dir, 'output', 'novel', 'chapters')
+      if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
+    }
 
     // 重置取消标记
     state.auditCanceled = false
@@ -715,7 +730,12 @@ function register(ipcMain: Electron.IpcMain) {
     }
 
     const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
-    const chapterNums = files.map((f: string) => parseInt(f.replace('.md', ''), 10)).filter((n: number) => !isNaN(n)).sort((a: number, b: number) => a - b)
+    const fileByNum = new Map<number, string>()
+    for (const f of files) {
+      const n = parseInt(f.replace('.md', ''), 10)
+      if (!isNaN(n) && !fileByNum.has(n)) fileByNum.set(n, f)
+    }
+    const chapterNums = Array.from(fileByNum.keys()).sort((a: number, b: number) => a - b)
     const rangeStart = startChapter > 0 ? startChapter : chapterNums[0] || 1
     const rangeEnd = endChapter > 0 ? endChapter : chapterNums[chapterNums.length - 1] || 9999
     const filteredNums = chapterNums.filter((n: number) => n >= rangeStart && n <= rangeEnd)
@@ -756,7 +776,7 @@ function register(ipcMain: Electron.IpcMain) {
         }
       } catch (e: any) { /* window gone, ignore */ }
 
-      const file = String(num).padStart(2, '0') + '.md'
+      const file = fileByNum.get(num) || `${num}.md`
       const filePath = join(chDir, file)
       const fullContent = readFileSync(filePath, 'utf8')
       const lines = fullContent.split('\n')
@@ -824,7 +844,7 @@ function register(ipcMain: Electron.IpcMain) {
       // 前一章末尾（衔接检查）
       let prevChapterEnding = ''
       if (num > 1) {
-        const prevFile = files.find((f: string) => f.startsWith(String(num - 1).padStart(2, '0') + '.md'))
+        const prevFile = fileByNum.get(num - 1)
         if (prevFile) {
           const prevContent = readFileSync(join(chDir, prevFile), 'utf8')
           const prevLines = prevContent.trim().split('\n')
@@ -1068,11 +1088,16 @@ ${reviewContent}
 
   // ── 应用审查修复（不重新调用 LLM，直接从已保存的审查结果中读取并执行）──
   ipcMain.handle('batch-apply-fixes', async (_e: Electron.IpcMainInvokeEvent, bookId: string, chapters?: number[]) => {
-    const dir = getBookDirById(bookId)
-    if (!dir) return { success: false, error: '未找到书籍目录' }
     const db = getDB()
-    const chDir = join(dir, 'chapters')
-    if (!existsSync(chDir)) return { success: false, error: '未找到章节目录' }
+    const chDir = getChaptersDir(bookId)
+    if (!chDir) return { success: false, error: '未找到章节目录' }
+
+    const chFiles = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
+    const chFileByNum = new Map<number, string>()
+    for (const f of chFiles) {
+      const n = parseInt(f.replace('.md', ''), 10)
+      if (!isNaN(n) && !chFileByNum.has(n)) chFileByNum.set(n, f)
+    }
 
     const selectedChapters = new Set((chapters || []).filter((num: number) => Number.isInteger(num) && num > 0))
     const audits = (db.getAuditedChapters(bookId) || [])
@@ -1102,7 +1127,7 @@ ${reviewContent}
         continue
       }
 
-      const file = String(num).padStart(2, '0') + '.md'
+      const file = chFileByNum.get(num) || `${num}.md`
       const filePath = join(chDir, file)
       if (!existsSync(filePath)) {
         skip(num, 'missing_file', '章节文件不存在')
