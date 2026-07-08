@@ -5,7 +5,7 @@ import type { ThemeMode } from '@/stores/useAppStore'
 import BookList from '@/pages/BookList'
 import Workspace from '@/pages/Workspace'
 import NewBook from '@/pages/NewBook'
-import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, SettingsPage, ModelsPage, SimulationPage, UserRulesPage, WorldRulesPage, SummaryPage, BookIntroPage, DashboardPage } from '@/pages'
+import { OutlinePage, ChapterPage, CharactersPage, TimelinePage, ReviewsPage, SettingsPage, ModelsPage, SimulationPage, UserRulesPage, WorldRulesPage, SummaryPage, BookIntroPage, DashboardPage, ProgressDashboard } from '@/pages'
 import ToastContainer from './Toast'
 import ConfirmModalHost from './ConfirmModal'
 import ErrorBoundary from './ErrorBoundary'
@@ -93,6 +93,7 @@ function AppRoutes() {
       <Route path="/books/:id/summaries" element={<SummaryPage />} />
       <Route path="/books/:id/intro" element={<BookIntroPage />} />
       <Route path="/books/:id/dashboard" element={<DashboardPage />} />
+      <Route path="/books/:id/progress" element={<ProgressDashboard />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/settings/models" element={<ModelsPage />} />
     </Routes>
