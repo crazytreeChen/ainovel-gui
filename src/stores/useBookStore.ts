@@ -60,6 +60,7 @@ export interface BookState {
   refreshSnapshot: () => Promise<void>
   refreshEvents: () => Promise<void>
   refreshChapters: () => Promise<void>
+  clearEvents: () => void
   setChapterContent: (content: string) => void
 }
 
@@ -95,4 +96,6 @@ export const useBookStore = create<BookState>((set) => ({
   },
 
   setChapterContent: (chapterContent) => set({ chapterContent }),
+
+  clearEvents: () => set({ events: [] }),
 }))

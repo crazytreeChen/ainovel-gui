@@ -143,7 +143,7 @@ export default function OutlinePage() {
           <div style={{ marginLeft: 28, marginTop: 4 }}>
             <SortableContext items={vol.arcs.map((_, ai) => `arc:${vi}:${ai}`)} strategy={verticalListSortingStrategy}>
               {vol.arcs.map((arc, ai) => (
-                <SortableArc key={arc.index} vol={vol} arc={arc} vi={vi} ai={ai} />
+                <SortableArc key={`${vi}-${ai}`} vol={vol} arc={arc} vi={vi} ai={ai} />
               ))}
             </SortableContext>
           </div>

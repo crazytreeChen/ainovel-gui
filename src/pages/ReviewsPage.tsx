@@ -106,6 +106,18 @@ export default function ReviewsPage() {
   const [chapterLoadError, setChapterLoadError] = useState('')
   const [staleChapters, setStaleChapters] = useState<number[]>([])
   const [lastApplyResult, setLastApplyResult] = useState<ApplyFixResult | null>(null)
+  const [localElapsed, setLocalElapsed] = useState(0)
+  const auditStartRef = useRef(0)
+
+  // 审查期间本地递增计时器（每秒更新，不依赖后端推送）
+  useEffect(() => {
+    if (!auditing) { setLocalElapsed(0); return }
+    auditStartRef.current = auditStartRef.current || Date.now()
+    const timer = setInterval(() => {
+      setLocalElapsed(Math.floor((Date.now() - auditStartRef.current) / 1000))
+    }, 1000)
+    return () => { clearInterval(timer); auditStartRef.current = 0 }
+  }, [auditing])
 
   useEffect(() => { loadData() }, [id])
 
@@ -313,7 +325,7 @@ export default function ReviewsPage() {
               <button className="welcome-mode-btn" disabled={auditing || selectedFixChapters.length === 0} onClick={handleApplyFixes}>应用所选修复</button>
               {auditing && <button className="welcome-mode-btn" onClick={handleCancelAudit} style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>停止</button>}
             </div>
-            <div className="text-dim text-xs mono">预计 {chapters.length ? formatTime(chapters.length * 12) : '0秒'}</div>
+            <div className="text-dim text-xs mono">共 {chapters.length} 章</div>
           </div>
           {auditProgress && (
             <div className="flex-row items-center gap-8 mt-12 mono text-xs">
@@ -322,7 +334,7 @@ export default function ReviewsPage() {
                 <div style={{ width: `${(auditProgress.current / auditProgress.total) * 100}%`, height: '100%', background: 'var(--color-accent)' }} />
               </div>
               <span className="text-dim">{auditProgress.current}/{auditProgress.total}</span>
-              <span className="text-dim">剩余 {formatTime(auditProgress.remaining)}</span>
+              <span className="text-dim">已用 {formatTime(localElapsed)}</span>
             </div>
           )}
           {lastResult?.stats && (

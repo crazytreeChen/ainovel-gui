@@ -16,6 +16,7 @@ export const COMMANDS: CommandItem[] = [
   { name: 'cocreate', usage: '/cocreate', desc: '共创规划后续阶段走向' },
   { name: 'simulate', usage: '/simulate', desc: '生成仿写画像' },
   { name: 'importsim', usage: '/importsim <file>', desc: '导入仿写画像' },
+  { name: 'clear', usage: '/clear', desc: '清空实时输出面板' },
 ]
 
 export interface UseCommandPaletteReturn {

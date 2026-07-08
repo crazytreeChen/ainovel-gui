@@ -295,8 +295,10 @@ function register(ipcMain: Electron.IpcMain) {
     if (!bookDir) return ''
     const f = join(bookDir, 'chapters', `${String(ch).padStart(2, '0')}.md`)
     if (!existsSync(f)) {
-      const fallback = join(state.outputDir, 'output', 'chapters', `${String(ch).padStart(2, '0')}.md`)
-      if (existsSync(fallback)) try { return readFileSync(fallback, 'utf8') } catch (e: any) { return '' }
+      const fallback1 = join(bookDir, 'output', 'novel', 'chapters', `${String(ch).padStart(2, '0')}.md`)
+      if (existsSync(fallback1)) try { return readFileSync(fallback1, 'utf8') } catch (e: any) { return '' }
+      const fallback2 = join(state.outputDir, 'output', 'chapters', `${String(ch).padStart(2, '0')}.md`)
+      if (existsSync(fallback2)) try { return readFileSync(fallback2, 'utf8') } catch (e: any) { return '' }
       return ''
     }
     try { return readFileSync(f, 'utf8') } catch (e: any) { return '' }
@@ -306,8 +308,11 @@ function register(ipcMain: Electron.IpcMain) {
     if (!state.outputDir) return []
     const bookDir = findActiveBookDir()
     if (!bookDir) return []
-    const chDir = join(bookDir, 'chapters')
-    if (!existsSync(chDir)) return []
+    let chDir = join(bookDir, 'chapters')
+    if (!existsSync(chDir)) {
+      chDir = join(bookDir, 'output', 'novel', 'chapters')
+      if (!existsSync(chDir)) return []
+    }
     const { readdirSync } = require('fs')
     const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
     const progress = readStoreJSON('meta/progress.json')

@@ -345,6 +345,15 @@ html, body, #root {
   border-color: var(--color-accent); color: var(--color-accent);
   background: rgba(229, 180, 73, 0.1);
 }
+.welcome-mode-btn:disabled {
+  opacity: 0.4; cursor: not-allowed;
+  border-color: var(--color-border);
+  color: var(--color-dim);
+}
+.welcome-mode-btn:disabled:hover {
+  border-color: var(--color-border);
+  color: var(--color-dim);
+}
 
 /* ── 欢迎页 ── */
 .welcome-container {

@@ -29,6 +29,8 @@ export default function Workspace() {
   const resumeWriting = useAppStore(s => s.resumeWriting)
   const pauseWriting = useAppStore(s => s.pauseWriting)
   const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
+  const clearEvents = useAppStore(s => s.clearEvents)
+  const clearStreamOutput = useAppStore(s => s.clearStreamOutput)
   const [fullscreen, setFullscreen] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
 
@@ -114,6 +116,8 @@ export default function Workspace() {
               ▶️ {snapshot.completedCount ? '继续' : '开始'}
             </button>
           )}
+          <button className="welcome-mode-btn text-xs" onClick={() => { clearEvents(); clearStreamOutput(); }}
+            title="清空事件流和实时输出">✕ 清屏</button>
           <span className="text-dim text-xs ml-auto mono">
             {snapshot.totalWordCount > 0 && `${snapshot.totalWordCount.toLocaleString()} 字`}
             {snapshot.totalWordCount > 0 && snapshot.completedCount > 0 && ' · '}

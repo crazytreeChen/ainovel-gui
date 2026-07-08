@@ -75,7 +75,8 @@ function register(ipcMain: Electron.IpcMain) {
       const premiseRaw = readStoreText(dir, 'meta/premise.md')
       const bookJson = readStoreJSON(dir, 'book.json')
       let chapterCount = 0
-      const chDir = join(dir, 'chapters')
+      let chDir = join(dir, 'chapters')
+      if (!existsSync(chDir)) chDir = join(dir, 'output', 'novel', 'chapters')
       if (existsSync(chDir)) chapterCount = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).length
       return {
         name: progress?.novelName || bookJson?.name || '',
@@ -182,7 +183,8 @@ function syncArcs(db: any, id: string, volumes: any[]) {
 }
 
 function syncChapters(db: any, id: string, dir: string) {
-  const chDir = join(dir, 'chapters')
+  let chDir = join(dir, 'chapters')
+  if (!existsSync(chDir)) chDir = join(dir, 'output', 'novel', 'chapters')
   if (!existsSync(chDir)) return
   for (const file of readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()) {
     const num = parseInt(file.replace('.md', ''), 10)

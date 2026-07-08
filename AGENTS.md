@@ -31,7 +31,7 @@ ainovel-gui 是 **独立桌面创作管理平台**，基于 [ainovel-cli](https:
 
 **编辑平台**：macOS
 **构建/运行平台**：macOS / Windows / Linux
-**CI**：手动构建
+**CI**：GitHub Actions（push to master 触发 lint/typecheck/build；push `v*` tag 触发多平台构建 + Release）
 
 ### Build
 
@@ -332,6 +332,36 @@ npm run dist:win
 ---
 
 > **模板版本**：v2.2 | **最后更新**：2026-07-08 | 新增：GitHub Issue 工作流规范
+
+---
+
+## Gotchas
+
+### ESM/CJS 混合项目陷阱
+
+项目是 CJS 为主（Electron 主进程 + scripts），但 Vite renderer 端走 ESM。**不要在 `package.json` 中添加 `"type": "module"`**——这会导致：
+1. 所有 `.js` 脚本被 Node.js 当作 ESM 解析，CJS `require()` 报错
+2. `dist-electron/main.js`（CJS 输出）也被拦截，Electron 启动失败
+3. 修复方式是将 `scripts/*.js` 重命名为 `*.cjs`，而非添加 `"type": "module"`
+
+### ESLint 9 迁移要点
+
+- 必须用 ESM flat config（`eslint.config.mjs`），旧版 `.eslintrc.cjs` 不再支持
+- CI 中 `npx eslint src/ electron/` 需加 `--ext .ts,.tsx`，否则 flat config 找不到文件
+- `src/` 和 `electron/` 需分别指定不同 `tsconfig`（`src` 用 ESNext，`electron` 用 CJS）
+- Electron 主进程的 `require()` + 大量 `any` 类型需要在 lint config 中关闭对应规则
+
+### 跨平台构建注意事项
+
+- `build-cli.cjs` 中 `execSync` 用 `cwd` 选项替代 `cd 'path' &&`，路径用 `JSON.stringify()` 包裹
+- `chmod` 只在 `process.platform !== 'win32'` 时执行
+- Release workflow 中 `npm ci --ignore-scripts` 跳过 `postinstall`，再显式 `npm run build:cli`
+
+### 版本号管理
+
+- **永远不要硬编码版本号**——从 `package.json` 动态读取
+- TopBar 等 UI 组件中版本号需与 `package.json` 保持一致
+- 每次发版需同步更新 `package.json`、`download.json`、`system.ts` 中的版本号
 
 ---
 

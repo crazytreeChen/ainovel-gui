@@ -147,7 +147,8 @@ function register(ipcMain: Electron.IpcMain) {
       const completedChapters = chapters.filter(c => c.status === 'completed' || c.status === 'draft')
       if (completedChapters.length === 0) {
         // 尝试从 JSON 文件中读取章节
-        const chDir = join(bookDir, 'chapters')
+        let chDir = join(bookDir, 'chapters')
+        if (!existsSync(chDir)) chDir = join(bookDir, 'output', 'novel', 'chapters')
         if (existsSync(chDir)) {
           const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
           for (const f of files) {
@@ -172,7 +173,8 @@ function register(ipcMain: Electron.IpcMain) {
         }
         // 尝试从 JSON 文件补充
         if (!ch.content) {
-          const chFile = join(bookDir, 'chapters', `${String(ch.num).padStart(2, '0')}.md`)
+          let chFile = join(bookDir, 'chapters', `${String(ch.num).padStart(2, '0')}.md`)
+          if (!existsSync(chFile)) chFile = join(bookDir, 'output', 'novel', 'chapters', `${String(ch.num).padStart(2, '0')}.md`)
           if (existsSync(chFile)) ch.content = readFileSync(chFile, 'utf8')
         }
         ch.title = ch.title || `第${ch.num}章`
