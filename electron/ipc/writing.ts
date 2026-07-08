@@ -611,7 +611,12 @@ function fillRunningSnapshot(snap: any, bookId: string) {
     snap.completedCount = completed.length > 0 ? completed.length : snap.completedCount
     snap.totalChapters = progress.total_chapters || 0; snap.totalWordCount = progress.total_word_count || snap.totalWordCount
     snap.inProgressChapter = progress.in_progress_chapter || 0; snap.currentChapter = progress.current_chapter || 0
-    snap.pendingRewrites = progress.pending_rewrites || []; snap.rewriteReason = progress.rewrite_reason || ''
+    // pending_rewrites 可能是 []int 或 []PendingRewrite 对象数组，统一提取章节号
+    const rawPending = progress.pending_rewrites || []
+    snap.pendingRewrites = Array.isArray(rawPending)
+      ? rawPending.map((p: any) => typeof p === 'object' ? p.chapter : p).filter((n: any) => typeof n === 'number' && n > 0)
+      : []
+    snap.rewriteReason = progress.rewrite_reason || ''
     snap.layered = progress.layered || false
     applyProgressSnapshot(snap, progress)
     if (progress.current_volume && progress.current_arc) snap.currentVolumeArc = `第${progress.current_volume}卷·第${progress.current_arc}弧`
