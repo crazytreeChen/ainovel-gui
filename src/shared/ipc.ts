@@ -169,6 +169,7 @@ export interface ElectronAPI {
   // 快照/事件/章节
   getSnapshot: (bookId?: string) => Promise<UISnapshot>
   getEvents: () => Promise<EventItem[]>
+  clearEvents: () => Promise<boolean>
   readChapter: (chapterNum: number) => Promise<string>
   listChapters: () => Promise<ChapterItem[]>
 

@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 快照和状态
   getSnapshot: (bookId?: string) => ipcRenderer.invoke('get-snapshot', bookId),
   getEvents: () => ipcRenderer.invoke('get-events'),
+  clearEvents: () => ipcRenderer.invoke('clear-events'),
   readChapter: (chapterNum: number) => ipcRenderer.invoke('read-chapter', chapterNum),
   listChapters: () => ipcRenderer.invoke('list-chapters'),
 

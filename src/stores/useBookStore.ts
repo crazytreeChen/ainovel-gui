@@ -97,5 +97,9 @@ export const useBookStore = create<BookState>((set) => ({
 
   setChapterContent: (chapterContent) => set({ chapterContent }),
 
-  clearEvents: () => set({ events: [] }),
+  clearEvents: async () => {
+    const api = window.electronAPI
+    if (api?.clearEvents) await api.clearEvents()
+    set({ events: [] })
+  },
 }))

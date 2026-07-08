@@ -289,6 +289,10 @@ function register(ipcMain: Electron.IpcMain) {
   // ── 运行时读取（快照/事件/章节）──
   ipcMain.handle('get-snapshot', createSnapshotHandler())
   ipcMain.handle('get-events', createEventsHandler())
+  ipcMain.handle('clear-events', () => {
+    state.engineEvents.length = 0
+    return true
+  })
   ipcMain.handle('read-chapter', async (_e: Electron.IpcMainInvokeEvent, ch: string) => {
     if (!state.outputDir) return ''
     const bookDir = findActiveBookDir()
