@@ -29,23 +29,15 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
   ]
 
   return (
-    <div style={{
-      width: 160, flexShrink: 0, display: 'flex', flexDirection: 'column',
-      borderRight: '1px solid var(--color-border)', background: 'var(--color-surface)',
-      padding: '12px 0', overflow: 'auto',
-    }}>
+    <div className="nav-sidebar">
       {/* 标题 */}
-      <div style={{
-        padding: '0 14px 12px', borderBottom: '1px solid var(--color-border)',
-        marginBottom: 8, fontSize: 11, fontFamily: 'var(--font-mono)',
-        color: 'var(--color-dim)', letterSpacing: 1,
-      }}>
-        <div className="text-accent" style={{ fontWeight: 'bold', fontSize: 13 }}>📖 AI小说管理</div>
-        <div style={{ fontSize: 10, marginTop: 2 }}>书籍导航</div>
+      <div className="nav-sidebar-header">
+        <div className="nav-sidebar-title">📖 AI小说管理</div>
+        <div className="nav-sidebar-subtitle">书籍导航</div>
       </div>
 
       {/* 导航项 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <div className="nav-sidebar-items">
         {items.map((item) => {
           const isActive = (() => {
             if (location.pathname === item.path) return true
@@ -57,7 +49,7 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
           return (
             <div
               key={item.path || item.label}
-              className="cursor-clickable"
+              className="nav-sidebar-item cursor-clickable"
               onClick={() => {
                 if (item.action === 'toggleExport') {
                   toggleExport()
@@ -66,15 +58,10 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
                 }
               }}
               style={{
-                padding: '8px 14px', margin: '0 6px', borderRadius: 'var(--radius-sm)',
-                cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8,
                 background: isActive ? 'var(--color-surface-2)' : 'transparent',
                 color: isActive ? 'var(--color-accent)' : 'var(--color-text)',
                 borderLeft: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
-                transition: 'all 0.12s',
               }}
-              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-2)' }}
-              onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
             >
               <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{item.icon}</span>
               <span>{item.label}</span>
@@ -84,19 +71,10 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
       </div>
 
       {/* 底部 */}
-      <div style={{
-        padding: '8px 14px', borderTop: '1px solid var(--color-border)', marginTop: 8,
-      }}>
+      <div className="nav-sidebar-footer">
         <div
-          className="cursor-clickable text-dim"
+          className="cursor-clickable text-dim nav-sidebar-item"
           onClick={() => navigate('/')}
-          style={{
-            padding: '6px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-            fontSize: 11, display: 'flex', alignItems: 'center', gap: 6,
-            transition: 'all 0.12s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text)'; e.currentTarget.style.background = 'var(--color-surface-2)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = ''; e.currentTarget.style.background = 'transparent' }}
         >
           <span>←</span>
           <span>返回书籍列表</span>

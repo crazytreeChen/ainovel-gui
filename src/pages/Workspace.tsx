@@ -93,15 +93,15 @@ export default function Workspace() {
   const isComplete = snapshot.phase === 'complete'
 
   return (
-    <div className="flex-row p-24" style={{ height: '100vh', gap: fullscreen ? 0 : 16 }}>
+    <div className="workspace-container" style={{ gap: fullscreen ? 0 : 16 }}>
       {!fullscreen && <BookNavSidebar bookId={id || ''} />}
-      <div className="flex-1 flex-col overflow-hidden" style={{ gap: 8 }}>
+      <div className="workspace-main">
 
         {/* 顶栏 */}
         <TopBar bookName={snapshot.novelName} />
 
         {/* 控制栏 */}
-        <div className="flex-row items-center gap-8 flex-shrink-0" style={{ padding: '4px 0', borderBottom: '1px solid var(--color-border)', minHeight: 32 }}>
+        <div className="workspace-control-bar">
           {!fullscreen && (
             <button className="welcome-mode-btn text-xs" onClick={() => setFullscreen(true)}>⊟ 全屏</button>
           )}
@@ -126,7 +126,7 @@ export default function Workspace() {
         </div>
 
         {/* 精简状态条 */}
-        <div className="flex-row items-center gap-12 flex-shrink-0 text-xs" style={{ padding: '2px 0', minHeight: 22, color: 'var(--color-dim)' }}>
+        <div className="workspace-status-bar">
           <span className="mono">
             {snapshot.runtimeState === 'running' ? '● 运行中' : snapshot.runtimeState === 'paused' ? '⏸ 已暂停' : '○ 空闲'}
           </span>
@@ -160,9 +160,9 @@ export default function Workspace() {
         )}
 
         {/* 主体：2 列（中央 + 右侧详情） */}
-        <div className="flex-1 flex-row overflow-hidden" style={{ gap: 12 }}>
+        <div className="workspace-content">
           {/* 中央：事件流 + 实时输出 */}
-          <div className="flex-1 flex-col overflow-hidden" style={{ gap: 4 }}>
+          <div className="workspace-center">
             <div className="event-panel" style={{ flex: 3 }}><EventFlow /></div>
             <div className="stream-panel" style={{ flex: 5 }}><StreamOutput /></div>
           </div>
