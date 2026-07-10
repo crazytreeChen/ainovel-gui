@@ -74,6 +74,7 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
       <div className="nav-sidebar-footer">
         <div
           className="cursor-clickable text-dim nav-sidebar-item"
+          style={{ padding: '6px 8px' }}
           onClick={() => navigate('/')}
         >
           <span>←</span>
