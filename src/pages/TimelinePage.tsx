@@ -9,7 +9,7 @@ interface ForeshadowEntry { id: string; description: string; plantedAt: number; 
 interface RelationshipEntry { characterA: string; characterB: string; relation: string; chapter: number }
 interface StateChange { chapter: number; entity: string; field: string; oldValue: string; newValue: string; reason: string }
 
-const FS_COLORS: Record<string, string> = { planted: '#e5b449', advanced: '#7ec5d8', resolved: '#7ec488' }
+const FS_COLORS: Record<string, string> = { planted: 'var(--color-accent)', advanced: 'var(--color-tool)', resolved: 'var(--color-success)' }
 const FS_LABELS: Record<string, string> = { planted: '已埋设', advanced: '推进中', resolved: '已回收' }
 
 export default function TimelinePage() {

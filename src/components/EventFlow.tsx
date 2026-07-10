@@ -63,7 +63,7 @@ export default function EventFlow() {
             if (agentName && AGENT_COLORS[agentName]) {
               lineColor = AGENT_COLORS[agentName]
             } else {
-              lineColor = '#7ec5d8'
+              lineColor = 'var(--color-tool)'
             }
             break
           case 'ERROR':

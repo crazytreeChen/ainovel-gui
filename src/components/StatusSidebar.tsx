@@ -32,9 +32,9 @@ function Field({ label, value, highlight }: { label: string; value: string; high
 
 function agentStateColor(state: string): string {
   switch (state) {
-    case 'running': return '#7ec488'
-    case 'failed': return '#e07060'
-    default: return '#8a8175'
+    case 'running': return 'var(--color-success)'
+    case 'failed': return 'var(--color-error)'
+    default: return 'var(--color-dim)'
   }
 }
 
