@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { subscribeWithSelector } from 'zustand/middleware'
 import type { AppMode, StartupMode, FocusPane, BinaryInfo } from '@/types'
 import type { ElectronAPI } from '@/shared/ipc'
 
@@ -57,7 +58,8 @@ export interface UIState {
   removeToast: (id: number) => void
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>()(
+  subscribeWithSelector((set) => ({
   mode: 'welcome',
   startupMode: 'quick',
   focusPane: 'events',
@@ -93,4 +95,4 @@ export const useUIStore = create<UIState>((set) => ({
   setTheme: (theme) => { localStorage.setItem('ainovel-theme', theme); set({ theme }) },
   addToast: (t) => set((s) => ({ toasts: [...s.toasts, t] })),
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter(t => t.id !== id) })),
-}))
+})))

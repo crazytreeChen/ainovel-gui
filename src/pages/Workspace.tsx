@@ -12,6 +12,7 @@ import CoCreateModal from '@/components/CoCreateModal'
 import ExportModal from '@/components/ExportModal'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useAppStore } from '@/stores/useAppStore'
+import { useWritingStore } from '@/stores/useWritingStore'
 import { useBookId } from '@/hooks/useBookId'
 import { showToast } from '@/components/Toast'
 
@@ -26,11 +27,11 @@ export default function Workspace() {
   const showExport = useAppStore(s => s.showExport)
   const snapshot = useAppStore(s => s.snapshot)
   const setActiveBookId = useAppStore(s => s.setActiveBookId)
-  const resumeWriting = useAppStore(s => s.resumeWriting)
-  const pauseWriting = useAppStore(s => s.pauseWriting)
+  const resumeWriting = useWritingStore(s => s.resumeWriting)
+  const pauseWriting = useWritingStore(s => s.pauseWriting)
   const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
   const clearEvents = useAppStore(s => s.clearEvents)
-  const clearStreamOutput = useAppStore(s => s.clearStreamOutput)
+  const clearStreamOutput = useWritingStore(s => s.clearStreamOutput)
   const [fullscreen, setFullscreen] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
 

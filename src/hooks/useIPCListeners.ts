@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
+import { useWritingStore } from '@/stores/useWritingStore'
 
 /**
  * 监听 Electron IPC 事件：运行时推送、进程退出、流式输出、初始化检查
@@ -67,9 +68,9 @@ export function useIPCListeners() {
     const cleanup = window.electronAPI.onStreamOutput((data) => {
       try {
         const parsed = JSON.parse(data)
-        useAppStore.getState().appendStreamOutput(parsed)
+        useWritingStore.getState().appendStreamOutput(parsed)
       } catch {
-        useAppStore.getState().appendStreamOutput({ type: 'content', text: data })
+        useWritingStore.getState().appendStreamOutput({ type: 'content', text: data })
       }
     })
     return cleanup

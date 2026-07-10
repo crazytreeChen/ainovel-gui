@@ -13,13 +13,13 @@ declare global {
 export type { ThemeMode, ToastItem }
 export { useUIStore, useBookStore, useWritingStore }
 
-export type AppState = UIState & BookState & WritingState
+export type AppState = UIState & BookState
 
 /**
  * 合并 store — 向后兼容的单一入口。
  *
- * 初始合并各子 store 的状态。高频写作状态（streamOutput/events）应直接
- * 使用 useWritingStore 避免每 token 全量重建。
+ * 注意：useWritingStore 的高频数据（streamOutput/events）
+ * 应直接使用 useWritingStore 避免每 token 全量重建。
  *
  * ✅ 推荐用法：
  *   const mode = useAppStore(s => s.mode)            // UI 状态
@@ -38,6 +38,5 @@ export const useAppStore = create<AppState>((set, get) => {
   return {
     ...useUIStore.getState(),
     ...useBookStore.getState(),
-    ...useWritingStore.getState(),
   }
 })

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
+import { useWritingStore } from '@/stores/useWritingStore'
 
 export interface CommandItem {
   name: string
@@ -45,9 +46,9 @@ export function useCommandPalette(
   const toggleModelSwitch = useAppStore((s) => s.toggleModelSwitch)
   const toggleExport = useAppStore((s) => s.toggleExport)
   const toggleCoCreate = useAppStore((s) => s.toggleCoCreate)
-  const runDiag = useAppStore((s) => s.runDiag)
-  const clearStreamOutput = useAppStore((s) => s.clearStreamOutput)
-  const sendInput = useAppStore((s) => s.sendInput)
+  const runDiag = useWritingStore((s) => s.runDiag)
+  const clearStreamOutput = useWritingStore((s) => s.clearStreamOutput)
+  const sendInput = useWritingStore((s) => s.sendInput)
 
   const filteredCmds = useMemo(() => {
     if (!inputValue.startsWith('/')) return []

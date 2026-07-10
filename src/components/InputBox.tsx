@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
+import { useWritingStore } from '@/stores/useWritingStore'
 import { useCommandPalette } from '@/hooks/useCommandPalette'
 
 /** 默认系统提示词：要求 AI 用中文思考和输出 */
@@ -10,8 +11,8 @@ export default function InputBox() {
   const startupMode = useAppStore((s) => s.startupMode)
   const inputValue = useAppStore((s) => s.inputValue)
   const setInputValue = useAppStore((s) => s.setInputValue)
-  const sendInput = useAppStore((s) => s.sendInput)
-  const startWriting = useAppStore((s) => s.startWriting)
+  const sendInput = useWritingStore((s) => s.sendInput)
+  const startWriting = useWritingStore((s) => s.startWriting)
 
   const {
     showCommands,
