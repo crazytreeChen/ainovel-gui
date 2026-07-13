@@ -1,9 +1,14 @@
 import { useState } from 'react'
 import { useUIStore, useWritingStore } from '@/stores/useAppStore'
 
-export default function DiagnosticsModal() {
+interface DiagnosticsModalProps {
+  onClose?: () => void
+}
+
+export default function DiagnosticsModal({ onClose }: DiagnosticsModalProps) {
   const diagReport = useUIStore((s) => s.diagReport)
   const toggleDiagnostics = useUIStore((s) => s.toggleDiagnostics)
+  const handleClose = onClose || toggleDiagnostics
   const runDiag = useWritingStore((s) => s.runDiag)
   const [loading, setLoading] = useState(false)
 
@@ -14,9 +19,9 @@ export default function DiagnosticsModal() {
   }
 
   return (
-    <div className="modal-overlay" onClick={toggleDiagnostics}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ minWidth: 600 }}>
-        <button className="modal-close" onClick={toggleDiagnostics}>✕</button>
+        <button className="modal-close" onClick={handleClose}>✕</button>
         <div className="modal-title">诊断报告</div>
 
         <button

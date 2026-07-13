@@ -12,15 +12,20 @@ const COMMANDS = [
   { cmd: '/clear', desc: '清空实时输出面板', group: 'system' },
 ]
 
-export default function HelpModal() {
+interface HelpModalProps {
+  onClose?: () => void
+}
+
+export default function HelpModal({ onClose }: HelpModalProps) {
   const toggleHelp = useUIStore((s) => s.toggleHelp)
+  const handleClose = onClose || toggleHelp
 
   const groups = [...new Set(COMMANDS.map((c) => c.group))]
 
   return (
-    <div className="modal-overlay" onClick={toggleHelp}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ minWidth: 500 }}>
-        <button className="modal-close" onClick={toggleHelp}>✕</button>
+        <button className="modal-close" onClick={handleClose}>✕</button>
         <div className="modal-title">命令帮助</div>
 
         {groups.map((group) => (

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore } from '@/stores/useUIStore'
 import { useWritingStore } from '@/stores/useWritingStore'
 
 export interface CommandItem {
@@ -42,10 +42,7 @@ export function useCommandPalette(
   const [showCommands, setShowCommands] = useState(false)
   const [cmdIndex, setCmdIndex] = useState(0)
 
-  const toggleHelp = useAppStore((s) => s.toggleHelp)
-  const toggleModelSwitch = useAppStore((s) => s.toggleModelSwitch)
-  const toggleExport = useAppStore((s) => s.toggleExport)
-  const toggleCoCreate = useAppStore((s) => s.toggleCoCreate)
+  const pushModal = useUIStore((s) => s.pushModal)
   const runDiag = useWritingStore((s) => s.runDiag)
   const clearStreamOutput = useWritingStore((s) => s.clearStreamOutput)
   const sendInput = useWritingStore((s) => s.sendInput)
@@ -106,19 +103,19 @@ export function useCommandPalette(
 
     switch (cmdName) {
       case 'help':
-        toggleHelp()
+        pushModal('help')
         return true
       case 'model':
-        toggleModelSwitch()
+        pushModal('modelSwitch')
         return true
       case 'diag':
         await runDiag()
         return true
       case 'export':
-        toggleExport()
+        pushModal('export')
         return true
       case 'cocreate':
-        toggleCoCreate()
+        pushModal('coCreate')
         return true
       case 'clear':
         clearStreamOutput()
@@ -127,7 +124,7 @@ export function useCommandPalette(
         await sendInput(text)
         return true
     }
-  }, [setInputValue, toggleHelp, toggleModelSwitch, runDiag, toggleExport, toggleCoCreate, clearStreamOutput, sendInput])
+  }, [setInputValue, pushModal, runDiag, clearStreamOutput, sendInput])
 
   return {
     showCommands,

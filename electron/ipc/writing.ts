@@ -11,6 +11,35 @@ const { spawn } = require('child_process')
 
 const log = createLogger('ipc:writing')
 
+/**
+ * 解析引擎 stderr 输出并写入 engineEvents，自动跳过连续重复行。
+ * headless 模式中同一工具事件可能通过 ensureSubagentToolStarted 和
+ * ProgressToolStart 两条路径各输出一次，此处按 category+summary 去重。
+ */
+function parseStderrLine(line: string) {
+  const match = line.match(/\[(\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(.*)/)
+  if (!match) return
+  const summary = match[3].trim()
+  // 跳过空白行（引擎偶发输出空事件的防御性过滤）
+  if (!summary) return
+  const timeStr = match[1]
+  const category = match[2]
+  // 跳过连续重复行（同 category + 同 summary）
+  const prev = state._lastStderrEvent
+  if (prev && prev.category === category && prev.summary === summary) return
+  state._lastStderrEvent = { category, summary }
+  const now = new Date()
+  const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${timeStr}`
+  state.engineEvents.push({ time: ts, category, summary, detail: '', agent: '', depth: 0, level: category === 'ERROR' ? 'error' : category === 'WARN' ? 'warn' : 'info', duration: 0 })
+}
+
+function parseStderr(text: string) {
+  for (const line of text.split('\n').filter(Boolean)) {
+    parseStderrLine(line)
+  }
+  if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
+}
+
 function register(ipcMain: Electron.IpcMain) {
   ipcMain.handle('start-writing', async (_e: Electron.IpcMainInvokeEvent, _prompt: string, bookId: string) => {
     await stopAinovelProcess()
@@ -34,15 +63,7 @@ function register(ipcMain: Electron.IpcMain) {
       let stderrData = ''
       state.ainovelProcess.stderr.on('data', (data: any) => {
         const text = data.toString(); stderrData += text
-        for (const line of text.split('\n').filter(Boolean)) {
-          const match = line.match(/\[(\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(.*)/)
-          if (match) {
-            const now = new Date()
-            const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${match[1]}`
-            state.engineEvents.push({ time: timeStr, category: match[2], summary: match[3], detail: '', agent: '', depth: 0, level: match[2] === 'ERROR' ? 'error' : match[2] === 'WARN' ? 'warn' : 'info', duration: 0 })
-          }
-        }
-        if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
+        parseStderr(text)
       })
       let streamMode = 'content', streamBuf = '', streamTimer: ReturnType<typeof setTimeout> | null = null
       state.ainovelProcess.stdout.on('data', (data: any) => {
@@ -51,15 +72,15 @@ function register(ipcMain: Electron.IpcMain) {
         if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
         const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
         if (tIdx >= 0 || cIdx >= 0) {
-          if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
+          if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
           if (tIdx >= 0) streamMode = 'thinking'
           if (cIdx >= 0) streamMode = 'content'
           const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
           const rest = clean.substring(idx).trim()
           if (rest) streamBuf = rest
         } else { streamBuf += clean }
-        if (streamBuf.length > 100) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
-        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' } }, 500) }
+        if (streamBuf.length > 100 && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
+        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' } }, 500) }
       })
       state.ainovelProcess.on('exit', (code: number | null) => {
         state.lastWritingExitCode = code
@@ -104,15 +125,7 @@ function register(ipcMain: Electron.IpcMain) {
       let stderrData = ''
       state.ainovelProcess.stderr.on('data', (data: any) => {
         const text = data.toString(); stderrData += text
-        for (const line of text.split('\n').filter(Boolean)) {
-          const match = line.match(/\[(\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(.*)/)
-          if (match) {
-            const now = new Date()
-            const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${match[1]}`
-            state.engineEvents.push({ time: timeStr, category: match[2], summary: match[3], detail: '', agent: '', depth: 0, level: match[2] === 'ERROR' ? 'error' : match[2] === 'WARN' ? 'warn' : 'info', duration: 0 })
-          }
-        }
-        if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
+        parseStderr(text)
       })
       let streamMode = 'content', streamBuf = '', streamTimer: ReturnType<typeof setTimeout> | null = null
       state.ainovelProcess.stdout.on('data', (data: any) => {
@@ -121,15 +134,15 @@ function register(ipcMain: Electron.IpcMain) {
         if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
         const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
         if (tIdx >= 0 || cIdx >= 0) {
-          if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
+          if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
           if (tIdx >= 0) streamMode = 'thinking'
           if (cIdx >= 0) streamMode = 'content'
           const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
           const rest = clean.substring(idx).trim()
           if (rest) streamBuf = rest
         } else { streamBuf += clean }
-        if (streamBuf.length > 100) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
-        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' } }, 500) }
+        if (streamBuf.length > 100 && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
+        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' } }, 500) }
       })
       state.ainovelProcess.on('exit', (code: number | null) => {
         if (code !== 0 && stderrData) log.error('resume exit:', code, stderrData)
@@ -220,6 +233,9 @@ function register(ipcMain: Electron.IpcMain) {
     pendingUserConfirm = false
     lastPhase = '' // 重置相位追踪，避免重复暂停
     log.info('confirm-continue-writing: 用户确认继续', { bookId })
+    // 清理上一轮残留事件（规划暂停后进程已退出，但 events 未清空）
+    state.engineEvents.length = 0
+    delete state._lastStderrEvent
     // 通过 resume-writing 恢复 CLI 进程
     const binary = getAinovelBinary()
     if (!existsSync(binary)) return false
@@ -242,15 +258,7 @@ function register(ipcMain: Electron.IpcMain) {
       let stderrData = ''
       state.ainovelProcess.stderr.on('data', (data: any) => {
         const text = data.toString(); stderrData += text
-        for (const line of text.split('\n').filter(Boolean)) {
-          const match = line.match(/\[(\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(.*)/)
-          if (match) {
-            const now = new Date()
-            const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${match[1]}`
-            state.engineEvents.push({ time: timeStr, category: match[2], summary: match[3], detail: '', agent: '', depth: 0, level: match[2] === 'ERROR' ? 'error' : match[2] === 'WARN' ? 'warn' : 'info', duration: 0 })
-          }
-        }
-        if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
+        parseStderr(text)
       })
       let streamMode = 'content', streamBuf = '', streamTimer: ReturnType<typeof setTimeout> | null = null
       state.ainovelProcess.stdout.on('data', (data: any) => {
@@ -259,15 +267,15 @@ function register(ipcMain: Electron.IpcMain) {
         if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
         const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
         if (tIdx >= 0 || cIdx >= 0) {
-          if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
+          if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
           if (tIdx >= 0) streamMode = 'thinking'
           if (cIdx >= 0) streamMode = 'content'
           const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
           const rest = clean.substring(idx).trim()
           if (rest) streamBuf = rest
         } else { streamBuf += clean }
-        if (streamBuf.length > 100) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' }
-        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf})); streamBuf = '' } }, 500) }
+        if (streamBuf.length > 100 && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
+        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' } }, 500) }
       })
       state.ainovelProcess.on('exit', (code: number | null) => {
         if (code !== 0 && stderrData) log.error('confirm-continue-writing exit:', code, stderrData)
@@ -379,20 +387,7 @@ function register(ipcMain: Electron.IpcMain) {
       
       // 收集 stderr（事件日志）
       state.ainovelProcess.stderr.on('data', (data: any) => {
-        const text = data.toString()
-        for (const line of text.split('\n').filter(Boolean)) {
-          const match = line.match(/\[(\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]\s+(.*)/)
-          if (match) {
-            const timeStr = `${now.slice(0, 10)}T${match[1]}`
-            state.engineEvents.push({
-              time: timeStr, category: match[2], summary: match[3],
-              detail: '', agent: '', depth: 0,
-              level: match[2] === 'ERROR' ? 'error' : match[2] === 'WARN' ? 'warn' : 'info',
-              duration: 0,
-            })
-          }
-        }
-        if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
+        parseStderr(data.toString())
       })
       
       // 处理 stdout（流式输出）
@@ -404,15 +399,15 @@ function register(ipcMain: Electron.IpcMain) {
         if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
         const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
         if (tIdx >= 0 || cIdx >= 0) {
-          if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({ type: streamMode, text: streamBuf })); streamBuf = '' }
+          if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({ type: streamMode, text: streamBuf.trim() })); streamBuf = '' }
           if (tIdx >= 0) streamMode = 'thinking'
           if (cIdx >= 0) streamMode = 'content'
           const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
           const rest = clean.substring(idx).trim()
           if (rest) streamBuf = rest
         } else { streamBuf += clean }
-        if (streamBuf.length > 100) { state.mainWindow.webContents.send('stream-output', JSON.stringify({ type: streamMode, text: streamBuf })); streamBuf = '' }
-        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf) { state.mainWindow.webContents.send('stream-output', JSON.stringify({ type: streamMode, text: streamBuf })); streamBuf = '' } }, 500) }
+        if (streamBuf.length > 100 && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({ type: streamMode, text: streamBuf.trim() })); streamBuf = '' }
+        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({ type: streamMode, text: streamBuf.trim() })); streamBuf = '' } }, 500) }
       })
       
       state.ainovelProcess.on('exit', (code: number | null) => {
@@ -828,6 +823,7 @@ function stopAinovelProcess() {
   }).then(() => {
     state.ainovelProcess = null
     state.engineEvents.length = 0
+    delete state._lastStderrEvent
     stopRuntimeSync()
   })
 }

@@ -1,7 +1,12 @@
 import { useUIStore } from '@/stores/useAppStore'
 
-export default function CoCreateModal() {
+interface CoCreateModalProps {
+  onClose?: () => void
+}
+
+export default function CoCreateModal({ onClose }: CoCreateModalProps) {
   const toggleCoCreate = useUIStore((s) => s.toggleCoCreate)
+  const handleClose = onClose || toggleCoCreate
   const setInputValue = useUIStore((s) => s.setInputValue)
 
   const suggestions = [
@@ -11,13 +16,13 @@ export default function CoCreateModal() {
   ]
 
   return (
-    <div className="modal-overlay" onClick={toggleCoCreate}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div
         className="modal-content"
         onClick={(e) => e.stopPropagation()}
         style={{ minWidth: 600, minHeight: 400, display: 'flex', flexDirection: 'column' }}
       >
-        <button className="modal-close" onClick={toggleCoCreate}>✕</button>
+        <button className="modal-close" onClick={handleClose}>✕</button>
         <div className="modal-title">共创规划</div>
 
         <div

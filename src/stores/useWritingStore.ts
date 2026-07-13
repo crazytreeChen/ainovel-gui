@@ -111,13 +111,13 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     const result = await api.runDiag()
     const report = await api.readDiagReport()
     useUIStore.getState().setDiagReport(report || result)
-    useUIStore.getState().toggleDiagnostics()
+    useUIStore.getState().pushModal('diagnostics')
   },
 
   runExport: async (bookId, args) => {
     const api = window.electronAPI
     if (!api) return
-    useUIStore.getState().toggleExport()
+    useUIStore.getState().pushModal('export', { id: bookId })
     await api.runExport(bookId, args)
   },
 }))

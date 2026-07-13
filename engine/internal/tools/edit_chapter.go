@@ -109,7 +109,15 @@ func (t *EditChapterTool) Execute(ctx context.Context, args json.RawMessage) (js
 		return nil, fmt.Errorf("old_string 不能为空: %w", errs.ErrToolArgs)
 	}
 	if a.OldString == a.NewString {
-		return nil, fmt.Errorf("old_string 与 new_string 相同，无需修改: %w", errs.ErrToolArgs)
+		// 新旧内容相同，无需实际修改，返回成功作为 no-op，
+		// 避免 LLM 生成的冗余编辑调用阻塞流程。
+		return json.Marshal(map[string]any{
+			"success":   true,
+			"chapter":   a.Chapter,
+			"noop":      true,
+			"message":   "old_string 与 new_string 相同，已跳过修改",
+			"next_step": "无需修改。仍有硬伤可再次 edit_chapter；否则 check_consistency 后 commit_chapter",
+		})
 	}
 
 	// 归属检查：已完成章节必须在重写队列中

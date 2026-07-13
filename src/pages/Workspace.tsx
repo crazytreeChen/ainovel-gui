@@ -5,10 +5,6 @@ import EventFlow from '@/components/EventFlow'
 import StreamOutput from '@/components/StreamOutput'
 import DetailPanel from '@/components/DetailPanel'
 import InputBox from '@/components/InputBox'
-import HelpModal from '@/components/HelpModal'
-import DiagnosticsModal from '@/components/DiagnosticsModal'
-import ModelSwitchModal from '@/components/ModelSwitchModal'
-import CoCreateModal from '@/components/CoCreateModal'
 import ExportModal from '@/components/ExportModal'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useAppStore } from '@/stores/useAppStore'
@@ -20,10 +16,6 @@ export default function Workspace() {
   const id = useBookId()
   const mode = useAppStore(s => s.mode)
   const setMode = useAppStore(s => s.setMode)
-  const showHelp = useAppStore(s => s.showHelp)
-  const showDiagnostics = useAppStore(s => s.showDiagnostics)
-  const showModelSwitch = useAppStore(s => s.showModelSwitch)
-  const showCoCreate = useAppStore(s => s.showCoCreate)
   const showExport = useAppStore(s => s.showExport)
   const snapshot = useAppStore(s => s.snapshot)
   const setActiveBookId = useAppStore(s => s.setActiveBookId)
@@ -216,12 +208,8 @@ export default function Workspace() {
         </div>
       )}
 
-      {/* 模态框 */}
-      {showHelp && <HelpModal />}
-      {showDiagnostics && <DiagnosticsModal />}
-      {showModelSwitch && <ModelSwitchModal />}
-      {showCoCreate && <CoCreateModal />}
-      {showExport && <ExportModal />}
+      {/* 模态框（ExportModal 需要 route params） */}
+      {showExport && <ExportModal id={id || undefined} />}
     </div>
   )
 }

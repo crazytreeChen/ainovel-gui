@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
 import { useUIStore, useWritingStore } from '@/stores/useAppStore'
 
 interface ExportOption { key: string; label: string; desc: string; args: string }
@@ -11,9 +10,14 @@ const EXPORT_FORMATS: ExportOption[] = [
   { key: 'full', label: '完整项目', desc: '导出完整项目目录（含大纲/角色/时间线）', args: '/format full' },
 ]
 
-export default function ExportModal() {
-  const { id } = useParams<{ id: string }>()
+interface ExportModalProps {
+  onClose?: () => void
+  id?: string
+}
+
+export default function ExportModal({ onClose, id: propId }: ExportModalProps) {
   const toggleExport = useUIStore((s) => s.toggleExport)
+  const handleClose = onClose || toggleExport
   const runExport = useWritingStore((s) => s.runExport)
 
   const [selected, setSelected] = useState('txt')
@@ -23,7 +27,8 @@ export default function ExportModal() {
   const [chapterRange, setChapterRange] = useState('all')
 
   async function handleExport() {
-    if (!id) return
+    const bookId = propId
+    if (!bookId) return
     setRunning(true)
     setOutput('')
     const opt = EXPORT_FORMATS.find(f => f.key === selected)
@@ -36,7 +41,7 @@ export default function ExportModal() {
     try {
       const api = window.electronAPI
       if (api) {
-        const result = await api.runExport(id, args)
+        const result = await api.runExport(bookId, args)
         setOutput(result || '导出完成')
       }
     } catch (e: any) {
@@ -46,9 +51,9 @@ export default function ExportModal() {
   }
 
   return (
-    <div className="modal-overlay" onClick={toggleExport}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ minWidth: 520 }}>
-        <button className="modal-close" onClick={toggleExport}>✕</button>
+        <button className="modal-close" onClick={handleClose}>✕</button>
         <div className="modal-title">导出管理</div>
 
         <div className="mb-16">

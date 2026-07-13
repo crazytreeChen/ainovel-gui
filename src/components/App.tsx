@@ -11,6 +11,7 @@ import ConfirmModalHost from './ConfirmModal'
 import ErrorBoundary from './ErrorBoundary'
 import SearchModal from './SearchModal'
 import ShortcutHelpModal from './ShortcutHelpModal'
+import ModalHost from './ModalHost'
 import { useIPCListeners } from '@/hooks/useIPCListeners'
 
 function resolveTheme(theme: ThemeMode): string {
@@ -43,10 +44,6 @@ function AppRoutes() {
   useIPCListeners()
   const [showSearch, setShowSearch] = useState(false)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
-  const showHelp = useAppStore((s) => s.showHelp)
-  const showDiagnostics = useAppStore((s) => s.showDiagnostics)
-  const showModelSwitch = useAppStore((s) => s.showModelSwitch)
-  const showCoCreate = useAppStore((s) => s.showCoCreate)
 
   // 键盘事件
   useEffect(() => {
@@ -62,18 +59,15 @@ function AppRoutes() {
         setShowShortcutHelp(s => !s)
         return
       }
+      // Escape 只处理搜索和快捷键帮助，其他模态框由 ModalHost 处理
       if (e.key === 'Escape') {
         if (showSearch) { setShowSearch(false); return }
         if (showShortcutHelp) { setShowShortcutHelp(false); return }
-        if (showHelp) useAppStore.getState().toggleHelp()
-        if (showDiagnostics) useAppStore.getState().toggleDiagnostics()
-        if (showModelSwitch) useAppStore.getState().toggleModelSwitch()
-        if (showCoCreate) useAppStore.getState().toggleCoCreate()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSearch, showShortcutHelp, showHelp, showDiagnostics, showModelSwitch, showCoCreate])
+  }, [showSearch, showShortcutHelp])
 
   return (
     <>
@@ -99,6 +93,7 @@ function AppRoutes() {
     </Routes>
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
       {showShortcutHelp && <ShortcutHelpModal />}
+      <ModalHost />
     </>
   )
 }

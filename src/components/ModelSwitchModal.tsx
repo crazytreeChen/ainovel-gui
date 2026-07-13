@@ -12,17 +12,22 @@ const THINKING_LEVELS = [
   { key: 'xhigh', label: '极高' }, { key: 'max', label: '最大' },
 ]
 
-export default function ModelSwitchModal() {
+interface ModelSwitchModalProps {
+  onClose?: () => void
+}
+
+export default function ModelSwitchModal({ onClose }: ModelSwitchModalProps) {
   const toggleModelSwitch = useUIStore((s) => s.toggleModelSwitch)
+  const handleClose = onClose || toggleModelSwitch
   const [selectedRole, setSelectedRole] = useState('')
   const [provider, setProvider] = useState('openrouter')
   const [model, setModel] = useState('google/gemini-2.5-flash')
   const [thinking, setThinking] = useState('medium')
 
   return (
-    <div className="modal-overlay" onClick={toggleModelSwitch}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ minWidth: 500 }}>
-        <button className="modal-close" onClick={toggleModelSwitch}>✕</button>
+        <button className="modal-close" onClick={handleClose}>✕</button>
         <div className="modal-title">模型切换</div>
 
         <div className="mb-16">

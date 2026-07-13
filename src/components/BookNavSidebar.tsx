@@ -5,13 +5,13 @@ interface NavItem {
   path: string
   label: string
   icon: string
-  action?: 'toggleExport'
+  action?: 'pushExport'
 }
 
 export default function BookNavSidebar({ bookId }: { bookId: string }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const toggleExport = useUIStore((s) => s.toggleExport)
+  const pushModal = useUIStore((s) => s.pushModal)
 
   const items: NavItem[] = [
     { path: `/books/${bookId}/workspace?mode=writing`, label: '创作工作台', icon: '⚡' },
@@ -25,7 +25,7 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
     { path: `/books/${bookId}/world`, label: '世界观/风格', icon: '🌍' },
     { path: `/books/${bookId}/summaries`, label: '摘要', icon: '📝' },
     { path: `/books/${bookId}/dashboard`, label: '写作统计', icon: '📊' },
-    { path: '', label: '导出管理', icon: '📤', action: 'toggleExport' },
+    { path: '', label: '导出管理', icon: '📤', action: 'pushExport' },
   ]
 
   return (
@@ -51,8 +51,8 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
               key={item.path || item.label}
               className="nav-sidebar-item cursor-clickable"
               onClick={() => {
-                if (item.action === 'toggleExport') {
-                  toggleExport()
+                if (item.action === 'pushExport') {
+                  pushModal('export', { id: bookId })
                 } else {
                   navigate(item.path)
                 }

@@ -17,6 +17,11 @@ declare global {
   }
 }
 
+export interface ModalState {
+  type: string
+  props?: Record<string, unknown>
+}
+
 export interface UIState {
   mode: AppMode
   startupMode: StartupMode
@@ -38,6 +43,12 @@ export interface UIState {
 
   error: string | null
   toasts: ToastItem[]
+
+  // 模态框栈
+  modalStack: ModalState[]
+  pushModal: (type: string, props?: Record<string, unknown>) => void
+  popModal: () => void
+  closeAllModals: () => void
 
   setMode: (mode: AppMode) => void
   setStartupMode: (mode: StartupMode) => void
@@ -77,6 +88,7 @@ export const useUIStore = create<UIState>()(
   placeholderText: '输入小说需求开始创作...',
   error: null,
   toasts: [],
+  modalStack: [],
 
   setMode: (mode) => set({ mode }),
   setStartupMode: (startupMode) => set({ startupMode }),
@@ -91,6 +103,13 @@ export const useUIStore = create<UIState>()(
   toggleCoCreate: () => set((s) => ({ showCoCreate: !s.showCoCreate })),
   toggleImport: () => set((s) => ({ showImport: !s.showImport })),
   toggleExport: () => set((s) => ({ showExport: !s.showExport })),
+  pushModal: (type, props) => set((s) => ({
+    modalStack: [...s.modalStack, { type, props }],
+  })),
+  popModal: () => set((s) => ({
+    modalStack: s.modalStack.slice(0, -1),
+  })),
+  closeAllModals: () => set({ modalStack: [] }),
   setDiagReport: (diagReport) => set({ diagReport }),
   setTheme: (theme) => { localStorage.setItem('ainovel-theme', theme); set({ theme }) },
   addToast: (t) => set((s) => ({ toasts: [...s.toasts, t] })),
