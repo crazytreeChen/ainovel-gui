@@ -85,12 +85,15 @@ function register(ipcMain: Electron.IpcMain) {
       state.ainovelProcess.on('exit', (code: number | null) => {
         state.lastWritingExitCode = code
         state.ainovelProcess = null
+        stopRuntimeSync()
+        if (code !== 0 && stderrData) log.error('start-writing:exit', { code, stderr: stderrData.slice(-2000) })
         sendProcessExited(code)
       })
       state.ainovelProcess.on('error', (err: Error) => {
         log.error('start-writing:error', err.message)
         state.lastWritingExitCode = -1
         state.ainovelProcess = null
+        stopRuntimeSync()
         sendProcessExited(-1)
       })
       startRuntimeSync()
@@ -230,12 +233,11 @@ function register(ipcMain: Electron.IpcMain) {
    * 重置 pendingUserConfirm 标志，重新 spawn CLI 恢复创作
    */
   ipcMain.handle('confirm-continue-writing', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+    // 确保旧进程已清理（规划暂停后进程可能尚未完全退出）
+    await stopAinovelProcess()
     pendingUserConfirm = false
     lastPhase = '' // 重置相位追踪，避免重复暂停
     log.info('confirm-continue-writing: 用户确认继续', { bookId })
-    // 清理上一轮残留事件（规划暂停后进程已退出，但 events 未清空）
-    state.engineEvents.length = 0
-    delete state._lastStderrEvent
     // 通过 resume-writing 恢复 CLI 进程
     const binary = getAinovelBinary()
     if (!existsSync(binary)) return false
@@ -386,8 +388,10 @@ function register(ipcMain: Electron.IpcMain) {
       })
       
       // 收集 stderr（事件日志）
+      let stderrData = ''
       state.ainovelProcess.stderr.on('data', (data: any) => {
-        parseStderr(data.toString())
+        const text = data.toString(); stderrData += text
+        parseStderr(text)
       })
       
       // 处理 stdout（流式输出）
@@ -413,6 +417,7 @@ function register(ipcMain: Electron.IpcMain) {
       state.ainovelProcess.on('exit', (code: number | null) => {
         state.lastWritingExitCode = code
         stopRuntimeSync(); state.ainovelProcess = null
+        if (code !== 0 && stderrData) log.error('create-book-auto:exit', { code, stderr: stderrData.slice(-2000) })
         sendProcessExited(code)
         // 尝试读取生成的书籍名称更新 SQLite
         try {
@@ -903,6 +908,36 @@ function doRuntimeSync() {
     } catch (e: any) { log.error('runtime-sync:chapters', e) }
   }
 
+  // 同步 drafts/ 草稿和计划 → SQLite（运行时实时同步，避免前端打开章节时拿到旧数据）
+  const draftDir = join(bookDir, 'drafts')
+  if (existsSync(draftDir)) {
+    try {
+      const currentMtime = statSync(draftDir).mtimeMs
+      const draftCacheKey = 'drafts_dir'
+      if (planFileCache[draftCacheKey] !== currentMtime) {
+        const files = readdirSync(draftDir)
+        for (const file of files) {
+          if (file.endsWith('.draft.md')) {
+            const num = parseInt(file.replace('.draft.md', ''), 10)
+            if (!isNaN(num)) {
+              const content = readFileSync(join(draftDir, file), 'utf8')
+              db.saveDraft(bookId, num, content)
+            }
+          } else if (file.endsWith('.plan.json')) {
+            const num = parseInt(file.replace('.plan.json', ''), 10)
+            if (!isNaN(num)) {
+              try {
+                const plan = JSON.parse(readFileSync(join(draftDir, file), 'utf8'))
+                db.saveChapterPlan(bookId, plan)
+              } catch { /* 文件可能正在写入中 */ }
+            }
+          }
+        }
+        planFileCache[draftCacheKey] = currentMtime
+      }
+    } catch (e: any) { log.debug('runtime-sync:drafts', e?.message || e) }
+  }
+
   // 同步 progress.json → SQLite progress 表
   if (bookId) {
     try {
@@ -1038,7 +1073,7 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
     },
     // 指南针
     {
-      key: 'compass', path: join(bookDir, 'compass.json'),
+      key: 'compass', path: join(bookDir, 'meta', 'compass.json'),
       save: (data: any) => { if (data) db.saveCompass(bookId, data) },
     },
     // 角色
@@ -1048,7 +1083,7 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
     },
     // 配角名册
     {
-      key: 'cast', path: join(bookDir, 'cast_ledger.json'),
+      key: 'cast', path: join(bookDir, 'meta', 'cast_ledger.json'),
       save: (data: any) => { if (data?.length) db.saveCastEntries(bookId, data) },
     },
     // 时间线
@@ -1068,7 +1103,7 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
     },
     // 状态变化
     {
-      key: 'state_changes', path: join(bookDir, 'state_changes.json'),
+      key: 'state_changes', path: join(bookDir, 'meta', 'state_changes.json'),
       save: (data: any) => { if (data?.length) db.saveStateChanges(bookId, data) },
     },
     // 世界观规则
@@ -1078,12 +1113,12 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
     },
     // 风格规则
     {
-      key: 'style_rules', path: join(bookDir, 'style_rules.json'),
+      key: 'style_rules', path: join(bookDir, 'meta', 'style_rules.json'),
       save: (data: any) => { if (data) db.saveStyleRules(bookId, data) },
     },
     // 仿写画像
     {
-      key: 'simulation_profile', path: join(bookDir, 'simulation_profile.json'),
+      key: 'simulation_profile', path: join(bookDir, 'meta', 'simulation_profile.json'),
       save: (data: any) => { if (data) db.saveSimulationProfile(bookId, data) },
     },
     // 用户规则（引擎写入 meta/user_rules.json）
@@ -1173,4 +1208,4 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
   } catch (e: any) { log.debug('runtime-sync:plan-skip', { key: 'user_directives', error: e.message }) }
 }
 
-module.exports = { register }
+module.exports = { register, stopAinovelProcess }

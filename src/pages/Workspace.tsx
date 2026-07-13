@@ -21,11 +21,14 @@ export default function Workspace() {
   const setActiveBookId = useAppStore(s => s.setActiveBookId)
   const resumeWriting = useWritingStore(s => s.resumeWriting)
   const pauseWriting = useWritingStore(s => s.pauseWriting)
+  const stopWriting = useWritingStore(s => s.stopWriting)
+  const confirmContinueWriting = useWritingStore(s => s.confirmContinueWriting)
   const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
   const clearEvents = useAppStore(s => s.clearEvents)
   const clearStreamOutput = useWritingStore(s => s.clearStreamOutput)
   const [fullscreen, setFullscreen] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
+  const [resuming, setResuming] = useState(false)
 
   // ── 规划完成确认 ──
   const [planningComplete, setPlanningComplete] = useState(false)
@@ -46,7 +49,7 @@ export default function Workspace() {
     if (!id || confirming) return
     setConfirming(true)
     try {
-      const ok = await window.electronAPI!.confirmContinueWriting(id)
+      const ok = await confirmContinueWriting(id)
       if (ok) {
         setPlanningComplete(false)
         showToast('继续创作中...', 'success')
@@ -57,12 +60,12 @@ export default function Workspace() {
       showToast('恢复创作失败: ' + e.message, 'error')
     }
     setConfirming(false)
-  }, [id, confirming])
+  }, [id, confirming, confirmContinueWriting])
 
-  const handleDecline = useCallback(() => {
+  const handleDecline = useCallback(async () => {
     setPlanningComplete(false)
-    setMode('idle')
-  }, [setMode])
+    await stopWriting()
+  }, [stopWriting])
 
   // 同步运行状态
   useEffect(() => {
@@ -76,9 +79,19 @@ export default function Workspace() {
   }, [id, setActiveBookId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleResume = async () => {
-    if (!id) return
-    const ok = await resumeWriting(id)
-    showToast(ok ? '创作已恢复' : '恢复失败，请检查控制台错误信息', ok ? 'success' : 'error')
+    if (!id || resuming) return
+    setResuming(true)
+    try {
+      const ok = await resumeWriting(id)
+      showToast(ok ? '创作已恢复' : '恢复失败，请检查控制台错误信息', ok ? 'success' : 'error')
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  const handleStop = async () => {
+    await stopWriting()
+    showToast('创作已停止', 'info')
   }
 
   const processAlive = snapshot.runtimeState === 'running'
@@ -102,10 +115,14 @@ export default function Workspace() {
             <button className="welcome-mode-btn text-xs" onClick={() => setFullscreen(false)}>⊞ 退出全屏</button>
           )}
           {isRunning && (
-            <button onClick={() => pauseWriting()} className="btn btn-danger btn-sm">⏸ 暂停</button>
+            <>
+              <button onClick={() => pauseWriting()} className="btn btn-danger btn-sm">⏸ 暂停</button>
+              <button onClick={handleStop} className="btn btn-danger btn-sm" title="完全停止引擎进程">⏹ 停止</button>
+            </>
           )}
           {!isRunning && !isComplete && (
-            <button onClick={handleResume} className="btn btn-primary btn-sm">
+            <button onClick={handleResume} disabled={resuming} className="btn btn-primary btn-sm"
+              style={{ opacity: resuming ? 0.6 : 1 }}>
               ▶️ {snapshot.completedCount ? '继续' : '开始'}
             </button>
           )}

@@ -14,6 +14,7 @@ export interface WritingState {
 
   startWriting: (prompt: string, bookId?: string) => Promise<boolean>
   resumeWriting: (bookId: string) => Promise<boolean>
+  confirmContinueWriting: (bookId: string) => Promise<boolean>
   sendInput: (text: string) => Promise<boolean>
   pauseWriting: () => Promise<boolean>
   stopWriting: () => Promise<boolean>
@@ -94,7 +95,9 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   pauseWriting: async () => {
     const api = window.electronAPI
     if (!api) return false
-    return api.pauseWriting()
+    const result = await api.pauseWriting()
+    useUIStore.getState().setMode('paused')
+    return result
   },
 
   stopWriting: async () => {
@@ -103,6 +106,22 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     await api.stopWriting()
     useUIStore.getState().setMode('idle')
     return true
+  },
+
+  confirmContinueWriting: async (bookId) => {
+    const api = window.electronAPI
+    if (!api) return false
+    try {
+      useUIStore.getState().setMode('running')
+      useUIStore.getState().setError(null)
+      const result = await api.confirmContinueWriting(bookId)
+      if (!result) useUIStore.getState().setMode('idle')
+      return result
+    } catch (e: any) {
+      useUIStore.getState().setError(e.message)
+      useUIStore.getState().setMode('idle')
+      return false
+    }
   },
 
   runDiag: async () => {

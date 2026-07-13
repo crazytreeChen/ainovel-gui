@@ -74,7 +74,7 @@ export interface ChapterInfo {
   wordCount: number
 }
 
-export type AppMode = 'welcome' | 'idle' | 'running' | 'completed'
+export type AppMode = 'welcome' | 'idle' | 'running' | 'paused' | 'completed'
 
 export type StartupMode = 'quick' | 'cocreate'
 

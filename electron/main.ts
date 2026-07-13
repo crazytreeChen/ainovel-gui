@@ -65,13 +65,9 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', async () => {
-  // 停止 ainovel 进程（writing 模块暴露的 stopAinovelProcess 在模块内部
-  // 通过 state.ainovelProcess 控制）
-  const { spawn } = require('child_process')
-  if (state.ainovelProcess && state.ainovelProcess.exitCode === null) {
-    try {
-      state.ainovelProcess.kill('SIGTERM')
-    } catch { /* 进程可能已退出 */ }
+  // 停止 ainovel 进程并清理运行时同步定时器
+  const { stopAinovelProcess } = require('./ipc/writing')
+  if (typeof stopAinovelProcess === 'function') {
+    await stopAinovelProcess()
   }
-  state.engineEvents.length = 0
 })

@@ -8,6 +8,7 @@ import (
 
 	"github.com/voocel/agentcore/schema"
 	"github.com/voocel/ainovel-cli/internal/domain"
+	"github.com/voocel/ainovel-cli/internal/errs"
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
@@ -108,6 +109,10 @@ func (t *SaveReviewTool) Execute(_ context.Context, args json.RawMessage) (json.
 		if len(affected) == 0 && r.Chapter > 0 {
 			affected = []int{r.Chapter}
 		}
+		// 自动补全后仍为空：chapter 也为 0，无法确定要打磨/重写哪章
+		if len(affected) == 0 {
+			return nil, fmt.Errorf("affected_chapters is required when verdict=%s and chapter is not available", finalVerdict)
+		}
 		// 构建 PendingRewrite 列表（按严重程度排序）
 		var rewrites []domain.PendingRewrite
 		for _, ch := range affected {
@@ -191,7 +196,7 @@ func (t *SaveReviewTool) Execute(_ context.Context, args json.RawMessage) (json.
 			return nil, fmt.Errorf("set pending rewrites: %w", err)
 		}
 		if err := t.store.Progress.SetFlow(flow); err != nil {
-			return nil, fmt.Errorf("set flow %s: %w", flow, err)
+			return nil, fmt.Errorf("set flow %s: %w: %w", flow, errs.ErrToolConflict, err)
 		}
 		// 增加审阅-修复循环次数
 		t.store.Progress.IncrementReviewRepairCycle(r.Chapter)
@@ -269,9 +274,9 @@ func validateReviewEntry(r domain.ReviewEntry) error {
 	if err := validateDimensions(r.Dimensions); err != nil {
 		return err
 	}
-	if (r.Verdict == "rewrite" || r.Verdict == "polish") && len(r.AffectedChapters) == 0 {
-		return fmt.Errorf("affected_chapters is required when verdict=%s", r.Verdict)
-	}
+	// affected_chapters 的检查移到 Execute 中自动补全之后执行：
+	// 评分卡门禁可能把 accept 升级为 polish/rewrite，此时 LLM 未提供 affected_chapters
+	// 是合理的，自动补全会用 r.Chapter 填充。在此处检查会导致不必要的失败。
 	return nil
 }
 

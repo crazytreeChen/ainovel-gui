@@ -100,23 +100,34 @@ func (t *CommitChapterTool) Schema() map[string]any {
 }
 
 func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (json.RawMessage, error) {
+	// 用 json.RawMessage 接收数组/对象字段，再做容错解析：
+	// LLM 偶尔会把 timeline_events / state_changes 等数组的元素传成字符串
+	// （如 "某事件描述" 而非 {"time":...,"event":...}），导致整体 Unmarshal 失败、
+	// commit_chapter 报错、Coordinator 卡死、StopGuard escalate 终止 run。
+	// 逐元素解析可跳过坏元素，保留有效数据，让章节提交正常完成。
 	var a struct {
-		Chapter             int                        `json:"chapter"`
-		Summary             string                     `json:"summary"`
-		Characters          []string                   `json:"characters"`
-		KeyEvents           []string                   `json:"key_events"`
-		TimelineEvents      []domain.TimelineEvent     `json:"timeline_events"`
-		ForeshadowUpdates   []domain.ForeshadowUpdate  `json:"foreshadow_updates"`
-		RelationshipChanges []domain.RelationshipEntry `json:"relationship_changes"`
-		StateChanges        []domain.StateChange       `json:"state_changes"`
-		CastIntros          []domain.CastIntro         `json:"cast_intros"`
-		HookType            string                     `json:"hook_type"`
-		DominantStrand      string                     `json:"dominant_strand"`
-		Feedback            *domain.OutlineFeedback    `json:"feedback"`
+		Chapter             int                     `json:"chapter"`
+		Summary             string                  `json:"summary"`
+		Characters          []string                `json:"characters"`
+		KeyEvents           []string                `json:"key_events"`
+		TimelineEvents      []json.RawMessage       `json:"timeline_events"`
+		ForeshadowUpdates   []json.RawMessage       `json:"foreshadow_updates"`
+		RelationshipChanges []json.RawMessage       `json:"relationship_changes"`
+		StateChanges        []json.RawMessage       `json:"state_changes"`
+		CastIntros          []json.RawMessage       `json:"cast_intros"`
+		HookType            string                  `json:"hook_type"`
+		DominantStrand      string                  `json:"dominant_strand"`
+		Feedback            json.RawMessage         `json:"feedback"`
 	}
 	if err := json.Unmarshal(args, &a); err != nil {
 		return nil, fmt.Errorf("invalid args: %w: %w", errs.ErrToolArgs, err)
 	}
+	timelineEvents := parseArrayLenient[domain.TimelineEvent](a.TimelineEvents, a.Chapter, "timeline_events")
+	foreshadowUpdates := parseArrayLenient[domain.ForeshadowUpdate](a.ForeshadowUpdates, a.Chapter, "foreshadow_updates")
+	relationshipChanges := parseArrayLenient[domain.RelationshipEntry](a.RelationshipChanges, a.Chapter, "relationship_changes")
+	stateChanges := parseArrayLenient[domain.StateChange](a.StateChanges, a.Chapter, "state_changes")
+	castIntros := parseArrayLenient[domain.CastIntro](a.CastIntros, a.Chapter, "cast_intros")
+	feedback := parseFeedbackLenient(a.Feedback)
 	if a.Chapter <= 0 {
 		return nil, fmt.Errorf("chapter must be > 0: %w", errs.ErrToolArgs)
 	}
@@ -207,32 +218,32 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	}
 
 	// 4. 更新状态增量
-	if len(a.TimelineEvents) > 0 {
-		for i := range a.TimelineEvents {
-			a.TimelineEvents[i].Chapter = a.Chapter
+	if len(timelineEvents) > 0 {
+		for i := range timelineEvents {
+			timelineEvents[i].Chapter = a.Chapter
 		}
-		if err := t.store.World.AppendTimelineEvents(a.TimelineEvents); err != nil {
+		if err := t.store.World.AppendTimelineEvents(timelineEvents); err != nil {
 			return nil, fmt.Errorf("append timeline: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
-	if len(a.ForeshadowUpdates) > 0 {
-		if err := t.store.World.UpdateForeshadow(a.Chapter, a.ForeshadowUpdates); err != nil {
+	if len(foreshadowUpdates) > 0 {
+		if err := t.store.World.UpdateForeshadow(a.Chapter, foreshadowUpdates); err != nil {
 			return nil, fmt.Errorf("update foreshadow: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
-	if len(a.RelationshipChanges) > 0 {
-		for i := range a.RelationshipChanges {
-			a.RelationshipChanges[i].Chapter = a.Chapter
+	if len(relationshipChanges) > 0 {
+		for i := range relationshipChanges {
+			relationshipChanges[i].Chapter = a.Chapter
 		}
-		if err := t.store.World.UpdateRelationships(a.RelationshipChanges); err != nil {
+		if err := t.store.World.UpdateRelationships(relationshipChanges); err != nil {
 			return nil, fmt.Errorf("update relationships: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
-	if len(a.StateChanges) > 0 {
-		for i := range a.StateChanges {
-			a.StateChanges[i].Chapter = a.Chapter
+	if len(stateChanges) > 0 {
+		for i := range stateChanges {
+			stateChanges[i].Chapter = a.Chapter
 		}
-		if err := t.store.World.AppendStateChanges(a.StateChanges); err != nil {
+		if err := t.store.World.AppendStateChanges(stateChanges); err != nil {
 			return nil, fmt.Errorf("append state changes: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
@@ -241,7 +252,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	// 失败时只 warn 不阻断 commit——名册是次要数据，可通过下一章 commit 自愈。
 	if len(a.Characters) > 0 {
 		coreNames := loadCoreCharacterNameSet(t.store)
-		if err := t.store.Cast.MergeAppearances(a.Chapter, a.Characters, a.CastIntros, coreNames); err != nil {
+		if err := t.store.Cast.MergeAppearances(a.Chapter, a.Characters, castIntros, coreNames); err != nil {
 			slog.Warn("配角名册累加失败，跳过", "module", "commit", "chapter", a.Chapter, "err", err)
 		}
 	}
@@ -300,7 +311,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 		ReviewReason:   reviewReason,
 		HookType:       a.HookType,
 		DominantStrand: a.DominantStrand,
-		Feedback:       a.Feedback,
+		Feedback:       feedback,
 		ArcEnd:         arcEnd,
 		VolumeEnd:      volumeEnd,
 		Volume:         vol,
@@ -615,4 +626,44 @@ func (t *CommitChapterTool) layeredBookComplete(progress *domain.Progress) bool 
 		return false
 	}
 	return true
+}
+
+// parseArrayLenient 逐元素解析 JSON 数组，跳过格式错误的元素（如 LLM 误传字符串）。
+// 这些世界状态增量（时间线/伏笔/关系/状态变化/配角名册）是次要数据——丢几条坏元素
+// 远比整体 commit 失败导致 StopGuard escalate 终止 run 的代价小。
+func parseArrayLenient[T any](raws []json.RawMessage, chapter int, field string) []T {
+	var result []T
+	for i, raw := range raws {
+		var item T
+		if err := json.Unmarshal(raw, &item); err != nil {
+			slog.Warn("commit_chapter: 跳过格式错误的数组元素",
+				"module", "commit", "chapter", chapter, "field", field,
+				"index", i, "err", err)
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+// parseFeedbackLenient 容错解析 feedback 字段。
+// LLM 偶尔把 feedback 传成字符串化 JSON（如 "{\"deviation\":...}"）而非直接对象。
+// 先按对象解析；失败时尝试当字符串取出再二次解析；都失败则返回 nil（不阻断 commit）。
+func parseFeedbackLenient(raw json.RawMessage) *domain.OutlineFeedback {
+	if len(raw) == 0 {
+		return nil
+	}
+	var fb domain.OutlineFeedback
+	if err := json.Unmarshal(raw, &fb); err == nil {
+		return &fb
+	}
+	// 尝试当字符串解析（LLM 传了字符串化 JSON）
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		if err2 := json.Unmarshal([]byte(str), &fb); err2 == nil {
+			return &fb
+		}
+	}
+	slog.Warn("commit_chapter: feedback 字段格式错误，跳过", "module", "commit")
+	return nil
 }

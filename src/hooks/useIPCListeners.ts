@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { useWritingStore } from '@/stores/useWritingStore'
+import { useUIStore } from '@/stores/useUIStore'
 
 /**
  * 监听 Electron IPC 事件：运行时推送、进程退出、流式输出、初始化检查
@@ -12,6 +13,7 @@ export function useIPCListeners() {
   const refreshEvents = useAppStore((s) => s.refreshEvents)
   const refreshChapters = useAppStore((s) => s.refreshChapters)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastErrorKeyRef = useRef<string>('')
 
   useEffect(() => {
     async function init() {
@@ -74,5 +76,24 @@ export function useIPCListeners() {
       }
     })
     return cleanup
+  }, [])
+
+  // 监听 ERROR 事件并弹 Toast
+  useEffect(() => {
+    const unsub = useAppStore.subscribe((state, prevState) => {
+      if (state.events.length <= prevState.events.length) return
+      const last = state.events[state.events.length - 1]
+      if (!last || last.level !== 'error') return
+      // 去重：同一错误摘要只弹一次
+      const key = `${last.time}-${last.summary}`
+      if (key === lastErrorKeyRef.current) return
+      lastErrorKeyRef.current = key
+      useUIStore.getState().addToast({
+        id: Date.now(),
+        message: last.summary.slice(0, 120),
+        type: 'error',
+      })
+    })
+    return unsub
   }, [])
 }

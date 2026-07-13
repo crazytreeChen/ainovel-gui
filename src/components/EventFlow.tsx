@@ -24,9 +24,18 @@ function formatDuration(d: number): string {
 export default function EventFlow() {
   const events = useAppStore((s) => s.events)
   const containerRef = useRef<HTMLDivElement>(null)
+  const autoScrollRef = useRef(true)
+
+  // 检测用户是否手动滚动离开底部
+  const handleScroll = () => {
+    const el = containerRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    autoScrollRef.current = atBottom
+  }
 
   useEffect(() => {
-    if (containerRef.current) {
+    if (containerRef.current && autoScrollRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
   }, [events.length])
@@ -36,7 +45,7 @@ export default function EventFlow() {
   }
 
   return (
-    <div ref={containerRef} style={{ height: '100%', overflow: 'auto' }}>
+    <div ref={containerRef} onScroll={handleScroll} style={{ height: '100%', overflow: 'auto' }}>
       <div className="panel-header">事件流</div>
       {events.slice(-200).map((ev, i) => {
         const indent = ev.depth > 0 ? '  ' : ''
