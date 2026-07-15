@@ -9,6 +9,7 @@ const { register: registerBooks } = require('./ipc/books')
 const { register: registerWorkspace } = require('./ipc/workspace')
 const { register: registerWriting } = require('./ipc/writing')
 const { register: registerSystem } = require('./ipc/system')
+const { register: registerCocreate } = require('./ipc/cocreate')
 
 const log = createLogger('main')
 
@@ -32,13 +33,23 @@ function createWindow() {
 
   if (isDev) {
     state.mainWindow.loadURL('http://localhost:5173')
-    state.mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     state.mainWindow.loadFile(join(__dirname, '../dist/index.html'))
   }
 
   state.mainWindow.on('ready-to-show', () => state.mainWindow?.show())
-  state.mainWindow.on('closed', () => { state.mainWindow = null })
+  // 点叉号后强制整应用退出，避免 dev 残留/启动 cmd 不结束
+  state.mainWindow.on('close', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
+    }
+  })
+  state.mainWindow.on('closed', () => {
+    state.mainWindow = null
+    if (process.platform !== 'darwin') {
+      app.quit()
+    }
+  })
 
   const homeConfig = join(app.getPath('home'), '.ainovel', 'config.json')
   if (existsSync(homeConfig)) state.configPath = homeConfig
@@ -51,6 +62,7 @@ app.whenReady().then(() => {
   registerWorkspace(ipcMain)
   registerWriting(ipcMain)
   registerSystem(ipcMain)
+  registerCocreate(ipcMain)
   log.info('All IPC modules registered')
 
   createWindow()
@@ -66,8 +78,27 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async () => {
   // 停止 ainovel 进程并清理运行时同步定时器
-  const { stopAinovelProcess } = require('./ipc/writing')
-  if (typeof stopAinovelProcess === 'function') {
-    await stopAinovelProcess()
+  try {
+    const { stopAinovelProcess } = require('./ipc/writing')
+    if (typeof stopAinovelProcess === 'function') {
+      // 给一点时间优雅停写，但不无限卡住退出
+      await Promise.race([
+        stopAinovelProcess(),
+        new Promise((r) => setTimeout(r, 3000)),
+      ])
+    }
+  } catch (e) {
+    log.warn('before-quit stopAinovelProcess failed', e)
   }
+})
+
+// 确保进程退出时尽量结束子进程，让 concurrently/cmd 一并结束
+app.on('will-quit', () => {
+  try {
+    const { stopAinovelProcess } = require('./ipc/writing')
+    if (typeof stopAinovelProcess === 'function') {
+      // fire-and-forget best effort
+      stopAinovelProcess()
+    }
+  } catch {}
 })

@@ -19,29 +19,28 @@ export default function DetailPanel() {
     if (snapshot.novelName) setBookName(snapshot.novelName)
   }, [snapshot.novelName])
 
+  // 切书时清空右侧面板本地状态，再按当前 id 重载
   useEffect(() => {
     if (!id || !window.electronAPI) return
-    if (!bookName) {
-      window.electronAPI.getBook(id).then((b: any) => {
-        if (b?.name) setBookName(b.name)
-      }).catch(() => {})
-    }
-    loadStats()
-    refreshChapters()
-  }, [id, bookName])
+    setBookName('')
+    setUsageStats(null)
+    setRunMeta(null)
+    setCast([])
+    setChapterCount(0)
 
-  async function loadStats() {
-    if (!id || !window.electronAPI) return
-    window.electronAPI.getUsageStats(id).then(setUsageStats).catch(() => {})
-    window.electronAPI.getRunMeta(id).then(setRunMeta).catch(() => {})
-    window.electronAPI.getBookCast(id).then(setCast).catch(() => {})
-  }
+    let cancelled = false
+    window.electronAPI.getBook(id).then((b: any) => {
+      if (!cancelled && b?.name) setBookName(b.name)
+    }).catch(() => {})
+    window.electronAPI.getUsageStats(id).then((s: any) => { if (!cancelled) setUsageStats(s) }).catch(() => {})
+    window.electronAPI.getRunMeta(id).then((s: any) => { if (!cancelled) setRunMeta(s) }).catch(() => {})
+    window.electronAPI.getBookCast(id).then((s: any) => { if (!cancelled) setCast(s || []) }).catch(() => {})
+    window.electronAPI.getBookChapters(id).then((chs: any) => {
+      if (!cancelled) setChapterCount(chs?.length || 0)
+    }).catch(() => {})
 
-  async function refreshChapters() {
-    if (!id || !window.electronAPI) return
-    const chs = await window.electronAPI.getBookChapters(id).catch(() => [])
-    if (chs?.length) setChapterCount(chs.length)
-  }
+    return () => { cancelled = true }
+  }, [id])
 
   return (
     <div>

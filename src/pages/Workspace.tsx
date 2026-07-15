@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import TopBar from '@/components/TopBar'
 import StatusSidebar from '@/components/StatusSidebar'
 import EventFlow from '@/components/EventFlow'
@@ -8,12 +9,15 @@ import InputBox from '@/components/InputBox'
 import ExportModal from '@/components/ExportModal'
 import BookNavSidebar from '@/components/BookNavSidebar'
 import { useAppStore } from '@/stores/useAppStore'
+import { useUIStore } from '@/stores/useUIStore'
 import { useWritingStore } from '@/stores/useWritingStore'
 import { useBookId } from '@/hooks/useBookId'
 import { showToast } from '@/components/Toast'
 
 export default function Workspace() {
   const id = useBookId()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const pushModal = useUIStore(s => s.pushModal)
   const mode = useAppStore(s => s.mode)
   const setMode = useAppStore(s => s.setMode)
   const showExport = useAppStore(s => s.showExport)
@@ -24,6 +28,8 @@ export default function Workspace() {
   const stopWriting = useWritingStore(s => s.stopWriting)
   const confirmContinueWriting = useWritingStore(s => s.confirmContinueWriting)
   const refreshSnapshot = useAppStore(s => s.refreshSnapshot)
+  const refreshEvents = useAppStore(s => s.refreshEvents)
+  const refreshChapters = useAppStore(s => s.refreshChapters)
   const clearEvents = useAppStore(s => s.clearEvents)
   const clearStreamOutput = useWritingStore(s => s.clearStreamOutput)
   const [fullscreen, setFullscreen] = useState(false)
@@ -49,13 +55,12 @@ export default function Workspace() {
     if (!id || confirming) return
     setConfirming(true)
     try {
-      const ok = await confirmContinueWriting(id)
-      if (ok) {
+      const result = await confirmContinueWriting(id)
+      if (result.ok) {
         setPlanningComplete(false)
         showToast('继续创作中...', 'success')
-      } else {
-        showToast('恢复创作失败，请检查配置', 'error')
       }
+      // 失败时 store 已 toast 真实错误
     } catch (e: any) {
       showToast('恢复创作失败: ' + e.message, 'error')
     }
@@ -67,23 +72,42 @@ export default function Workspace() {
     await stopWriting()
   }, [stopWriting])
 
-  // 同步运行状态
+  // 同步运行状态：切书时清空实时输出，并按当前 bookId 重载快照/事件/章节
   useEffect(() => {
     if (!id || !window.electronAPI) return
     setActiveBookId(id)
-    refreshSnapshot().then(() => {
+    clearStreamOutput()
+    Promise.all([
+      refreshSnapshot(),
+      refreshEvents(),
+      refreshChapters(),
+    ]).then(() => {
+      // 再次确认仍在同一本书
+      if (useAppStore.getState().activeBookId !== id) return
       const snap = useAppStore.getState().snapshot
-      if (snap.isRunning && mode !== 'running') setMode('running')
-      if (!snap.isRunning && mode === 'welcome') setMode('idle')
+      if (snap.isRunning) setMode('running')
+      else if (mode === 'running' || mode === 'welcome') setMode('idle')
     })
-  }, [id, setActiveBookId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, setActiveBookId, clearStreamOutput, refreshSnapshot, refreshEvents, refreshChapters, setMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 新建书籍「共创规划」入口：?cocreate=1 时自动打开共创窗
+  useEffect(() => {
+    if (!id) return
+    if (searchParams.get('cocreate') !== '1') return
+    pushModal('coCreate')
+    // 去掉 query，避免刷新重复弹窗
+    const next = new URLSearchParams(searchParams)
+    next.delete('cocreate')
+    setSearchParams(next, { replace: true })
+  }, [id, searchParams, setSearchParams, pushModal])
 
   const handleResume = async () => {
     if (!id || resuming) return
     setResuming(true)
     try {
-      const ok = await resumeWriting(id)
-      showToast(ok ? '创作已恢复' : '恢复失败，请检查控制台错误信息', ok ? 'success' : 'error')
+      const result = await resumeWriting(id)
+      // 失败时 store 已 toast 真实错误；成功再提示
+      if (result.ok) showToast('创作已恢复', 'success')
     } finally {
       setResuming(false)
     }

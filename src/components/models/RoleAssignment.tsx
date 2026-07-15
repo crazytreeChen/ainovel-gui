@@ -16,7 +16,7 @@ export default function RoleAssignment({ roles, allItems, enabled, roleAssign, o
     <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: 14, marginBottom: 24 }}>
       <div className="sidebar-section-header" style={{ margin: 0, marginBottom: 8 }}>角色模型分配（可选）</div>
       {roles.map(role => {
-        const roleKey = role.key || 'default'
+        const roleKey = role.key
         const currentVal = roleAssign[roleKey] || { provider: '', model: '' }
         const selectedProv = apiProviders.find(p => p.key === currentVal.provider)
         return (

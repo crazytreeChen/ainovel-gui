@@ -29,6 +29,7 @@ export interface UseBookCRUDReturn {
   handleEditClick: (book: BookItem, e: React.MouseEvent) => void
   handleEditSave: () => Promise<void>
   handleImport: () => Promise<void>
+  handleOpenFolder: (book: BookItem, e: React.MouseEvent) => Promise<void>
   closeEdit: () => void
   closeDelete: () => void
 }
@@ -73,11 +74,20 @@ export function useBookCRUD(): UseBookCRUDReturn {
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget || deleteConfirm !== '确认删除') return
-    if (window.electronAPI) {
-      await window.electronAPI.deleteBook(deleteTarget.id)
+    if (!window.electronAPI) return
+    try {
+      const result: any = await window.electronAPI.deleteBook(deleteTarget.id)
       setDeleteTarget(null)
       setDeleteConfirm('')
       await loadBooks()
+      const removed = (result && result.removed) || []
+      if (Array.isArray(removed) && removed.length > 0) {
+        showToast('书籍与文件夹已删除', 'success')
+      } else {
+        showToast('书籍已删除（未找到可删文件夹或已不存在）', 'success')
+      }
+    } catch (e: any) {
+      showToast(e?.message || '删除失败', 'error')
     }
   }, [deleteTarget, deleteConfirm, loadBooks])
 
@@ -136,6 +146,21 @@ export function useBookCRUD(): UseBookCRUDReturn {
     }
   }, [loadBooks])
 
+  const handleOpenFolder = useCallback(async (book: BookItem, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!window.electronAPI) return
+    try {
+      const dir = await window.electronAPI.getBookDir(book.id)
+      if (!dir) {
+        showToast('未找到书籍目录', 'error')
+        return
+      }
+      await window.electronAPI.openDirectory(dir)
+    } catch (err: any) {
+      showToast(err?.message || '打开目录失败', 'error')
+    }
+  }, [])
+
   const closeEdit = useCallback(() => {
     setEditBook(null)
   }, [])
@@ -171,6 +196,7 @@ export function useBookCRUD(): UseBookCRUDReturn {
     handleEditClick,
     handleEditSave,
     handleImport,
+    handleOpenFolder,
     closeEdit,
     closeDelete,
   }
