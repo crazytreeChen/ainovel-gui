@@ -25,7 +25,16 @@ export default function ProviderEditPanel({
   return (
     <div className="card border-bottom" style={{ borderColor: 'var(--color-accent)', padding: 16, marginBottom: 12 }}>
       <div className="flex-row items-center justify-between mb-12">
-        <span className="text-lg" style={{ fontWeight: 'bold', color: 'var(--color-accent2)' }}>{item.name}</span>
+        {!presets.find(p => p.key === item.key) ? (
+          <input
+            value={item.name}
+            onChange={e => onUpdate(item.key, 'name', e.target.value)}
+            placeholder="显示名称"
+            style={{ ...inputStyle, fontSize: 16, fontWeight: 'bold', color: 'var(--color-accent2)', maxWidth: 280 }}
+          />
+        ) : (
+          <span className="text-lg" style={{ fontWeight: 'bold', color: 'var(--color-accent2)' }}>{item.name}</span>
+        )}
         <div className="flex-row items-center gap-8">
           <span className="text-muted text-xs">启用:</span>
           <div onClick={() => onSetEnabled(item.key)}

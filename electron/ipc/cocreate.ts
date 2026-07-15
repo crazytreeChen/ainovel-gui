@@ -79,7 +79,19 @@ function buildStoryStateSummary(bookId: string): string {
   const lines: string[] = []
   try {
     const book = bookId ? getDB().getBook(bookId) : null
-    if (book?.name) lines.push(`- 书名：《${book.name}》`)
+    if (book) {
+      const rawName = String(book.name || '').trim()
+      const premiseFull = String(book.premise || '').replace(/\s+/g, ' ').trim()
+      let displayName = rawName || '未命名共创'
+      if (!rawName || rawName.length > 40) displayName = '未命名共创'
+      else {
+        const bare = rawName.replace(/[….]+$/, '')
+        if (premiseFull && bare.length >= 12 && (premiseFull === bare || premiseFull.startsWith(bare))) {
+          displayName = '未命名共创'
+        }
+      }
+      lines.push(`- 书名：《${displayName}》`)
+    }
     if (book?.phase) lines.push(`- 阶段：${book.phase}`)
     if (book?.premise) {
       const p = String(book.premise)
@@ -92,7 +104,11 @@ function buildStoryStateSummary(bookId: string): string {
     readJsonSafe(join(dir, 'meta', 'progress.json'))
   if (progress) {
     const name = String(progress.novel_name || progress.novelName || '').trim()
-    if (name) lines.push(`- 书名：《${name}》`)
+    if (name) {
+      let dn = name
+      if (name.length > 40) dn = '未命名共创'
+      lines.push(`- 书名：《${dn}》`)
+    }
     const completed = Array.isArray(progress.completed_chapters)
       ? progress.completed_chapters.length
       : Array.isArray(progress.completedChapters)

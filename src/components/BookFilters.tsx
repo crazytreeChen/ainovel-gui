@@ -15,7 +15,7 @@ export default function BookFilters({ viewMode, setViewMode, onNewBook, onImport
           onClick={() => setViewMode('detail')} style={{ fontSize: 11, padding: '4px 10px' }}>☰ 详情</button>
       </div>
       <button className="welcome-mode-btn" onClick={onNewBook}>+ 新建书籍</button>
-      <button className="welcome-mode-btn" onClick={onImport}>📂 打开目录</button>
+      <button className="welcome-mode-btn" onClick={onImport} title="从外部文件夹导入已有 ainovel 作品">📂 导入目录</button>
     </div>
   )
 }

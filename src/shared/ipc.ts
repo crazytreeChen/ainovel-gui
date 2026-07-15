@@ -106,7 +106,7 @@ export interface ElectronAPI {
   // 书籍
   listBooks: () => Promise<BookItem[]>
   createBook: (name: string, style: string, phase?: string, premise?: string, tags?: string) => Promise<BookItem>
-  deleteBook: (id: string) => Promise<boolean>
+  deleteBook: (id: string) => Promise<boolean | { ok: boolean; removed?: string[]; errors?: string[] }>
   getBook: (id: string) => Promise<BookItem | null>
   updateBook: (id: string, fields: Record<string, any>) => Promise<boolean>
   getBookDir: (id: string) => Promise<string | null>
@@ -161,6 +161,7 @@ export interface ElectronAPI {
   fetchModels: (baseUrl: string, apiKey: string, protocol: string) => Promise<{ models?: string[]; error?: string }>
   loadProviderConfig: () => Promise<any>
   saveProviderConfig: (config: any) => Promise<boolean>
+  applyProviderToBook: (bookId?: string) => Promise<boolean>
 
   // 全局配置
   saveConfigValue: (key: string, value: any) => Promise<boolean>
@@ -168,15 +169,15 @@ export interface ElectronAPI {
 
   // 快照/事件/章节
   getSnapshot: (bookId?: string) => Promise<UISnapshot>
-  getEvents: () => Promise<EventItem[]>
+  getEvents: (bookId?: string) => Promise<EventItem[]>
   clearEvents: () => Promise<boolean>
-  readChapter: (chapterNum: number) => Promise<string>
-  listChapters: () => Promise<ChapterItem[]>
+  readChapter: (chapterNum: number, bookId?: string) => Promise<string>
+  listChapters: (bookId?: string) => Promise<ChapterItem[]>
 
   // 创作控制
-  startWriting: (prompt: string, bookId?: string) => Promise<boolean>
+  startWriting: (prompt: string, bookId?: string) => Promise<{ ok: boolean; error?: string }>
   createBookAuto: (premise: string, style?: string) => Promise<{ book?: BookItem; error?: string | null }>
-  resumeWriting: (bookId: string) => Promise<boolean>
+  resumeWriting: (bookId: string) => Promise<{ ok: boolean; error?: string }>
   sendInput: (text: string, bookId?: string) => Promise<boolean>
   pauseWriting: () => Promise<boolean>
   stopWriting: () => Promise<boolean>
@@ -281,7 +282,7 @@ export interface ElectronAPI {
 
   // 规划完成事件（确认继续写作）
   onPlanningComplete: (callback: (data: { bookId: string }) => void) => () => void
-  confirmContinueWriting: (bookId: string) => Promise<boolean>
+  confirmContinueWriting: (bookId: string) => Promise<{ ok: boolean; error?: string }>
 
   // 质量审查进度
   onAuditProgress: (callback: (data: { current: number; total: number; chapter: number; elapsed: number; remaining: number }) => void) => () => void

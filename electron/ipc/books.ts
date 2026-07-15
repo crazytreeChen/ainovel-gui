@@ -11,10 +11,62 @@ const { existsSync, mkdirSync, readFileSync, readdirSync, copyFileSync } = requi
 
 const log = createLogger('ipc:books')
 
+
+/** 清理 books 下已无数据库记录的孤儿目录 */
+function cleanupOrphanBookDirs() {
+  const { readdirSync, rmSync, existsSync: fExists, statSync } = require('fs')
+  const { resolve: pathResolve, join: pJoin } = require('path')
+  let known = new Set<string>()
+  try {
+    const rows = getDB().listBooks() || []
+    for (const b of rows) if (b?.id) known.add(String(b.id))
+  } catch (e: any) {
+    log.error('cleanupOrphanBookDirs:list', e)
+    return { removed: [], errors: ['无法读取书籍列表'] }
+  }
+
+  const roots = [
+    pathResolve(join(GUI_DATA_DIR, 'books')),
+    pathResolve(join(home, '.ainovel-gui', 'books')),
+  ]
+  const seen = new Set<string>()
+  const removed: string[] = []
+  const errors: string[] = []
+
+  for (const root of roots) {
+    try {
+      if (!fExists(root)) continue
+      const keyRoot = process.platform === 'win32' ? root.toLowerCase() : root
+      if (seen.has(keyRoot)) continue
+      seen.add(keyRoot)
+      for (const name of readdirSync(root)) {
+        // 只处理 UUID 形式目录
+        if (!/^[0-9a-fA-F-]{8,64}$/.test(name)) continue
+        if (known.has(name)) continue
+        const full = pJoin(root, name)
+        try {
+          if (!statSync(full).isDirectory()) continue
+          rmSync(full, { recursive: true, force: true, maxRetries: 8, retryDelay: 120 })
+          removed.push(full)
+          log.info('cleanupOrphanBookDirs:removed', full)
+        } catch (e: any) {
+          errors.push((e && e.message) || String(e))
+          log.error('cleanupOrphanBookDirs:rm', e)
+        }
+      }
+    } catch (e: any) {
+      errors.push((e && e.message) || String(e))
+    }
+  }
+  return { removed, errors }
+}
+
 function register(ipcMain: Electron.IpcMain) {
   ipcMain.handle('list-books', () => {
-    try { return getDB().listBooks() }
-    catch (e: any) { log.error('list-books', e); return [] }
+    try {
+      try { cleanupOrphanBookDirs() } catch (e: any) { log.warn('list-books:orphan', e?.message || e) }
+      return getDB().listBooks()
+    } catch (e: any) { log.error('list-books', e); return [] }
   })
 
   ipcMain.handle('create-book', (_e: Electron.IpcMainInvokeEvent, name: string, style: string, phase: string, premise: string, tags: string) => {
@@ -28,9 +80,94 @@ function register(ipcMain: Electron.IpcMain) {
     return { ...book, completedCount: 0 }
   })
 
-  ipcMain.handle('delete-book', (_e: Electron.IpcMainInvokeEvent, id: string) => {
+    ipcMain.handle('delete-book', async (_e: Electron.IpcMainInvokeEvent, id: string) => {
+    if (typeof id !== 'string' || !/^[0-9a-fA-F-]{8,64}$/.test(id)) {
+      throw new Error('无效的书籍 ID')
+    }
+
+    // 若正在写这本书，先停引擎
+    if (state.activeWritingBookId === id && state.ainovelProcess) {
+      try { state.ainovelProcess.kill('SIGTERM') } catch {}
+      state.ainovelProcess = null
+      state.activeWritingBookId = ''
+    }
+
+    // 先删数据库
     getDB().deleteBook(id)
-    return true
+
+    // 强制删除托管目录 books/<id>（处理 junction：~/.ainovel-gui -> zayang）
+    const { rmSync, existsSync: fExists, realpathSync } = require('fs')
+    const { resolve: pathResolve } = require('path')
+    const candidates = [
+      join(GUI_DATA_DIR, 'books', id),
+      join(home, '.ainovel-gui', 'books', id),
+    ]
+    const seen = new Set<string>()
+    const removed: string[] = []
+    const errors: string[] = []
+
+    for (const dir of candidates) {
+      try {
+        const abs = pathResolve(dir)
+        const key = process.platform === 'win32' ? abs.toLowerCase() : abs
+        if (seen.has(key)) continue
+        seen.add(key)
+        if (!fExists(abs)) continue
+        // 确认 basename 是 book id，防止误删
+        if (require('path').basename(abs) !== id) continue
+        rmSync(abs, { recursive: true, force: true, maxRetries: 8, retryDelay: 120 })
+        removed.push(abs)
+        log.info('delete-book:removed-dir', abs)
+        // 也尝试 realpath 后的路径（junction 另一端若仍残留）
+        try {
+          const real = realpathSync(abs)
+          if (real && real !== abs && fExists(real)) {
+            rmSync(real, { recursive: true, force: true, maxRetries: 8, retryDelay: 120 })
+            removed.push(real)
+            log.info('delete-book:removed-realpath', real)
+          }
+        } catch {}
+      } catch (e: any) {
+        // 若 abs 已在 rm 中被删掉，realpath 会失败，可忽略
+        const msg = e?.message || String(e)
+        // ENOENT 不算失败
+        if (!/ENOENT|no such file/i.test(msg)) {
+          errors.push(msg)
+          log.error('delete-book:rm', msg)
+        }
+      }
+    }
+
+    // 再扫一遍确认
+    for (const dir of candidates) {
+      if (fExists(pathResolve(dir))) {
+        errors.push('文件夹仍存在: ' + dir)
+      }
+    }
+
+    if (errors.length) {
+      // 再试一次孤儿清理
+      try {
+        const orphan = cleanupOrphanBookDirs()
+        removed.push(...(orphan.removed || []))
+      } catch {}
+      if (errors.length && removed.length === 0) {
+        throw new Error('书籍记录已删除，但文件夹未删干净: ' + errors[0])
+      }
+    }
+
+    // 顺手清掉其它已不在库里的 books 残留目录
+    try {
+      const orphan = cleanupOrphanBookDirs()
+      for (const p of (orphan.removed || [])) {
+        if (!removed.includes(p)) removed.push(p)
+      }
+      for (const e of (orphan.errors || [])) errors.push(e)
+    } catch (e: any) {
+      log.error('delete-book:orphan-cleanup', e)
+    }
+
+    return { ok: true, removed, errors }
   })
 
   ipcMain.handle('get-book', (_e: Electron.IpcMainInvokeEvent, id: string) => {
@@ -103,26 +240,25 @@ function register(ipcMain: Electron.IpcMain) {
       const name = progress?.novelName || bookJson?.name || '未命名作品'
       const style = bookJson?.style || progress?.style || 'default'
       const phase = progress?.phase || 'init'
+      // 始终落到托管目录 books/<新id>，删除时才能干净清掉
+      const destDir = join(GUI_DATA_DIR, 'books', id)
+      if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true })
+      try {
+        require('fs').cpSync(dir, destDir, { recursive: true, force: true })
+        log.info('import-workspace:copied', { from: dir, to: destDir })
+      } catch (e: any) {
+        log.error('import-workspace:copy', e)
+        throw new Error('导入失败：无法复制到托管目录 ' + (e?.message || e))
+      }
       const book = {
         id, name, premise: bookJson?.premise || '', style,
         planning_tier: bookJson?.planningTier || bookJson?.planning_tier || 'short',
         phase, flow: 'writing', layered: progress?.layered ? 1 : 0,
         total_word_count: progress?.totalWordCount || 0,
-        workspace_dir: dir,
+        workspace_dir: destDir,
         created_at: now, updated_at: now, last_opened_at: now,
       }
       getDB().createBook(book)
-      // Copy cover
-      const coverExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp']
-      for (const ext of coverExts) {
-        const coverFile = join(dir, 'cover' + ext)
-        if (existsSync(coverFile)) {
-          const destDir = join(GUI_DATA_DIR, 'books', id)
-          if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true })
-          copyFileSync(coverFile, join(destDir, 'cover' + ext))
-          break
-        }
-      }
       // Sync data to SQLite
       const db = getDB()
       try {

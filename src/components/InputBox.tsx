@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { useWritingStore } from '@/stores/useWritingStore'
+import { useUIStore } from '@/stores/useUIStore'
 import { useCommandPalette } from '@/hooks/useCommandPalette'
 
 /** 默认系统提示词：要求 AI 用中文思考和输出 */
@@ -16,6 +17,7 @@ export default function InputBox() {
   const sendInput = useWritingStore((s) => s.sendInput)
   const startWriting = useWritingStore((s) => s.startWriting)
   const resumeWriting = useWritingStore((s) => s.resumeWriting)
+  const starting = useWritingStore((s) => s.starting)
 
   const {
     showCommands,
@@ -33,6 +35,14 @@ export default function InputBox() {
   const handleSubmit = useCallback(async () => {
     const text = inputValue.trim()
     if (!text) return
+    if (starting) {
+      useUIStore.getState().addToast({
+        id: Date.now(),
+        message: '正在启动中，请稍候',
+        type: 'error',
+      })
+      return
+    }
 
     // 斜杠命令：委托给 useCommandPalette
     if (text.startsWith('/')) {
@@ -44,18 +54,13 @@ export default function InputBox() {
 
     const processAlive = snapshot.runtimeState === 'running' || mode === 'running'
 
-    // 欢迎模式 / 进程未运行：把输入当作「共创/启动指令」
-    // - 有当前书籍：先启动/恢复进程，再把文本作为干预/引导写入
-    // - 无当前书籍：按欢迎模式直接 startWriting
+    // 欢迎模式 / 进程未运行
     if (!processAlive) {
       if (activeBookId) {
-        // 先保存引导文本，再拉起进程（避免进程未运行导致“干预失败”）
-        await sendInput(text, activeBookId)
-        const ok = await resumeWriting(activeBookId)
-        if (!ok) {
-          // 恢复失败时再尝试 startWriting（新开一轮）
-          await startWriting(SYSTEM_PROMPT + '\n\n' + text, activeBookId)
-        }
+        // 主流程：pending_steer → resume。失败直接报错，不再 start 掩盖。
+        const saved = await sendInput(text, activeBookId)
+        if (!saved) return
+        await resumeWriting(activeBookId)
         return
       }
 
@@ -65,7 +70,7 @@ export default function InputBox() {
 
     // 运行模式: 发送干预/继续指令
     await sendInput(text, activeBookId || undefined)
-  }, [inputValue, mode, snapshot.runtimeState, activeBookId, setInputValue, startWriting, resumeWriting, sendInput, executeCommand])
+  }, [inputValue, mode, snapshot.runtimeState, activeBookId, setInputValue, startWriting, resumeWriting, sendInput, executeCommand, starting])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // 先尝试命令面板键盘导航
@@ -112,6 +117,7 @@ export default function InputBox() {
           value={inputValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          disabled={starting}
           placeholder={isWelcomeLike
             ? (startupMode === 'quick' ? '输入共创/创作指令后回车，将自动开始或恢复创作...' : '输入共创对话，回车后自动开始/恢复...')
             : '输入剧情干预，例如：把感情线提前到第4章'

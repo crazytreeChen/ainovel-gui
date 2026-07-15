@@ -8,9 +8,10 @@ interface BookCardProps {
   onClick: () => void
   onEdit: (e: React.MouseEvent) => void
   onDelete: (e: React.MouseEvent) => void
+  onOpenFolder: (e: React.MouseEvent) => void
 }
 
-export default function BookCard({ book, viewMode, onClick, onEdit, onDelete }: BookCardProps) {
+export default function BookCard({ book, viewMode, onClick, onEdit, onDelete, onOpenFolder }: BookCardProps) {
   return (
     <div
       className="cursor-clickable"
@@ -34,6 +35,9 @@ export default function BookCard({ book, viewMode, onClick, onEdit, onDelete }: 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: viewMode === 'card' ? 8 : 2 }}>
           <div style={{ fontWeight: 'bold', fontSize: viewMode === 'card' ? 15 : 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.name}</div>
           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            <button onClick={onOpenFolder}
+              style={{ background: 'none', border: 'none', color: 'var(--color-dim)', cursor: 'pointer', fontSize: viewMode === 'card' ? 13 : 11, padding: '0 4px' }}
+              title="打开书籍目录">📂</button>
             <button onClick={onEdit}
               style={{ background: 'none', border: 'none', color: 'var(--color-dim)', cursor: 'pointer', fontSize: viewMode === 'card' ? 12 : 10, padding: '0 4px' }} title="编辑">✎</button>
             <button onClick={onDelete}

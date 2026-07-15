@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchModels: (baseUrl: string, apiKey: string, protocol: string) => ipcRenderer.invoke('fetch-models', baseUrl, apiKey, protocol),
   loadProviderConfig: () => ipcRenderer.invoke('load-provider-config'),
   saveProviderConfig: (config: any) => ipcRenderer.invoke('save-provider-config', config),
+  applyProviderToBook: (bookId?: string) => ipcRenderer.invoke('apply-provider-to-book', bookId),
 
   // 全局配置
   saveConfigValue: (key: string, value: any) => ipcRenderer.invoke('save-config-value', key, value),
@@ -66,10 +67,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 快照和状态
   getSnapshot: (bookId?: string) => ipcRenderer.invoke('get-snapshot', bookId),
-  getEvents: () => ipcRenderer.invoke('get-events'),
+  getEvents: (bookId?: string) => ipcRenderer.invoke('get-events', bookId),
   clearEvents: () => ipcRenderer.invoke('clear-events'),
-  readChapter: (chapterNum: number) => ipcRenderer.invoke('read-chapter', chapterNum),
-  listChapters: () => ipcRenderer.invoke('list-chapters'),
+  readChapter: (chapterNum: number, bookId?: string) => ipcRenderer.invoke('read-chapter', chapterNum, bookId),
+  listChapters: (bookId?: string) => ipcRenderer.invoke('list-chapters', bookId),
 
   // 创作控制
   startWriting: (prompt: string, bookId?: string) => ipcRenderer.invoke('start-writing', prompt, bookId),

@@ -30,7 +30,7 @@ function parseStderrLine(line: string) {
   state._lastStderrEvent = { category, summary }
   const now = new Date()
   const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${timeStr}`
-  state.engineEvents.push({ time: ts, category, summary, detail: '', agent: '', depth: 0, level: category === 'ERROR' ? 'error' : category === 'WARN' ? 'warn' : 'info', duration: 0 })
+  state.engineEvents.push({ time: ts, category, summary, detail: '', agent: '', depth: 0, level: category === 'ERROR' ? 'error' : category === 'WARN' ? 'warn' : 'info', duration: 0, bookId: state.activeWritingBookId || '' })
 }
 
 function parseStderr(text: string) {
@@ -40,6 +40,181 @@ function parseStderr(text: string) {
   if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
 }
 
+/** 启动成功判定窗口：spawn 后需保持运行，秒退即失败 */
+const STARTUP_HEALTH_MS = 2800
+
+type WritingStartResult = { ok: boolean; error?: string }
+
+/** CLI 真配置路径：output/novel/meta/run.json */
+function bookRunJsonPath(cwd: string): string {
+  const { join: pJoin } = require('path')
+  return pJoin(cwd, 'output', 'novel', 'meta', 'run.json')
+}
+
+/** 从 stderr / last-error 提取真实失败原因 */
+function extractCliError(stderrData: string): string {
+  const { join: pJoin } = require('path')
+  const { existsSync: fExists, readFileSync: fRead } = require('fs')
+  const { homedir } = require('os')
+  const lines = String(stderrData || '')
+    .split(/\r?\n/)
+    .map((l: string) => l.trim())
+    .filter(Boolean)
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]
+    if (/error:\s*/i.test(line) || /config error/i.test(line) || /失败|错误/.test(line)) {
+      return line.replace(/^\[.*?\]\s*/, '').slice(0, 300)
+    }
+  }
+
+  try {
+    const lastErrPath = pJoin(homedir(), '.ainovel', 'last-error.log')
+    if (fExists(lastErrPath)) {
+      const content = fRead(lastErrPath, 'utf8').trim()
+      const last = content.split(/\r?\n/).filter(Boolean).pop() || ''
+      if (last) return last.replace(/^\[[^\]]*\]\s*/, '').replace(/^error:\s*/i, 'error: ').slice(0, 300)
+    }
+  } catch {}
+
+  if (lines.length) return lines.slice(-2).join(' | ').slice(0, 300)
+  return ''
+}
+
+/**
+ * 启动 CLI 并等待健康窗口：
+ * - 窗口内退出 => ok:false + 真实错误
+ * - 窗口后仍存活 => ok:true
+ */
+function spawnWritingEngine(opts: {
+  binary: string
+  args: string[]
+  cwd: string
+  bookId: string
+  logLabel: string
+}): Promise<WritingStartResult> {
+  const { binary, args, cwd, bookId, logLabel } = opts
+  return new Promise((resolve) => {
+    let startupSettled = false
+    let stderrData = ''
+    let healthTimer: ReturnType<typeof setTimeout> | null = null
+
+    const settle = (result: WritingStartResult) => {
+      if (startupSettled) return
+      startupSettled = true
+      if (healthTimer) clearTimeout(healthTimer)
+      resolve(result)
+    }
+
+    let proc: any
+    try {
+      proc = spawn(binary, args, {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env },
+      })
+    } catch (e: any) {
+      resolve({ ok: false, error: e?.message || 'spawn 失败' })
+      return
+    }
+
+    state.ainovelProcess = proc
+    state.outputDir = cwd
+    state.activeWritingBookId = bookId || ''
+    state.lastWritingExitCode = null
+
+    proc.stderr.on('data', (data: any) => {
+      const text = data.toString()
+      stderrData += text
+      parseStderr(text)
+    })
+
+    let streamMode = 'content'
+    let streamBuf = ''
+    let streamTimer: ReturnType<typeof setTimeout> | null = null
+    proc.stdout.on('data', (data: any) => {
+      const text = data.toString()
+      const clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
+      const tIdx = clean.indexOf('[T]')
+      const cIdx = clean.indexOf('[C]')
+      if (tIdx >= 0 || cIdx >= 0) {
+        if (streamBuf && streamBuf.trim()) {
+          state.mainWindow.webContents.send(
+            'stream-output',
+            JSON.stringify({ type: streamMode, text: streamBuf.trim() }),
+          )
+          streamBuf = ''
+        }
+        if (tIdx >= 0) streamMode = 'thinking'
+        if (cIdx >= 0) streamMode = 'content'
+        const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
+        const rest = clean.substring(idx).trim()
+        if (rest) streamBuf = rest
+      } else {
+        streamBuf += clean
+      }
+      if (streamBuf.length > 100 && streamBuf.trim()) {
+        state.mainWindow.webContents.send(
+          'stream-output',
+          JSON.stringify({ type: streamMode, text: streamBuf.trim() }),
+        )
+        streamBuf = ''
+      }
+      if (!streamTimer) {
+        streamTimer = setTimeout(() => {
+          streamTimer = null
+          if (streamBuf && streamBuf.trim()) {
+            state.mainWindow.webContents.send(
+              'stream-output',
+              JSON.stringify({ type: streamMode, text: streamBuf.trim() }),
+            )
+            streamBuf = ''
+          }
+        }, 500)
+      }
+    })
+
+    proc.on('exit', (code: number | null) => {
+      state.lastWritingExitCode = code
+      state.ainovelProcess = null
+      stopRuntimeSync()
+      if (code !== 0 && stderrData) {
+        log.error(logLabel + ':exit', { code, stderr: stderrData.slice(-2000) })
+      }
+      if (!startupSettled) {
+        const detail = extractCliError(stderrData)
+        settle({
+          ok: false,
+          error: detail || ('引擎启动失败（退出码 ' + (code ?? -1) + '）'),
+        })
+      }
+      sendProcessExited(code)
+    })
+
+    proc.on('error', (err: Error) => {
+      log.error(logLabel + ':error', err.message)
+      state.lastWritingExitCode = -1
+      state.ainovelProcess = null
+      stopRuntimeSync()
+      if (!startupSettled) settle({ ok: false, error: err.message })
+      sendProcessExited(-1)
+    })
+
+    startRuntimeSync()
+
+    healthTimer = setTimeout(() => {
+      if (state.ainovelProcess === proc && proc.exitCode === null) {
+        settle({ ok: true })
+        return
+      }
+      if (!startupSettled) {
+        const detail = extractCliError(stderrData)
+        settle({ ok: false, error: detail || '引擎未能保持运行' })
+      }
+    }, STARTUP_HEALTH_MS)
+  })
+}
 
 /** 解析书籍工作目录 */
 function resolveBookCwd(bookId: string): string {
@@ -70,7 +245,7 @@ function resolveBookCwd(bookId: string): string {
  * - 可恢复阶段：仅 --headless
  * - 新建/init：--headless --prompt <premise|hint>
  */
-function buildHeadlessArgs(bookId: string, promptHint?: string): { args: string[]; cwd: string; mode: 'resume' | 'prompt'; phase: string } {
+function buildHeadlessArgs(bookId: string, promptHint?: string): { args: string[]; cwd: string; mode: 'resume' | 'prompt'; phase: string; error?: string } {
   const { join: pJoin } = require('path')
   const { existsSync: fExists, readFileSync: fRead } = require('fs')
   const cwd = resolveBookCwd(bookId)
@@ -107,125 +282,71 @@ function buildHeadlessArgs(bookId: string, promptHint?: string): { args: string[
   if (!prompt && bookId) {
     try {
       const book = getDB().getBook(bookId)
-      prompt = String(book?.premise || book?.name || '').trim()
+      // 仅使用 premise，不用书名冒充需求
+      prompt = String(book?.premise || '').trim()
     } catch {}
   }
-  if (!prompt) prompt = '请基于当前书籍设定继续创作'
+  if (!prompt) {
+    log.error('buildHeadlessArgs:missing-prompt', { bookId, phase: phase || 'none', cwd })
+    return {
+      args: [],
+      cwd,
+      mode: 'prompt' as const,
+      phase: phase || 'none',
+      error: '无法启动：没有可恢复会话，且未提供创作提示词（premise/prompt）',
+    }
+  }
   args.push('--prompt', prompt)
   log.info('buildHeadlessArgs', { bookId, mode: 'prompt', phase: phase || 'none', cwd, promptLen: prompt.length })
-  return { args, cwd, mode: 'prompt', phase: phase || 'none' }
+  return { args, cwd, mode: 'prompt' as const, phase: phase || 'none' }
 }
 function register(ipcMain: Electron.IpcMain) {
-  ipcMain.handle('start-writing', async (_e: Electron.IpcMainInvokeEvent, _prompt: string, bookId: string) => {
+  ipcMain.handle('start-writing', async (_e: Electron.IpcMainInvokeEvent, _prompt: string, bookId: string): Promise<WritingStartResult> => {
     await stopAinovelProcess()
     const binary = getAinovelBinary()
-    if (!existsSync(binary)) return false
+    if (!existsSync(binary)) {
+      return { ok: false, error: '未找到 ainovel-cli 可执行文件: ' + binary }
+    }
     const built = buildHeadlessArgs(bookId || '', _prompt || '')
+    if (built.error) return { ok: false, error: built.error }
     const cwd = built.cwd
-    const args = built.args
-    log.info('start-writing', { bookId, mode: built.mode, cwd })
-    state.outputDir = cwd
-    state.activeWritingBookId = bookId || ''
-    state.lastWritingExitCode = null
-    try {
-      state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
-      let stderrData = ''
-      state.ainovelProcess.stderr.on('data', (data: any) => {
-        const text = data.toString(); stderrData += text
-        parseStderr(text)
-      })
-      let streamMode = 'content', streamBuf = '', streamTimer: ReturnType<typeof setTimeout> | null = null
-      state.ainovelProcess.stdout.on('data', (data: any) => {
-        const text = data.toString()
-        const clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-        if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
-        const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
-        if (tIdx >= 0 || cIdx >= 0) {
-          if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
-          if (tIdx >= 0) streamMode = 'thinking'
-          if (cIdx >= 0) streamMode = 'content'
-          const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
-          const rest = clean.substring(idx).trim()
-          if (rest) streamBuf = rest
-        } else { streamBuf += clean }
-        if (streamBuf.length > 100 && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
-        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' } }, 500) }
-      })
-      state.ainovelProcess.on('exit', (code: number | null) => {
-        state.lastWritingExitCode = code
-        state.ainovelProcess = null
-        stopRuntimeSync()
-        if (code !== 0 && stderrData) log.error('start-writing:exit', { code, stderr: stderrData.slice(-2000) })
-        sendProcessExited(code)
-      })
-      state.ainovelProcess.on('error', (err: Error) => {
-        log.error('start-writing:error', err.message)
-        state.lastWritingExitCode = -1
-        state.ainovelProcess = null
-        stopRuntimeSync()
-        sendProcessExited(-1)
-      })
-      startRuntimeSync()
-      return true
-    } catch (e: any) { log.error('start-writing:spawn', e); return false }
+    if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true })
+    applyActiveProviderToBook(bookId || '', cwd)
+    log.info('start-writing', { bookId, mode: built.mode, phase: built.phase, cwd })
+    return spawnWritingEngine({
+      binary,
+      args: built.args,
+      cwd,
+      bookId: bookId || '',
+      logLabel: 'start-writing',
+    })
   })
 
-  ipcMain.handle('resume-writing', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
+  ipcMain.handle('resume-writing', async (_e: Electron.IpcMainInvokeEvent, bookId: string): Promise<WritingStartResult> => {
     await stopAinovelProcess()
     const binary = getAinovelBinary()
-    if (!existsSync(binary)) return false
+    if (!existsSync(binary)) {
+      return { ok: false, error: '未找到 ainovel-cli 可执行文件: ' + binary }
+    }
     const built = buildHeadlessArgs(bookId || '')
+    if (built.error) return { ok: false, error: built.error }
     const cwd = built.cwd
-    if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }) }
-    state.outputDir = cwd
-    state.activeWritingBookId = bookId || ''
-    state.lastWritingExitCode = null
-    const args = built.args
+    if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true })
+    applyActiveProviderToBook(bookId || '', cwd)
     log.info('resume-writing', { bookId, mode: built.mode, phase: built.phase, cwd })
-    try {
-      state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
-      let stderrData = ''
-      state.ainovelProcess.stderr.on('data', (data: any) => {
-        const text = data.toString(); stderrData += text
-        parseStderr(text)
-      })
-      let streamMode = 'content', streamBuf = '', streamTimer: ReturnType<typeof setTimeout> | null = null
-      state.ainovelProcess.stdout.on('data', (data: any) => {
-        const text = data.toString()
-        const clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-        if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
-        const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
-        if (tIdx >= 0 || cIdx >= 0) {
-          if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
-          if (tIdx >= 0) streamMode = 'thinking'
-          if (cIdx >= 0) streamMode = 'content'
-          const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
-          const rest = clean.substring(idx).trim()
-          if (rest) streamBuf = rest
-        } else { streamBuf += clean }
-        if (streamBuf.length > 100 && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
-        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' } }, 500) }
-      })
-      state.ainovelProcess.on('exit', (code: number | null) => {
-        if (code !== 0 && stderrData) log.error('resume exit:', code, stderrData)
-        state.lastWritingExitCode = code
-        stopRuntimeSync(); state.ainovelProcess = null
-        sendProcessExited(code)
-      })
-      state.ainovelProcess.on('error', (err: Error) => {
-        log.error('resume-writing:error', err.message)
-        state.lastWritingExitCode = -1
-        stopRuntimeSync(); state.ainovelProcess = null
-        sendProcessExited(-1)
-      })
-      startRuntimeSync()
-      return true
-    } catch (e: any) { log.error('resume-writing:spawn', e); return false }
+    return spawnWritingEngine({
+      binary,
+      args: built.args,
+      cwd,
+      bookId: bookId || '',
+      logLabel: 'resume-writing',
+    })
   })
 
   ipcMain.handle('send-input', async (_e: Electron.IpcMainInvokeEvent, text: string, bookIdArg?: string) => {
     const now = new Date()
     const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
+    const bookId = bookIdArg || getActiveWritingBookId()
 
     // 进程正在运行：写入 stdin
     if (state.ainovelProcess && state.ainovelProcess.stdin && state.ainovelProcess.exitCode === null) {
@@ -239,44 +360,33 @@ function register(ipcMain: Electron.IpcMain) {
         // 短暂等待让 CLI 进入输入处理状态
         await new Promise(r => setTimeout(r, 100))
         state.ainovelProcess.stdin.write(text + '\n')
-        state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0 })
+        state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0, bookId: state.activeWritingBookId || bookId || '' })
         return true
       } catch (e: any) { log.error('send-input', e); return false }
     }
 
     // 进程未运行（规划暂停/已退出）：保存为 pending_steer，下次恢复时生效
-    const bookId = bookIdArg || getActiveWritingBookId()
     if (bookId) {
       try {
         const db = getDB()
         const existing = db.getRunMeta(bookId) || {}
         db.saveRunMeta(bookId, { ...existing, pending_steer: text, pending_steer_at: timeStr })
-        // 同时写入 JSON 文件（CLI 从 meta/run.json 读取）
-        const { join: pJoin } = require('path')
-        const { existsSync: fExists, writeFileSync: fWrite } = require('fs')
-        const { homedir } = require('os')
+        // 只写 CLI 主路径 output/novel/meta/run.json
+        const { existsSync: fExists, writeFileSync: fWrite, mkdirSync: fMkdir, readFileSync: fRead } = require('fs')
+        const { dirname: fDirname } = require('path')
         const dir = resolveBookCwd(bookId)
-        const runJsonCandidates = [
-          pJoin(dir, 'output', 'novel', 'meta', 'run.json'),
-          pJoin(dir, 'meta', 'run.json'),
-        ]
-        let runJsonPath = runJsonCandidates.find((p: string) => fExists(p)) || runJsonCandidates[0]
+        const runJsonPath = bookRunJsonPath(dir)
         if (fExists(runJsonPath)) {
-          try {
-            const raw = JSON.parse(require('fs').readFileSync(runJsonPath, 'utf8'))
-            raw.pending_steer = text
-            raw.pending_steer_at = timeStr
-            fWrite(runJsonPath, JSON.stringify(raw, null, 2), 'utf8')
-          } catch (e: any) { /* 文件可能不存在，忽略 */ }
+          const raw = JSON.parse(fRead(runJsonPath, 'utf8') || '{}') || {}
+          raw.pending_steer = text
+          raw.pending_steer_at = timeStr
+          fWrite(runJsonPath, JSON.stringify(raw, null, 2), 'utf8')
         } else {
-          // 创建 CLI 默认目录结构：output/novel/meta/run.json
-          const { mkdirSync } = require('fs')
-          const metaDir = pJoin(dir, 'output', 'novel', 'meta')
-          if (!fExists(metaDir)) mkdirSync(metaDir, { recursive: true })
-          runJsonPath = pJoin(metaDir, 'run.json')
+          const metaDir = fDirname(runJsonPath)
+          if (!fExists(metaDir)) fMkdir(metaDir, { recursive: true })
           fWrite(runJsonPath, JSON.stringify({ pending_steer: text, pending_steer_at: timeStr }, null, 2), 'utf8')
         }
-        state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0 })
+        state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0, bookId: state.activeWritingBookId || bookId || '' })
         log.info('send-input:saved-as-pending-steer', { bookId, text: text.slice(0, 60) })
         return true
       } catch (e: any) { log.error('send-input:save-pending-steer', e); return false }
@@ -296,62 +406,41 @@ function register(ipcMain: Electron.IpcMain) {
    * 规划完成后用户确认继续
    * 重置 pendingUserConfirm 标志，重新 spawn CLI 恢复创作
    */
-  ipcMain.handle('confirm-continue-writing', async (_e: Electron.IpcMainInvokeEvent, bookId: string) => {
-    // 确保旧进程已清理（规划暂停后进程可能尚未完全退出）
+  ipcMain.handle('confirm-continue-writing', async (_e: Electron.IpcMainInvokeEvent, bookId: string): Promise<WritingStartResult> => {
     await stopAinovelProcess()
     pendingUserConfirm = false
-    lastPhase = '' // 重置相位追踪，避免重复暂停
+    lastPhase = ''
     log.info('confirm-continue-writing: 用户确认继续', { bookId })
     const binary = getAinovelBinary()
-    if (!existsSync(binary)) return false
+    if (!existsSync(binary)) {
+      return { ok: false, error: '未找到 ainovel-cli 可执行文件: ' + binary }
+    }
     const built = buildHeadlessArgs(bookId || '')
+    if (built.error) return { ok: false, error: built.error }
     const cwd = built.cwd
-    if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }) }
-    state.outputDir = cwd
-    state.activeWritingBookId = bookId || ''
-    state.lastWritingExitCode = null
-    const args = built.args
-    log.info('confirm-continue-writing', { bookId, mode: built.mode, phase: built.phase, cwd })
+    if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true })
+    applyActiveProviderToBook(bookId || '', cwd)
+    return spawnWritingEngine({
+      binary,
+      args: built.args,
+      cwd,
+      bookId: bookId || '',
+      logLabel: 'confirm-continue-writing',
+    })
+  })
+
+  // 模型切换后：同步当前启用模型到指定书籍（run_meta + run.json）
+  ipcMain.handle('apply-provider-to-book', async (_e: Electron.IpcMainInvokeEvent, bookId?: string) => {
+    const id = bookId || state.activeWritingBookId || ''
+    if (!id) return false
     try {
-      state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
-      const { join: pJoin } = require('path')
-      let stderrData = ''
-      state.ainovelProcess.stderr.on('data', (data: any) => {
-        const text = data.toString(); stderrData += text
-        parseStderr(text)
-      })
-      let streamMode = 'content', streamBuf = '', streamTimer: ReturnType<typeof setTimeout> | null = null
-      state.ainovelProcess.stdout.on('data', (data: any) => {
-        const text = data.toString()
-        const clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-        if (!clean || !state.mainWindow || state.mainWindow.isDestroyed()) return
-        const tIdx = clean.indexOf('[T]'), cIdx = clean.indexOf('[C]')
-        if (tIdx >= 0 || cIdx >= 0) {
-          if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
-          if (tIdx >= 0) streamMode = 'thinking'
-          if (cIdx >= 0) streamMode = 'content'
-          const idx = tIdx >= 0 ? tIdx + 3 : cIdx + 3
-          const rest = clean.substring(idx).trim()
-          if (rest) streamBuf = rest
-        } else { streamBuf += clean }
-        if (streamBuf.length > 100 && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' }
-        if (!streamTimer) { streamTimer = setTimeout(() => { streamTimer = null; if (streamBuf && streamBuf.trim()) { state.mainWindow.webContents.send('stream-output', JSON.stringify({type: streamMode, text: streamBuf.trim()})); streamBuf = '' } }, 500) }
-      })
-      state.ainovelProcess.on('exit', (code: number | null) => {
-        if (code !== 0 && stderrData) log.error('confirm-continue-writing exit:', code, stderrData)
-        state.lastWritingExitCode = code
-        stopRuntimeSync(); state.ainovelProcess = null; pendingUserConfirm = false
-        sendProcessExited(code)
-      })
-      state.ainovelProcess.on('error', (err: Error) => {
-        log.error('confirm-continue-writing:error', err.message)
-        state.lastWritingExitCode = -1
-        stopRuntimeSync(); state.ainovelProcess = null; pendingUserConfirm = false
-        sendProcessExited(-1)
-      })
-      startRuntimeSync()
+      const cwd = resolveBookCwd(id)
+      applyActiveProviderToBook(id, cwd)
       return true
-    } catch (e: any) { log.error('confirm-continue-writing:spawn', e); return false }
+    } catch (e: any) {
+      log.error('apply-provider-to-book', e)
+      return false
+    }
   })
 
   // ── 运行时读取（快照/事件/章节）──
@@ -361,24 +450,25 @@ function register(ipcMain: Electron.IpcMain) {
     state.engineEvents.length = 0
     return true
   })
-  ipcMain.handle('read-chapter', async (_e: Electron.IpcMainInvokeEvent, ch: string) => {
-    if (!state.outputDir) return ''
-    const bookDir = findActiveBookDir()
+  ipcMain.handle('read-chapter', async (_e: Electron.IpcMainInvokeEvent, ch: string, bookId?: string) => {
+    const bookDir = resolveBookDirReadOnly(bookId || state.activeWritingBookId || undefined)
     if (!bookDir) return ''
-    const f = join(bookDir, 'chapters', `${String(ch).padStart(2, '0')}.md`)
-    if (!existsSync(f)) {
-      const fallback1 = join(bookDir, 'output', 'novel', 'chapters', `${String(ch).padStart(2, '0')}.md`)
-      if (existsSync(fallback1)) try { return readFileSync(fallback1, 'utf8') } catch (e: any) { return '' }
-      const fallback2 = join(state.outputDir, 'output', 'chapters', `${String(ch).padStart(2, '0')}.md`)
-      if (existsSync(fallback2)) try { return readFileSync(fallback2, 'utf8') } catch (e: any) { return '' }
-      return ''
+    const candidates = [
+      join(bookDir, 'chapters', `${String(ch).padStart(2, '0')}.md`),
+      join(bookDir, 'output', 'novel', 'chapters', `${String(ch).padStart(2, '0')}.md`),
+      join(bookDir, 'output', 'chapters', `${String(ch).padStart(2, '0')}.md`),
+    ]
+    for (const f of candidates) {
+      if (existsSync(f)) {
+        try { return readFileSync(f, 'utf8') } catch (e: any) { return '' }
+      }
     }
-    try { return readFileSync(f, 'utf8') } catch (e: any) { return '' }
+    return ''
   })
 
-  ipcMain.handle('list-chapters', async () => {
-    if (!state.outputDir) return []
-    const bookDir = findActiveBookDir()
+  ipcMain.handle('list-chapters', async (_e: Electron.IpcMainInvokeEvent, bookId?: string) => {
+    const targetId = bookId || state.activeWritingBookId || ''
+    const bookDir = resolveBookDirReadOnly(targetId || undefined)
     if (!bookDir) return []
     let chDir = join(bookDir, 'chapters')
     if (!existsSync(chDir)) {
@@ -387,8 +477,11 @@ function register(ipcMain: Electron.IpcMain) {
     }
     const { readdirSync } = require('fs')
     const files = readdirSync(chDir).filter((f: string) => f.endsWith('.md')).sort()
-    const progress = readStoreJSON('meta/progress.json')
-    const titles = progress?.chapterTitles || {}
+    const progress = readStoreJSONAny(
+      ['meta/progress.json', 'output/novel/meta/progress.json', 'progress.json'],
+      bookDir,
+    )
+    const titles = progress?.chapterTitles || progress?.chapter_titles || {}
     return files.map((file: string) => {
       const num = parseInt(file.replace('.md', ''), 10)
       if (isNaN(num)) return null
@@ -493,6 +586,38 @@ function register(ipcMain: Electron.IpcMain) {
       })
       
       startRuntimeSync()
+      const health = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        let settled = false
+        const done = (r: { ok: boolean; error?: string }) => {
+          if (settled) return
+          settled = true
+          clearTimeout(t)
+          resolve(r)
+        }
+        const t = setTimeout(() => {
+          if (state.ainovelProcess && state.ainovelProcess.exitCode === null) done({ ok: true })
+          else done({ ok: false, error: extractCliError(stderrData) || '引擎未能保持运行' })
+        }, STARTUP_HEALTH_MS)
+        const proc = state.ainovelProcess
+        if (!proc) {
+          done({ ok: false, error: '引擎进程未创建' })
+          return
+        }
+        if (proc.exitCode !== null) {
+          done({ ok: false, error: extractCliError(stderrData) || ('引擎退出码 ' + proc.exitCode) })
+          return
+        }
+        proc.once('exit', (code: number | null) => {
+          done({
+            ok: false,
+            error: extractCliError(stderrData) || ('引擎启动失败（退出码 ' + (code ?? -1) + '）'),
+          })
+        })
+      })
+      if (!health.ok) {
+        log.error('create-book-auto:startup-failed', health.error)
+        return { book: null, error: health.error || '引擎启动失败' }
+      }
       log.info('create-book-auto: CLI 已启动', { id, bookDir })
       return { book: { ...book, completedCount: 0 }, error: null }
     } catch (e: any) {
@@ -550,70 +675,203 @@ function readStoreJSONAny(relativePaths: string[], baseDir?: string) {
 
 function getBookForSnapshot(bookId?: string) {
   const db = getDB()
+  // 指定 bookId 时只查该书，禁止回落到其它书籍（切书串数据的根因之一）
   if (bookId) {
-    const book = db.getBook(bookId)
-    if (book) return book
+    return db.getBook(bookId) || null
   }
   if (state.activeWritingBookId) {
     const book = db.getBook(state.activeWritingBookId)
     if (book) return book
   }
-  return db.listBooks()?.[0] || null
+  return null
+}
+
+/** 只读解析书籍目录，不创建、不回落到上一本书的 outputDir */
+function resolveBookDirReadOnly(bookId?: string): string | null {
+  if (!bookId) {
+    if (state.activeWritingBookId) return resolveBookDirReadOnly(state.activeWritingBookId)
+    return state.outputDir || null
+  }
+  try {
+    const book = getDB().getBook(bookId)
+    if (book?.workspace_dir) return book.workspace_dir
+  } catch (e: any) {
+    log.error('resolveBookDirReadOnly:getBook', e)
+  }
+  try {
+    const { join: pJoin } = require('path')
+    const { homedir } = require('os')
+    const { existsSync: fExists } = require('fs')
+    const candidate = pJoin(homedir(), '.ainovel-gui', 'books', bookId)
+    if (fExists(candidate)) return candidate
+  } catch {}
+  return null
 }
 
 function getBookRuntimeDir(bookId?: string) {
-  const book = getBookForSnapshot(bookId)
-  if (book?.id && state.activeWritingBookId && book.id === state.activeWritingBookId) {
-    return findActiveBookDir() || state.outputDir || book.workspace_dir || null
+  const id = bookId || state.activeWritingBookId || ''
+  if (!id) return state.outputDir || null
+  // 当前正在写作的书：优先进程 cwd / outputDir
+  if (state.activeWritingBookId && id === state.activeWritingBookId) {
+    return findActiveBookDir() || state.outputDir || resolveBookDirReadOnly(id)
   }
-  return book?.workspace_dir || state.outputDir || null
+  // 其它书：绝不能回落到 state.outputDir（那是上一本的目录）
+  return resolveBookDirReadOnly(id)
+}
+
+
+/** 当前全局启用的 provider/model（模型管理/切换弹窗写入） */
+function getActiveProviderDisplay(): { provider: string; model: string; name: string } {
+  try {
+    const cfg = getDB().getConfig('provider_config') || {}
+    const key = String(cfg.provider || '')
+    const p = (cfg.providers && key) ? cfg.providers[key] : null
+    const name = String((p && p.name) || key || '')
+    const model = String(cfg.model || (p && p.model) || '')
+    return { provider: key, model, name: name || key }
+  } catch {
+    return { provider: '', model: '', name: '' }
+  }
+}
+
+/**
+ * 开始/继续写作前：把当前启用模型写入书籍 run_meta + run.json，
+ * 避免 CLI/顶栏继续用上一轮的 custom-xxx 残留。
+ */
+function applyActiveProviderToBook(bookId: string, cwd?: string) {
+  if (!bookId) return
+  const cur = getActiveProviderDisplay()
+  if (!cur.provider && !cur.model) return
+
+  try {
+    const db = getDB()
+    const existing = db.getRunMeta(bookId) || {}
+    db.saveRunMeta(bookId, {
+      ...existing,
+      provider: cur.provider || existing.provider || '',
+      model: cur.model || existing.model || '',
+      started_at: existing.started_at || new Date().toISOString(),
+    })
+  } catch (e: any) {
+    log.warn('applyActiveProviderToBook:db', e?.message || e)
+  }
+
+  // 单一真源：书籍 cwd 下 CLI 路径 output/novel/meta/run.json
+  let root = cwd || ''
+  if (!root) {
+    try {
+      const book = getDB().getBook(bookId)
+      if (book?.workspace_dir) root = book.workspace_dir
+    } catch {}
+  }
+  if (!root) root = resolveBookCwd(bookId)
+
+  const { existsSync: fExists, mkdirSync: fMkdir, readFileSync: fRead, writeFileSync: fWrite } = require('fs')
+  const { dirname: fDirname } = require('path')
+  const runPath = bookRunJsonPath(root)
+  try {
+    let data: any = {}
+    if (fExists(runPath)) {
+      data = JSON.parse(fRead(runPath, 'utf8') || '{}') || {}
+    } else {
+      const dir = fDirname(runPath)
+      if (!fExists(dir)) fMkdir(dir, { recursive: true })
+    }
+    data.provider = cur.provider || data.provider || ''
+    data.model = cur.model || data.model || ''
+    if (!data.started_at) data.started_at = new Date().toISOString()
+    fWrite(runPath, JSON.stringify(data, null, 2), 'utf8')
+    log.info('applyActiveProviderToBook:run.json', { bookId, runPath, provider: data.provider, model: data.model })
+  } catch (e: any) {
+    log.warn('applyActiveProviderToBook:run.json', e?.message || e)
+  }
 }
 
 function createSnapshotHandler() {
   return async (_e: Electron.IpcMainInvokeEvent, bookId?: string) => {
     const snap = createEmptySnapshot()
     const activeBook = getBookForSnapshot(bookId)
-    const activeBookId = activeBook?.id || ''
-    const isAlive = state.ainovelProcess !== null && state.ainovelProcess.exitCode === null
-    snap.runtimeState = isAlive ? 'running' : 'idle'
-    snap.isRunning = isAlive
+    const activeBookId = activeBook?.id || bookId || ''
+    const processAlive = state.ainovelProcess !== null && state.ainovelProcess.exitCode === null
+    // 仅当查看的书就是当前写作书时，才显示 running
+    const isThisBookRunning = processAlive && !!activeBookId && activeBookId === (state.activeWritingBookId || '')
+    snap.runtimeState = isThisBookRunning ? 'running' : 'idle'
+    snap.isRunning = isThisBookRunning
     try {
       if (activeBook) {
         snap.novelName = activeBook.name || ''; snap.style = activeBook.style || ''
         snap.phase = activeBook.phase || 'init'; snap.totalWordCount = activeBook.totalWordCount || 0; snap.completedCount = activeBook.completedCount || 0
       }
     } catch (e: any) { log.error('snapshot:book', e) }
-    if (isAlive) { fillRunningSnapshot(snap, activeBookId) }
-    else { fillDbSnapshot(snap, activeBookId) }
-    try { if (activeBookId) applyUsageSnapshot(snap, getDB().getUsageStats(activeBookId)) } catch (e: any) { log.error('snapshot:usage', e) }
-    snap.statusLabel = deriveStatusLabel(snap)
-    fillFallbackData(snap, activeBookId)
+    if (activeBookId) {
+      if (isThisBookRunning) { fillRunningSnapshot(snap, activeBookId) }
+      else { fillDbSnapshot(snap, activeBookId) }
+      try { applyUsageSnapshot(snap, getDB().getUsageStats(activeBookId)) } catch (e: any) { log.error('snapshot:usage', e) }
+      snap.statusLabel = deriveStatusLabel(snap)
+      fillFallbackData(snap, activeBookId)
+    }
+    // 运行中：显示本书 run 模型；空闲：显示全局当前启用
+    {
+      const cur = getActiveProviderDisplay()
+      if (!isThisBookRunning && cur.provider) {
+        snap.provider = cur.name || cur.provider
+        if (cur.model) snap.modelName = cur.model
+      } else if (snap.provider) {
+        try {
+          const cfg = getDB().getConfig('provider_config') || {}
+          const p = cfg.providers?.[snap.provider]
+          if (p?.name) snap.provider = p.name
+        } catch {}
+      } else if (cur.provider) {
+        snap.provider = cur.name || cur.provider
+        if (cur.model) snap.modelName = cur.model
+      }
+    }
     return snap
   }
 }
 
+function loadCheckpointEvents(bookDir: string) {
+  const { existsSync, readFileSync } = require('fs')
+  const { join } = require('path')
+  const candidates = [
+    join(bookDir, 'meta', 'checkpoints.jsonl'),
+    join(bookDir, 'output', 'meta', 'checkpoints.jsonl'),
+    join(bookDir, 'output', 'novel', 'meta', 'checkpoints.jsonl'),
+  ]
+  const finalPath = candidates.find((p: string) => existsSync(p))
+  if (!finalPath) return []
+  try {
+    const raw = readFileSync(finalPath, 'utf8')
+    return raw.split('\n').filter(Boolean).slice(-500).map((line: string) => {
+      try {
+        const p = JSON.parse(line)
+        return { time: p.time || '', category: p.category || 'SYSTEM', summary: p.summary || '', detail: p.detail || '', agent: p.agent || '', depth: p.depth || 0, level: p.level || 'info', duration: p.duration || 0, bookId: p.bookId || '' }
+      } catch (e: any) {
+        return { time: '', category: 'SYSTEM', summary: line, detail: '', agent: '', depth: 0, level: 'info', duration: 0, bookId: '' }
+      }
+    })
+  } catch (e: any) {
+    log.warn('get-events:read', e?.message || e)
+    return []
+  }
+}
+
 function createEventsHandler() {
-  return async () => {
-    if (state.engineEvents.length > 0) return [...state.engineEvents].slice(-500)
-    if (!state.outputDir) return []
-    const bookDir = findActiveBookDir()
-    if (!bookDir) return []
-    const { existsSync, readFileSync } = require('fs')
-    const { join } = require('path')
-    const cpPath = join(bookDir, 'meta', 'checkpoints.jsonl')
-    if (!existsSync(cpPath)) {
-      const altPath = join(bookDir, 'output', 'meta', 'checkpoints.jsonl')
-      if (!existsSync(altPath)) return []
-      state.cpPathAlt = altPath
-    }
-    const finalPath = existsSync(cpPath) ? cpPath : state.cpPathAlt
-    try {
-      const raw = readFileSync(finalPath || cpPath, 'utf8')
-      return raw.split('\n').filter(Boolean).slice(-500).map((line: string) => {
-        try { const p = JSON.parse(line); return { time: p.time || '', category: p.category || 'SYSTEM', summary: p.summary || '', detail: p.detail || '', agent: p.agent || '', depth: p.depth || 0, level: p.level || 'info', duration: p.duration || 0 } }
-        catch (e: any) { return { time: '', category: 'SYSTEM', summary: line, detail: '', agent: '', depth: 0, level: 'info', duration: 0 } }
+  return async (_e: Electron.IpcMainInvokeEvent, bookId?: string) => {
+    const targetId = bookId || state.activeWritingBookId || ''
+    // 内存事件：按 bookId 过滤，避免切书后仍显示上一本日志
+    if (state.engineEvents.length > 0) {
+      const filtered = state.engineEvents.filter((ev: any) => {
+        if (!targetId) return true
+        if (!ev.bookId) return targetId === (state.activeWritingBookId || '')
+        return ev.bookId === targetId
       })
-    } catch (e: any) { log.warn('get-events:read', e?.message || e); return [] }
+      if (filtered.length > 0) return filtered.slice(-500)
+    }
+    const bookDir = resolveBookDirReadOnly(targetId || undefined)
+    if (!bookDir) return []
+    return loadCheckpointEvents(bookDir)
   }
 }
 
@@ -892,9 +1150,8 @@ function stopAinovelProcess() {
 }
 
 function getActiveWritingBookId() {
-  if (state.activeWritingBookId) return state.activeWritingBookId
-  try { return getDB().listBooks()?.[0]?.id || '' }
-  catch (e: any) { log.error('getActiveWritingBookId', e); return '' }
+  // 禁止回落到「书库第一本」，否则会把指令/元数据写到错误书籍
+  return state.activeWritingBookId || ''
 }
 
 function sendProcessExited(code: number | null) {
@@ -1266,4 +1523,4 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
   } catch (e: any) { log.debug('runtime-sync:plan-skip', { key: 'user_directives', error: e.message }) }
 }
 
-module.exports = { register, stopAinovelProcess }
+module.exports = { register, stopAinovelProcess, applyActiveProviderToBook, getActiveProviderDisplay }

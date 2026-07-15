@@ -87,7 +87,16 @@ function register(ipcMain: Electron.IpcMain) {
   })
 
   ipcMain.handle('get-directory', async () => state.outputDir)
-  ipcMain.handle('open-directory', async (_e: Electron.IpcMainInvokeEvent, dir: string) => { require('electron').shell.openPath(validatePath(dir)) })
+  ipcMain.handle('open-directory', async (_e: Electron.IpcMainInvokeEvent, dir: string) => {
+    const safeDir = validatePath(dir)
+    if (!existsSync(safeDir)) mkdirSync(safeDir, { recursive: true })
+    const err = await require('electron').shell.openPath(safeDir)
+    if (err) {
+      log.error('open-directory', err)
+      throw new Error(err)
+    }
+    return true
+  })
 
   // ── CLI 二进制检查 ──
   ipcMain.handle('check-binary', async () => {
@@ -445,21 +454,42 @@ ${navItems}
     } catch (e: any) { return { error: e.message || '请求失败' } }
   })
 
+  function sanitizeProviderConfig(config: any) {
+    if (!config || typeof config !== 'object') return config
+    if (config.roles && typeof config.roles === 'object') {
+      const valid = new Set(['coordinator', 'architect', 'writer', 'editor'])
+      const cleaned: Record<string, any> = {}
+      for (const [k, v] of Object.entries(config.roles)) {
+        if (valid.has(k)) cleaned[k] = v
+      }
+      if (Object.keys(cleaned).length > 0) config.roles = cleaned
+      else delete config.roles
+    }
+    delete config.role_models
+    return config
+  }
+
   ipcMain.handle('load-provider-config', async () => {
     try {
       const config = getDB().getConfig('provider_config')
-      if (config) return config
+      if (config) return sanitizeProviderConfig(config)
     } catch (e: any) { log.error('load-provider-config:db', e) }
     if (!existsSync(CONFIG_PATH)) return null
     try {
-      const jsonConfig = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))
+      const jsonConfig = sanitizeProviderConfig(JSON.parse(readFileSync(CONFIG_PATH, 'utf8')))
       getDB().setConfig('provider_config', jsonConfig)
       return jsonConfig
     } catch (e: any) { log.error('load-provider-config:file', e); return null }
   })
 
   ipcMain.handle('save-provider-config', async (_e: Electron.IpcMainInvokeEvent, config: any) => {
-    try { getDB().setConfig('provider_config', config) } catch (e: any) { log.error('save-provider-config:db', e) }
+    try {
+      config = sanitizeProviderConfig(config || {})
+    } catch (e: any) {
+      log.warn('save-provider-config:sanitize', e?.message || e)
+      return false
+    }
+    try { getDB().setConfig('provider_config', config) } catch (e: any) { log.error('save-provider-config:db', e); return false }
     const dir = dirname(CONFIG_PATH)
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))

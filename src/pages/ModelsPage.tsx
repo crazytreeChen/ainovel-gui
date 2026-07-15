@@ -30,8 +30,10 @@ const PRESETS: ProviderItem[] = [
 ]
 
 const ROLES = [
-  { key: '', label: '默认' }, { key: 'coordinator', label: '协调器' },
-  { key: 'architect', label: '架构师' }, { key: 'writer', label: '写手' }, { key: 'editor', label: '编辑' },
+  { key: 'coordinator', label: '协调器' },
+  { key: 'architect', label: '架构师' },
+  { key: 'writer', label: '写手' },
+  { key: 'editor', label: '编辑' },
 ]
 
 const inputS: React.CSSProperties = {
@@ -73,12 +75,30 @@ export default function ModelsPage() {
       if (cfg.providers) {
         setProviders(prev => prev.map(p => {
           const saved = cfg.providers[p.key]
-          return saved ? { ...p, apiKey: saved.api_key || '', baseUrl: saved.base_url || p.baseUrl, models: saved.models || [] } : p
+          return saved ? {
+            ...p,
+            apiKey: saved.api_key || '',
+            baseUrl: saved.base_url || p.baseUrl,
+            models: saved.models || [],
+            selectedModel: saved.model || p.selectedModel || '',
+            // 预设保留中文显示名；若配置里有自定义 name 也允许覆盖
+            name: saved.name || p.name,
+          } : p
         }))
         const extra: ProviderItem[] = []
         for (const [k, v] of Object.entries(cfg.providers) as [string, ProviderConfig][]) {
           if (!PRESETS.find(p => p.key === k)) {
-            extra.push({ key: k, name: v.name || k, type: v.type || 'openai', baseUrl: v.base_url || '', apiKey: v.api_key || '', models: v.models || [], selectedModel: v.model || '' })
+            // 显示名优先用保存的 name，绝不默认展示 custom-时间戳（除非用户真没起名）
+            const displayName = (v.name && String(v.name).trim()) || (k.startsWith('custom-') ? '自定义 Provider' : k)
+            extra.push({
+              key: k,
+              name: displayName,
+              type: v.type || 'openai',
+              baseUrl: v.base_url || '',
+              apiKey: v.api_key || '',
+              models: v.models || [],
+              selectedModel: v.model || '',
+            })
           }
         }
         setCustoms(extra)
@@ -87,6 +107,19 @@ export default function ModelsPage() {
       if (cfg.image_provider) setImageProvider(cfg.image_provider)
       if (cfg.image_model) setImageModel(cfg.image_model)
       if (cfg.image_format) setImageFormat(cfg.image_format)
+      // 角色分配：仅合法 role key
+      if (cfg.roles && typeof cfg.roles === 'object') {
+        const next: Record<string, { provider: string; model: string }> = {}
+        for (const [k, v] of Object.entries(cfg.roles as Record<string, any>)) {
+          if (!['coordinator', 'architect', 'writer', 'editor'].includes(k)) continue
+          if (!v || typeof v !== 'object') continue
+          next[k] = {
+            provider: String(v.provider || ''),
+            model: String(v.model || ''),
+          }
+        }
+        setRoleAssign(next)
+      }
     })()
   }, [])
 
@@ -118,22 +151,78 @@ export default function ModelsPage() {
   async function handleSave() {
     if (!window.electronAPI) return
     setSaving(true); setSaveMsg('')
-    const all = [...providers, ...customs]
-    const providersCfg: Record<string, any> = {}
-    for (const p of all) {
-      if (!p.apiKey) continue
-      const entry: any = { type: p.type, base_url: p.baseUrl, api_key: p.apiKey }
-      if (p.models.length > 0) entry.models = p.models
-      providersCfg[p.key] = entry
+    try {
+      // 与磁盘合并，避免整包覆盖冲掉 reasoning/roles/其它字段
+      const prev = (await window.electronAPI.loadProviderConfig()) || {}
+      const all = [...providers, ...customs]
+      const providersCfg: Record<string, any> = { ...(prev.providers || {}) }
+
+      // 更新 UI 中有 key 的项；明确清空 key 的项从配置删除
+      const uiKeys = new Set(all.map(p => p.key))
+      for (const p of all) {
+        if (!p.apiKey) {
+          if (providersCfg[p.key]) delete providersCfg[p.key]
+          continue
+        }
+        const entry: any = {
+          ...(providersCfg[p.key] || {}),
+          name: p.name,
+          type: p.type,
+          base_url: p.baseUrl,
+          api_key: p.apiKey,
+        }
+        if (p.models.length > 0) entry.models = p.models
+        if (p.selectedModel) entry.model = p.selectedModel
+        providersCfg[p.key] = entry
+      }
+
+      // 自定义已从 UI 删除的，从配置移除（预设 key 无 key 时上面已删）
+      for (const key of Object.keys(providersCfg)) {
+        if (!uiKeys.has(key) && String(key).startsWith('custom-')) {
+          delete providersCfg[key]
+        }
+      }
+
+      const active = itemByKey(enabled)
+      if (!enabled || !active?.apiKey) {
+        setSaveMsg('请先选择并配置启用的 Provider')
+        setSaving(false)
+        return
+      }
+
+      const roles: Record<string, { provider?: string; model?: string }> = {}
+      for (const [k, v] of Object.entries(roleAssign)) {
+        if (!['coordinator', 'architect', 'writer', 'editor'].includes(k)) continue
+        if (!v?.provider) continue
+        roles[k] = { provider: v.provider, model: v.model || '' }
+      }
+
+      const config: Record<string, any> = {
+        ...prev,
+        provider: enabled,
+        model: active.selectedModel || prev.model || '',
+        reasoning_effort: prev.reasoning_effort || 'medium',
+        providers: providersCfg,
+      }
+      if (Object.keys(roles).length > 0) config.roles = roles
+      else delete config.roles
+      delete config.role_models
+
+      await window.electronAPI.saveProviderConfig(config)
+
+      const { useBookStore } = await import('@/stores/useBookStore')
+      const bookId = useBookStore.getState().activeBookId
+      if (bookId && window.electronAPI.applyProviderToBook) {
+        await window.electronAPI.applyProviderToBook(bookId)
+      }
+
+      setSaveMsg('已保存')
+      setTimeout(() => setSaveMsg(''), 2500)
+    } catch (e: any) {
+      setSaveMsg(e?.message || '保存失败')
+    } finally {
+      setSaving(false)
     }
-    const active = itemByKey(enabled)
-    const config: Record<string, any> = {
-      provider: enabled, model: active?.selectedModel || '',
-      reasoning_effort: 'medium', providers: providersCfg,
-    }
-    await window.electronAPI.saveProviderConfig(config)
-    setSaveMsg('已保存')
-    setSaving(false); setTimeout(() => setSaveMsg(''), 2500)
   }
 
   function removeCustom(key: string) {
@@ -144,9 +233,28 @@ export default function ModelsPage() {
 
   function addCustom() {
     if (!addUrl.trim()) return
-    const key = 'custom-' + Date.now()
     const name = addName.trim() || addUrl.replace(/^https?:\/\//, '').split('/')[0] || '自定义'
-    setCustoms(prev => [...prev, { key, name, type: addType, baseUrl: addUrl.trim(), apiKey: addKey.trim(), models: [], selectedModel: '' }])
+    // key 仅作内部 id；卡片显示始终用 name
+    // 尽量用可读 slug，冲突时再追加时间戳
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fff_-]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32) || 'custom'
+    const used = new Set([...providers, ...customs].map(p => p.key))
+    let key = slug
+    if (used.has(key) || PRESETS.some(p => p.key === key)) {
+      key = `${slug}-${Date.now()}`
+    }
+    setCustoms(prev => [...prev, {
+      key,
+      name,
+      type: addType,
+      baseUrl: addUrl.trim(),
+      apiKey: addKey.trim(),
+      models: [],
+      selectedModel: '',
+    }])
     setSelected(key)
     setShowAdd(false); setAddName(''); setAddUrl(''); setAddKey('')
   }
@@ -296,7 +404,7 @@ export default function ModelsPage() {
           )}
         </div>
 
-        <RoleAssignment roles={ROLES} allItems={allItems} enabled={enabled} roleAssign={roleAssign} onChange={() => {}} />
+        <RoleAssignment roles={ROLES} allItems={allItems} enabled={enabled} roleAssign={roleAssign} onChange={(_en, roleKey, value) => { if (!roleKey) return; setRoleAssign(prev => { if (!value.provider) { const next = { ...prev }; delete next[roleKey]; return next }; return { ...prev, [roleKey]: value } }) }} />
       </div>
     </div>
   )

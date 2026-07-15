@@ -28,7 +28,7 @@ export default function BookList() {
           <div className="text-dim text-center mt-60">
             <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.3 }}>📖</div>
             <p style={{ fontSize: 16, marginBottom: 8 }}>还没有书籍</p>
-            <p className="text-sm">点击"新建书籍"开始创作，或"打开目录"导入已有作品</p>
+            <p className="text-sm">点击"新建书籍"开始创作，或"导入目录"导入已有作品</p>
           </div>
         )}
 
@@ -43,7 +43,8 @@ export default function BookList() {
               <BookCard key={book.id} book={book} viewMode={crud.viewMode}
                 onClick={() => navigate(`/books/${book.id}/workspace?mode=writing`)}
                 onEdit={(e) => crud.handleEditClick(book, e)}
-                onDelete={(e) => crud.handleDelete(book.id, e)} />
+                onDelete={(e) => crud.handleDelete(book.id, e)}
+                onOpenFolder={(e) => { void crud.handleOpenFolder(book, e) }} />
             ))}
           </div>
         )}
@@ -72,7 +73,7 @@ export default function BookList() {
 
             <div className="mb-12 text-sm" style={{ lineHeight: 1.6 }}>
               <p>确认要删除 <strong style={{ color: 'var(--color-text)' }}>《{crud.deleteTarget.name}》</strong> 吗？</p>
-              <p className="text-dim text-xs mt-8">此操作不可恢复，所有章节、大纲、角色数据将被永久删除。</p>
+              <p className="text-dim text-xs mt-8">此操作不可恢复，数据库记录与书籍文件夹（章节、大纲、角色等）都将被永久删除。</p>
             </div>
 
             <div className="mb-12">

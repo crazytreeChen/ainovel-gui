@@ -4,7 +4,7 @@ import BookCover from '@/components/BookCover'
 import ImageViewer from '@/components/ImageViewer'
 import { getPhaseLabel } from '@/lib/utils/phaseLabel'
 
-type Mode = 'quick' | 'detailed'
+type Mode = 'quick' | 'detailed' | 'cocreate'
 
 export default function NewBook() {
   const navigate = useNavigate()
@@ -15,6 +15,12 @@ export default function NewBook() {
   const [quickStyle, setQuickStyle] = useState('default')
   const [quickCreating, setQuickCreating] = useState(false)
   const [quickError, setQuickError] = useState('')
+
+  // ── 共创模式 ──
+  const [coPremise, setCoPremise] = useState('')
+  const [coStyle, setCoStyle] = useState('default')
+  const [coCreating, setCoCreating] = useState(false)
+  const [coError, setCoError] = useState('')
 
   // ── 详细模式 ──
   const [name, setName] = useState('')
@@ -65,6 +71,29 @@ export default function NewBook() {
       setQuickError(e.message || '创建失败')
     }
     setQuickCreating(false)
+  }
+
+  // ── 共创模式：先建书，再进工作台打开共创窗（不立刻开写） ──
+  const handleCocreateCreate = async () => {
+    if (!coPremise.trim()) { setCoError('请输入初始创作想法'); return }
+    setCoCreating(true)
+    setCoError('')
+    try {
+      if (window.electronAPI) {
+        const premise = coPremise.trim()
+        // 想法只放 premise；书名用占位，避免把整段创作想法当成书名
+        const tempName = '未命名共创'
+        const book = await window.electronAPI.createBook(tempName, coStyle, 'init', premise, '')
+        if (book?.id) {
+          navigate(`/books/${book.id}/workspace?mode=writing&cocreate=1`)
+        } else {
+          setCoError('创建失败')
+        }
+      }
+    } catch (e: any) {
+      setCoError(e.message || '创建失败')
+    }
+    setCoCreating(false)
   }
 
   // ── 详细模式：手动创建 ──
@@ -132,6 +161,10 @@ export default function NewBook() {
             onClick={() => switchMode('detailed')} style={{ flex: 1, fontSize: 12 }}>
             📝 详细设置
           </button>
+          <button className={`welcome-mode-btn ${mode === 'cocreate' ? 'active' : ''}`}
+            onClick={() => switchMode('cocreate')} style={{ flex: 1, fontSize: 12 }}>
+            🤝 共创规划
+          </button>
         </div>
 
         {/* ── 快速创作 ── */}
@@ -181,6 +214,63 @@ export default function NewBook() {
               <div className="text-dim text-xs mt-12" style={{ lineHeight: 1.6 }}>
                 点击后 AI 将自动生成书名、大纲与框架，完成后自动进入创作工作台。
                 首次使用需确保已配置好 API 模型（<span className="cursor-clickable text-accent" onClick={() => navigate('/settings/models')}>模型管理</span>）。
+              </div>
+            </div>
+          </>
+        )}
+
+
+        {/* ── 共创规划 ── */}
+        {mode === 'cocreate' && (
+          <>
+            <div className="mb-12">
+              <div className="text-dim text-xs mb-12" style={{ lineHeight: 1.65 }}>
+                适合还没想清楚细节时：先创建书籍，再和 AI 多轮讨论方向、章纲与约束。
+                <b>确认后再开始写作</b>，不会像「一键创作」那样立刻开写。
+              </div>
+              <label className="text-muted text-sm mb-8 d-block">
+                初始创作想法 <span className="text-error text-xs">*必填</span>
+              </label>
+              <textarea value={coPremise} onChange={e => setCoPremise(e.target.value)}
+                placeholder={'例如：「都市高武，主角 F 级绝对平衡能力，超限进化系统，前八万字只写城市范围……」\n\n可以写得尽量完整；进入共创后还能继续改。'}
+                className="textarea-field mono"
+                style={{ width: '100%', minHeight: 180, fontSize: 14, lineHeight: 1.8, padding: 14, resize: 'vertical' }} />
+            </div>
+
+            <div className="mb-16">
+              <label className="text-muted text-sm mb-8 d-block">写作风格（可选）</label>
+              <div className="flex-row flex-wrap" style={{ gap: 6 }}>
+                {[
+                  { key: 'default', label: '通用' },
+                  { key: 'fantasy', label: '仙侠/玄幻' },
+                  { key: 'suspense', label: '悬疑推理' },
+                  { key: 'romance', label: '言情' },
+                ].map(s => (
+                  <button key={s.key}
+                    className={`welcome-mode-btn ${coStyle === s.key ? 'active' : ''}`}
+                    onClick={() => setCoStyle(s.key)}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {coError && (
+              <div className="text-error text-sm mono mb-12">{coError}</div>
+            )}
+
+            <div className="mt-auto" style={{ paddingTop: 16 }}>
+              <div className="flex-row gap-10">
+                <button className="welcome-mode-btn active" onClick={handleCocreateCreate} disabled={coCreating}
+                  style={{ flex: 1, fontSize: 14, padding: '10px 24px', opacity: coCreating ? 0.6 : 1 }}>
+                  {coCreating ? '创建中...' : '🤝 创建并进入共创'}
+                </button>
+                <button className="welcome-mode-btn" onClick={() => navigate('/')}
+                  style={{ fontSize: 13, padding: '10px 24px' }}>
+                  取消
+                </button>
+              </div>
+              <div className="text-dim text-xs mt-12" style={{ lineHeight: 1.6 }}>
+                流程：创建书籍 → 打开工作台 → 自动弹出共创窗口 → 多轮讨论 → 确认后开始写作。
+                也可稍后在工作台输入 <span className="text-accent">/cocreate</span> 再次进入。
               </div>
             </div>
           </>
@@ -289,6 +379,24 @@ export default function NewBook() {
       </div>
 
       {/* 右侧：内容简介（仅详细模式展示大编辑区） */}
+      {mode === 'cocreate' && (
+        <div className="flex-1 flex-col p-32" style={{ justifyContent: 'center' }}>
+          <div className="text-accent mono mb-12" style={{ fontSize: 16 }}>共创规划适合什么情况？</div>
+          <div className="text-dim" style={{ fontSize: 13, lineHeight: 1.8, maxWidth: 520 }}>
+            <div className="mb-12">• 只有大致题材，还没定书名、能力线、前几章事件</div>
+            <div className="mb-12">• 想先和 AI 把方向、禁忌、节奏谈清楚，再开写</div>
+            <div className="mb-12">• 不想像「一键创作」那样立刻进入正文流水线</div>
+            <div className="mb-12">• 已有长设定，想整理成可执行的后续方向 brief</div>
+            <div style={{ marginTop: 20, padding: 12, border: '1px solid var(--color-border)', borderRadius: 6, background: 'var(--color-surface)' }}>
+              <div className="text-muted text-xs mb-6">三种入口怎么选</div>
+              <div>⚡ 快速创作：一句话直接开写</div>
+              <div>📝 详细设置：手动填书名/封面/阶段后再建书</div>
+              <div>🤝 共创规划：先讨论方向，确认后再写作</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {mode === 'detailed' && (
         <div className="flex-1 flex-col p-32">
           <label className="text-muted text-sm mb-8" style={{ display: 'block', fontWeight: 'bold' }}>内容简介</label>

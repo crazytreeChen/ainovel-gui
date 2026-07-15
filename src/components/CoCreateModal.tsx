@@ -102,9 +102,22 @@ function looksLikeProtocolLeak(text: string): boolean {
   return /<\/?\s*(?:reply|draft|ready|suggestions)\s*>/i.test(String(text || ''))
 }
 
+/** display name helper: avoid premise-as-title */
+function displayNovelName(name?: string, premise?: string): string {
+  const n = String(name || '').trim()
+  if (!n) return '未命名共创'
+  if (n === '未命名共创' || n === '共创规划中') return n
+  if (n === '未命名' || n === '未定书名') return '未命名共创'
+  if (n.length > 40) return '未命名共创'
+  const p = String(premise || '').replace(/\s+/g, ' ').trim()
+  const bare = n.replace(/[…\.]+$/, '')
+  if (p && bare.length >= 12 && (p === bare || p.startsWith(bare))) return '未命名共创'
+  return n
+}
+
 function compactStatusLines(snap: UISnapshot, summaryText?: string): string[] {
   const lines: string[] = []
-  const name = snap.novelName || '未命名'
+  const name = displayNovelName(snap.novelName, snap.premise)
   lines.push(`书名：《${name}》`)
   lines.push(`阶段：${phaseLabel(snap.phase)}${snap.flow ? ` · ${snap.flow}` : ''}`)
   const completed = Number(snap.completedCount || 0)
@@ -334,13 +347,14 @@ export default function CoCreateModal({ onClose }: CoCreateModalProps) {
       }
       await new Promise((r) => setTimeout(r, 200))
       const resumed = await resumeWriting(activeBookId)
-      addToast({
-        id: Date.now(),
-        message: resumed
-          ? '共创结束，已按新方向开始写作'
-          : '共创结果已保存，但自动开始失败，请手动点「开始」',
-        type: resumed ? 'success' : 'error',
-      })
+      if (resumed.ok) {
+        addToast({
+          id: Date.now(),
+          message: '共创结束，已按新方向开始写作',
+          type: 'success',
+        })
+      }
+      // 失败时 store 已 toast 真实错误，不再二次模糊提示
       handleClose()
     } finally {
       setFinishing(false)
