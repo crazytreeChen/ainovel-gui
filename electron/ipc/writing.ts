@@ -40,24 +40,93 @@ function parseStderr(text: string) {
   if (state.engineEvents.length > 2000) state.engineEvents.splice(0, state.engineEvents.length - 2000)
 }
 
+
+/** 解析书籍工作目录 */
+function resolveBookCwd(bookId: string): string {
+  const { join: pJoin } = require('path')
+  const { existsSync: fExists, mkdirSync: fMkdir } = require('fs')
+  const { homedir } = require('os')
+  let cwd = ''
+  if (bookId) {
+    try {
+      const book = getDB().getBook(bookId)
+      if (book?.workspace_dir) cwd = book.workspace_dir
+    } catch (e: any) {
+      log.error('resolveBookCwd:getBook', e)
+    }
+    if (!cwd) {
+      cwd = pJoin(homedir(), '.ainovel-gui', 'books', bookId)
+      try { getDB().updateBook(bookId, { workspace_dir: cwd }) } catch {}
+    }
+  }
+  if (!cwd) cwd = state.outputDir || pJoin(homedir(), '.ainovel-gui', 'books', 'default')
+  if (!fExists(cwd)) fMkdir(cwd, { recursive: true })
+  return cwd
+}
+
+/**
+ * headless 启动参数：
+ * - 引擎 Resume 仅在 label 非空时成立；phase=init/complete 或无 progress 必须带 --prompt
+ * - 可恢复阶段：仅 --headless
+ * - 新建/init：--headless --prompt <premise|hint>
+ */
+function buildHeadlessArgs(bookId: string, promptHint?: string): { args: string[]; cwd: string; mode: 'resume' | 'prompt'; phase: string } {
+  const { join: pJoin } = require('path')
+  const { existsSync: fExists, readFileSync: fRead } = require('fs')
+  const cwd = resolveBookCwd(bookId)
+  const progressCandidates = [
+    pJoin(cwd, 'output', 'novel', 'meta', 'progress.json'),
+    pJoin(cwd, 'meta', 'progress.json'),
+  ]
+  let phase = ''
+  try {
+    for (const progressPath of progressCandidates) {
+      if (!fExists(progressPath)) continue
+      const progress = JSON.parse(fRead(progressPath, 'utf8'))
+      phase = String(progress?.phase || '').trim()
+      break
+    }
+  } catch (e: any) {
+    log.warn('buildHeadlessArgs:progress-parse', e?.message || e)
+  }
+
+  // 与 engine/internal/host/resume.go 对齐：
+  // - 无 progress / phase=complete -> 不可 resume，必须 --prompt
+  // - phase=init 仍可 resume（引擎 label="恢复"），前提是 progress.json 真实存在
+  const canResume = !!phase && phase !== 'complete'
+
+  const args = ['--headless']
+  if (state.configPath) args.push('--config', state.configPath)
+
+  if (canResume) {
+    log.info('buildHeadlessArgs', { bookId, mode: 'resume', phase, cwd })
+    return { args, cwd, mode: 'resume', phase }
+  }
+
+  let prompt = (promptHint || '').trim()
+  if (!prompt && bookId) {
+    try {
+      const book = getDB().getBook(bookId)
+      prompt = String(book?.premise || book?.name || '').trim()
+    } catch {}
+  }
+  if (!prompt) prompt = '请基于当前书籍设定继续创作'
+  args.push('--prompt', prompt)
+  log.info('buildHeadlessArgs', { bookId, mode: 'prompt', phase: phase || 'none', cwd, promptLen: prompt.length })
+  return { args, cwd, mode: 'prompt', phase: phase || 'none' }
+}
 function register(ipcMain: Electron.IpcMain) {
   ipcMain.handle('start-writing', async (_e: Electron.IpcMainInvokeEvent, _prompt: string, bookId: string) => {
     await stopAinovelProcess()
     const binary = getAinovelBinary()
     if (!existsSync(binary)) return false
-    let cwd = state.outputDir || require('electron').app.getPath('documents')
-    if (bookId) {
-      try {
-        const book = getDB().getBook(bookId)
-        if (book?.workspace_dir) cwd = book.workspace_dir
-      } catch (e: any) { log.error('start-writing:getBook', e) }
-    }
-    if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true })
+    const built = buildHeadlessArgs(bookId || '', _prompt || '')
+    const cwd = built.cwd
+    const args = built.args
+    log.info('start-writing', { bookId, mode: built.mode, cwd })
     state.outputDir = cwd
     state.activeWritingBookId = bookId || ''
     state.lastWritingExitCode = null
-    const args = ['--headless']
-    if (state.configPath) args.push('--config', state.configPath)
     try {
       state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
       let stderrData = ''
@@ -105,24 +174,14 @@ function register(ipcMain: Electron.IpcMain) {
     await stopAinovelProcess()
     const binary = getAinovelBinary()
     if (!existsSync(binary)) return false
-    let cwd = state.outputDir || require('electron').app.getPath('documents')
-    if (bookId) {
-      try {
-        const book = getDB().getBook(bookId)
-        if (book?.workspace_dir) cwd = book.workspace_dir
-      } catch (e: any) { log.error('resume-writing:getBook', e) }
-    }
-    if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }); return false }
-    const path = require('path')
-    const sep = path.sep
-    const outputPattern = new RegExp(`${sep}output${sep}[^${sep}]+$`)
-    const outputParent = cwd.replace(outputPattern, '')
-    if (outputParent !== cwd && existsSync(join(outputParent, 'output'))) cwd = outputParent
+    const built = buildHeadlessArgs(bookId || '')
+    const cwd = built.cwd
+    if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }) }
     state.outputDir = cwd
     state.activeWritingBookId = bookId || ''
     state.lastWritingExitCode = null
-    const args = ['--headless']
-    if (state.configPath) args.push('--config', state.configPath)
+    const args = built.args
+    log.info('resume-writing', { bookId, mode: built.mode, phase: built.phase, cwd })
     try {
       state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
       let stderrData = ''
@@ -164,7 +223,7 @@ function register(ipcMain: Electron.IpcMain) {
     } catch (e: any) { log.error('resume-writing:spawn', e); return false }
   })
 
-  ipcMain.handle('send-input', async (_e: Electron.IpcMainInvokeEvent, text: string) => {
+  ipcMain.handle('send-input', async (_e: Electron.IpcMainInvokeEvent, text: string, bookIdArg?: string) => {
     const now = new Date()
     const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
 
@@ -186,7 +245,7 @@ function register(ipcMain: Electron.IpcMain) {
     }
 
     // 进程未运行（规划暂停/已退出）：保存为 pending_steer，下次恢复时生效
-    const bookId = getActiveWritingBookId()
+    const bookId = bookIdArg || getActiveWritingBookId()
     if (bookId) {
       try {
         const db = getDB()
@@ -196,8 +255,12 @@ function register(ipcMain: Electron.IpcMain) {
         const { join: pJoin } = require('path')
         const { existsSync: fExists, writeFileSync: fWrite } = require('fs')
         const { homedir } = require('os')
-        const dir = pJoin(homedir(), '.ainovel-gui', 'books', bookId)
-        const runJsonPath = pJoin(dir, 'meta', 'run.json')
+        const dir = resolveBookCwd(bookId)
+        const runJsonCandidates = [
+          pJoin(dir, 'output', 'novel', 'meta', 'run.json'),
+          pJoin(dir, 'meta', 'run.json'),
+        ]
+        let runJsonPath = runJsonCandidates.find((p: string) => fExists(p)) || runJsonCandidates[0]
         if (fExists(runJsonPath)) {
           try {
             const raw = JSON.parse(require('fs').readFileSync(runJsonPath, 'utf8'))
@@ -206,10 +269,11 @@ function register(ipcMain: Electron.IpcMain) {
             fWrite(runJsonPath, JSON.stringify(raw, null, 2), 'utf8')
           } catch (e: any) { /* 文件可能不存在，忽略 */ }
         } else {
-          // 创建 meta 目录和 run.json
+          // 创建 CLI 默认目录结构：output/novel/meta/run.json
           const { mkdirSync } = require('fs')
-          const metaDir = pJoin(dir, 'meta')
+          const metaDir = pJoin(dir, 'output', 'novel', 'meta')
           if (!fExists(metaDir)) mkdirSync(metaDir, { recursive: true })
+          runJsonPath = pJoin(metaDir, 'run.json')
           fWrite(runJsonPath, JSON.stringify({ pending_steer: text, pending_steer_at: timeStr }, null, 2), 'utf8')
         }
         state.engineEvents.push({ time: timeStr, category: 'USER', summary: text.slice(0, 120), detail: text, agent: '', depth: 0, level: 'info', duration: 0 })
@@ -238,22 +302,16 @@ function register(ipcMain: Electron.IpcMain) {
     pendingUserConfirm = false
     lastPhase = '' // 重置相位追踪，避免重复暂停
     log.info('confirm-continue-writing: 用户确认继续', { bookId })
-    // 通过 resume-writing 恢复 CLI 进程
     const binary = getAinovelBinary()
     if (!existsSync(binary)) return false
-    let cwd = state.outputDir || require('electron').app.getPath('documents')
-    if (bookId) {
-      try {
-        const book = getDB().getBook(bookId)
-        if (book?.workspace_dir) cwd = book.workspace_dir
-      } catch (e: any) { log.error('confirm-continue-writing:getBook', e) }
-    }
-    if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }); return false }
+    const built = buildHeadlessArgs(bookId || '')
+    const cwd = built.cwd
+    if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }) }
     state.outputDir = cwd
     state.activeWritingBookId = bookId || ''
     state.lastWritingExitCode = null
-    const args = ['--headless']
-    if (state.configPath) args.push('--config', state.configPath)
+    const args = built.args
+    log.info('confirm-continue-writing', { bookId, mode: built.mode, phase: built.phase, cwd })
     try {
       state.ainovelProcess = spawn(binary, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } })
       const { join: pJoin } = require('path')

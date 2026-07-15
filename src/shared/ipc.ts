@@ -177,9 +177,11 @@ export interface ElectronAPI {
   startWriting: (prompt: string, bookId?: string) => Promise<boolean>
   createBookAuto: (premise: string, style?: string) => Promise<{ book?: BookItem; error?: string | null }>
   resumeWriting: (bookId: string) => Promise<boolean>
-  sendInput: (text: string) => Promise<boolean>
+  sendInput: (text: string, bookId?: string) => Promise<boolean>
   pauseWriting: () => Promise<boolean>
   stopWriting: () => Promise<boolean>
+  cocreateGetContext: (bookId?: string) => Promise<{ opener: string; summary: string; bookId: string; error?: string }>
+  cocreateChat: (payload: { bookId?: string; history?: { role: string; content: string }[]; userText?: string; kickoff?: boolean; prevDraft?: string }) => Promise<{ error?: string | null; message: string; draft: string; ready: boolean; suggestions: string[]; summary?: string; raw?: string }>
 
   // 诊断
   runDiag: () => Promise<string>

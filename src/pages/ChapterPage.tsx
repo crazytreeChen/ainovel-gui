@@ -63,6 +63,31 @@ export default function ChapterPage() {
     if (!isNaN(n)) navigate(`/books/${id}/chapters/${n}`)
   }
 
+  async function handleCopyBody() {
+    const text = (showDraft ? draft : content).trim()
+    if (!text) {
+      showToast('暂无正文可复制', 'error')
+      return
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.left = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      showToast(showDraft ? '草稿正文已复制' : '终稿正文已复制', 'success')
+    } catch {
+      showToast('复制失败，请手动选择复制', 'error')
+    }
+  }
+
   // Cmd+S / Ctrl+S 保存（必须在早期 return 之前）
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -138,13 +163,22 @@ export default function ChapterPage() {
       )}
 
       {/* 草稿/终稿切换 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexShrink: 0 }}>
-        <button className={`welcome-mode-btn ${!showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(false); setShowPreview(false) }}>终稿</button>
-        <button className={`welcome-mode-btn ${showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(true); setShowPreview(false) }}>草稿</button>
-        <button className={`welcome-mode-btn ${showPreview ? 'active' : ''}`} onClick={() => setShowPreview(!showPreview)}>预览</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexShrink: 0, alignItems: 'center' }}>
+        <button className={`welcome-mode-btn ${!showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(false); setShowPreview(false); setShowDiff(false) }}>终稿</button>
+        <button className={`welcome-mode-btn ${showDraft && !showPreview ? 'active' : ''}`} onClick={() => { setShowDraft(true); setShowPreview(false); setShowDiff(false) }}>草稿</button>
+        <button className={`welcome-mode-btn ${showPreview ? 'active' : ''}`} onClick={() => { setShowPreview(!showPreview); setShowDiff(false) }}>预览</button>
         <button className={`welcome-mode-btn ${showDiff ? 'active' : ''}`}
-          onClick={() => { setShowDiff(!showDiff); if (!showDiff && !draft) setDraft(content) }}
+          onClick={() => { setShowDiff(!showDiff); setShowPreview(false); if (!showDiff && !draft) setDraft(content) }}
           disabled={!content && !draft}>对比</button>
+        <button
+          className="welcome-mode-btn"
+          onClick={() => void handleCopyBody()}
+          disabled={!(showDraft ? draft : content).trim()}
+          title="复制当前正文纯文本"
+          style={{ marginLeft: 'auto' }}
+        >
+          复制正文
+        </button>
       </div>
 
       {/* 编辑器 / Markdown 预览 / Diff */}

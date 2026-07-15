@@ -75,9 +75,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startWriting: (prompt: string, bookId?: string) => ipcRenderer.invoke('start-writing', prompt, bookId),
   createBookAuto: (premise: string, style?: string) => ipcRenderer.invoke('create-book-auto', premise, style),
   resumeWriting: (bookId: string) => ipcRenderer.invoke('resume-writing', bookId),
-  sendInput: (text: string) => ipcRenderer.invoke('send-input', text),
+  sendInput: (text: string, bookId?: string) => ipcRenderer.invoke('send-input', text, bookId),
   pauseWriting: () => ipcRenderer.invoke('pause-writing'),
   stopWriting: () => ipcRenderer.invoke('stop-writing'),
+  cocreateGetContext: (bookId?: string) => ipcRenderer.invoke('cocreate-get-context', bookId),
+  cocreateChat: (payload: any) => ipcRenderer.invoke('cocreate-chat', payload),
 
   // 诊断
   runDiag: () => ipcRenderer.invoke('run-diag'),

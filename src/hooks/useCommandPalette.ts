@@ -46,10 +46,13 @@ export function useCommandPalette(
   const runDiag = useWritingStore((s) => s.runDiag)
   const clearStreamOutput = useWritingStore((s) => s.clearStreamOutput)
   const sendInput = useWritingStore((s) => s.sendInput)
+  const addToast = useUIStore((s) => s.addToast)
 
   const filteredCmds = useMemo(() => {
     if (!inputValue.startsWith('/')) return []
-    return COMMANDS.filter((c) => c.name.startsWith(inputValue.slice(1).toLowerCase()))
+    const q = inputValue.slice(1).trim().toLowerCase()
+    if (!q) return COMMANDS
+    return COMMANDS.filter((c) => c.name.startsWith(q) || c.usage.toLowerCase().includes(q))
   }, [inputValue])
 
   const handleInputChange = useCallback((value: string) => {
@@ -63,40 +66,20 @@ export function useCommandPalette(
     setCmdIndex(0)
   }, [])
 
-  const handlePaletteKeyDown = useCallback((e: React.KeyboardEvent): boolean => {
-    if (e.key === 'Escape') {
-      setInputValue('')
-      setShowCommands(false)
-      return true
-    }
-
-    if (e.key === 'ArrowUp' && showCommands) {
-      e.preventDefault()
-      setCmdIndex((i) => Math.max(0, i - 1))
-      return true
-    }
-
-    if (e.key === 'ArrowDown' && showCommands) {
-      e.preventDefault()
-      setCmdIndex((i) => Math.min(filteredCmds.length - 1, i + 1))
-      return true
-    }
-
-    if (e.key === 'Tab' && showCommands && filteredCmds.length > 0) {
-      e.preventDefault()
-      setInputValue('/' + filteredCmds[cmdIndex].name + ' ')
-      setShowCommands(false)
-      return true
-    }
-
-    return false
-  }, [setInputValue, showCommands, cmdIndex, filteredCmds])
-
   const executeCommand = useCallback(async (text: string): Promise<boolean> => {
     if (!text.startsWith('/')) return false
 
-    const parts = text.slice(1).split(' ')
-    const cmdName = parts[0].toLowerCase()
+    const raw = text.slice(1).trim()
+    // 只有一个斜杠或空命令：不发送到引擎
+    if (!raw) {
+      setInputValue('')
+      setShowCommands(false)
+      addToast({ id: Date.now(), message: '请选择命令，例如 /cocreate', type: 'info' })
+      return true
+    }
+
+    const parts = raw.split(/\s+/)
+    const cmdName = (parts[0] || '').toLowerCase()
 
     setInputValue('')
     setShowCommands(false)
@@ -115,16 +98,65 @@ export function useCommandPalette(
         pushModal('export')
         return true
       case 'cocreate':
+        // 打开共创规划弹窗（不走干预通道）
         pushModal('coCreate')
         return true
       case 'clear':
         clearStreamOutput()
         return true
+      case 'import':
+      case 'simulate':
+      case 'importsim':
+        // 这些命令需要参数/引擎支持：进程运行中才转发
+        await sendInput(text)
+        return true
       default:
+        // 未知 /命令 才尝试作为引擎指令发送
         await sendInput(text)
         return true
     }
-  }, [setInputValue, pushModal, runDiag, clearStreamOutput, sendInput])
+  }, [setInputValue, pushModal, runDiag, clearStreamOutput, sendInput, addToast])
+
+  const handlePaletteKeyDown = useCallback((e: React.KeyboardEvent): boolean => {
+    if (!inputValue.startsWith('/') && !showCommands) return false
+
+    if (e.key === 'Escape') {
+      setInputValue('')
+      setShowCommands(false)
+      return true
+    }
+
+    if (e.key === 'ArrowUp' && showCommands && filteredCmds.length > 0) {
+      e.preventDefault()
+      setCmdIndex((i) => Math.max(0, i - 1))
+      return true
+    }
+
+    if (e.key === 'ArrowDown' && showCommands && filteredCmds.length > 0) {
+      e.preventDefault()
+      setCmdIndex((i) => Math.min(filteredCmds.length - 1, i + 1))
+      return true
+    }
+
+    // Tab：补全当前高亮命令
+    if (e.key === 'Tab' && showCommands && filteredCmds.length > 0) {
+      e.preventDefault()
+      setInputValue('/' + filteredCmds[cmdIndex].name + ' ')
+      setShowCommands(false)
+      return true
+    }
+
+    // Enter：直接执行当前高亮命令（关键修复）
+    // 以前只提交输入框里的 "/"，导致 /cocreate 被当成干预发出并失败
+    if (e.key === 'Enter' && !e.shiftKey && showCommands && filteredCmds.length > 0) {
+      e.preventDefault()
+      const chosen = filteredCmds[Math.min(cmdIndex, filteredCmds.length - 1)]
+      void executeCommand('/' + chosen.name)
+      return true
+    }
+
+    return false
+  }, [inputValue, showCommands, cmdIndex, filteredCmds, setInputValue, executeCommand])
 
   return {
     showCommands,

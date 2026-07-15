@@ -9,6 +9,7 @@ const { register: registerBooks } = require('./ipc/books')
 const { register: registerWorkspace } = require('./ipc/workspace')
 const { register: registerWriting } = require('./ipc/writing')
 const { register: registerSystem } = require('./ipc/system')
+const { register: registerCocreate } = require('./ipc/cocreate')
 
 const log = createLogger('main')
 
@@ -51,6 +52,7 @@ app.whenReady().then(() => {
   registerWorkspace(ipcMain)
   registerWriting(ipcMain)
   registerSystem(ipcMain)
+  registerCocreate(ipcMain)
   log.info('All IPC modules registered')
 
   createWindow()

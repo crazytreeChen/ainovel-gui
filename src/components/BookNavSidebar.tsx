@@ -40,11 +40,16 @@ export default function BookNavSidebar({ bookId }: { bookId: string }) {
       <div className="nav-sidebar-items">
         {items.map((item) => {
           const isActive = (() => {
-            if (location.pathname === item.path) return true
-            if (item.path === `/books/${bookId}`) return false
-            const locParts = location.pathname.split('/')
-            const itemParts = item.path.split('/')
-            return itemParts.every((part, i) => part === locParts[i])
+            // 导出管理是弹窗，没有路由，绝不能因为 path 为空误判为高亮
+            if (item.action === 'pushExport' || !item.path) return false
+            // 导航项 path 可能带 query（如 workspace?mode=writing），只按 pathname 匹配
+            const itemPath = item.path.split('?')[0]
+            const pathname = location.pathname
+            if (pathname === itemPath) return true
+            if (pathname.startsWith(itemPath + '/')) return true
+            // 章节详情页归入「书籍简介/章节」
+            if (itemPath.endsWith('/intro') && pathname.startsWith(`/books/${bookId}/chapters`)) return true
+            return false
           })()
           return (
             <div

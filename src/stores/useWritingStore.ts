@@ -15,7 +15,7 @@ export interface WritingState {
   startWriting: (prompt: string, bookId?: string) => Promise<boolean>
   resumeWriting: (bookId: string) => Promise<boolean>
   confirmContinueWriting: (bookId: string) => Promise<boolean>
-  sendInput: (text: string) => Promise<boolean>
+  sendInput: (text: string, bookId?: string) => Promise<boolean>
   pauseWriting: () => Promise<boolean>
   stopWriting: () => Promise<boolean>
   runDiag: () => Promise<void>
@@ -77,15 +77,15 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     }
   },
 
-  sendInput: async (text) => {
+  sendInput: async (text, bookId) => {
     const api = window.electronAPI
     if (!api) return false
     get().pushToHistory(text)
-    const ok = await api.sendInput(text)
+    const ok = await api.sendInput(text, bookId)
     if (!ok) {
       useUIStore.getState().addToast({
         id: Date.now(),
-        message: '发送干预失败：创作进程未运行或已退出',
+        message: '发送失败：未找到当前书籍或创作引擎不可用',
         type: 'error',
       })
     }

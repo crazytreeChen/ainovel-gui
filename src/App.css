@@ -258,6 +258,21 @@ html, body, #root {
   border-radius: var(--radius); min-width: 400px; max-width: 700px;
   max-height: 80vh; overflow-y: auto; padding: 20px;
 }
+.modal-content.modal-lg {
+  max-width: min(960px, 96vw);
+  width: min(960px, 96vw);
+  max-height: 94vh;
+  height: min(820px, 94vh);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modal-content.modal-lg .modal-close {
+  float: none;
+  position: absolute;
+  top: 12px;
+  right: 14px;
+}
 .modal-title {
   font-size: 16px; font-weight: bold; color: var(--color-accent);
   margin-bottom: 16px; font-family: var(--font-mono);
