@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/voocel/agentcore/schema"
@@ -143,6 +144,14 @@ func (t *SaveReviewTool) Execute(_ context.Context, args json.RawMessage) (json.
 
 	if err := t.store.World.SaveReview(r); err != nil {
 		return nil, fmt.Errorf("save review: %w", err)
+	}
+
+	// 弹出已审阅的章节，避免 Router 反复派发 editor 审阅同一章
+	// （PopImmediateReviewChapter 在重写 commit 时被加入，审阅完成后必须清除）
+	if popped, popErr := t.store.Progress.PopImmediateReviewChapter(); popErr != nil {
+		return nil, fmt.Errorf("pop immediate review: %w", popErr)
+	} else if popped > 0 {
+		slog.Info("save_review: 已弹出立即审阅章节", "module", "review", "chapter", popped)
 	}
 
 	// 检查审阅-修复循环次数限制

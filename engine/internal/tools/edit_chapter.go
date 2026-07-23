@@ -14,6 +14,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/domain"
 	"github.com/voocel/ainovel-cli/internal/errs"
 	"github.com/voocel/ainovel-cli/internal/store"
+	"github.com/voocel/ainovel-cli/internal/utils"
 )
 
 // EditChapterTool 对章节草稿做定点字符串替换，适用于打磨场景。
@@ -81,7 +82,7 @@ func fallbackReplace(draftPath, oldStr, newStr string, replaceAll bool) error {
 		if result == content {
 			return fmt.Errorf("替换后无变化")
 		}
-		return os.WriteFile(draftPath, []byte(result), 0644)
+		return os.WriteFile(draftPath, utils.SanitizeUTF8([]byte(result)), 0644)
 	}
 	result := re.ReplaceAllStringFunc(content, func(match string) string {
 		return newStr
@@ -89,7 +90,7 @@ func fallbackReplace(draftPath, oldStr, newStr string, replaceAll bool) error {
 	if result == content {
 		return fmt.Errorf("替换后无变化")
 	}
-	return os.WriteFile(draftPath, []byte(result), 0644)
+	return os.WriteFile(draftPath, utils.SanitizeUTF8([]byte(result)), 0644)
 }
 
 func (t *EditChapterTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {

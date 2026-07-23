@@ -976,13 +976,27 @@ ${reviewContent}
         let applied: string[] = []
 
         // 应用修复：标题
-        if (suggestedTitle && suggestedTitle !== oldTitle) {
+        // 目标标题优先级：AI 建议标题 > 大纲预定标题（首行非有效标题行时兜底回填）> 现有标题清洗归一。
+        // 之前仅在 AI 主动返回 suggested_title 且 ≠ 当前标题时才改，导致首行是正文（无 # 标题行、
+        // oldTitle 退化为「第N章」）的章节标题永远不被修复。现用大纲预定标题主动回填。
+        let targetTitle = suggestedTitle || ''
+        const cleanOld = cleanChapterTitle(oldTitle, num)
+        if (!targetTitle && outlineEntry?.title && (!titleMatch || oldTitle === `第${num}章`)) {
+          const cleanOutline = cleanChapterTitle(outlineEntry.title, num)
+          if (cleanOutline && cleanOutline !== cleanOld) targetTitle = cleanOutline
+        }
+        if (!targetTitle && cleanOld !== oldTitle && titleMatch) {
+          targetTitle = cleanOld
+        }
+        if (targetTitle && targetTitle !== cleanOld) {
           if (apply) {
-            lines[0] = `# ${suggestedTitle}`
-            writeFileSync(filePath, lines.join('\n'), 'utf8')
-            try { db.saveChapter(bookId, num, lines.join('\n'), suggestedTitle) } catch (e: any) { log.error('batch-audit:save-title', e) }
+            if (titleMatch) lines[0] = `# ${targetTitle}`
+            else lines.unshift(`# ${targetTitle}`)
+            const newContent = lines.join('\n')
+            writeFileSync(filePath, newContent, 'utf8')
+            try { db.saveChapter(bookId, num, newContent, targetTitle) } catch (e: any) { log.error('batch-audit:save-title', e) }
           }
-          applied.push(`标题: "${oldTitle}" → "${suggestedTitle}"`)
+          applied.push(`标题: "${oldTitle}" → "${targetTitle}"`)
         }
 
         // 应用修复：修正正文

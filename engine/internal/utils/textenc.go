@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"strings"
 	"unicode/utf8"
 
@@ -18,4 +19,33 @@ func DecodeText(data []byte) string {
 		}
 	}
 	return strings.TrimPrefix(string(data), "\uFEFF")
+}
+
+// SanitizeUTF8 将字节切片中的非法 UTF-8 序列替换为 U+FFFD，保证返回值一定
+// 通过 utf8.Valid 校验。用于把磁盘文件/工具结果喂给 LLM 前做兜底清洗，避免
+// provider SDK 因 "text block must be valid UTF-8" 拒绝请求，进而导致上下文
+// 压缩（compaction / FullSummary）失败、Coordinator 终止。合法 UTF-8 原样返回。
+func SanitizeUTF8(b []byte) []byte {
+	if utf8.Valid(b) {
+		return b
+	}
+	out := bytes.NewBuffer(make([]byte, 0, len(b)))
+	for len(b) > 0 {
+		r, size := utf8.DecodeRune(b)
+		if r == utf8.RuneError {
+			out.WriteRune('\uFFFD')
+		} else {
+			out.WriteRune(r)
+		}
+		b = b[size:]
+	}
+	return out.Bytes()
+}
+
+// SanitizeUTF8String 对字符串做同样的非法 UTF-8 清洗。
+func SanitizeUTF8String(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	return string(SanitizeUTF8([]byte(s)))
 }

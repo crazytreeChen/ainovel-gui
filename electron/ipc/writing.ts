@@ -857,8 +857,30 @@ let planFileCache: Record<string, number> = {}
 let lastPhase = ''
 /** 是否已暂停等待用户确认继续写作（避免重复暂停） */
 let pendingUserConfirm = false
-/** 从大纲数据提取的预定章节标题，按顺序排列（索引 0 → 第1章） */
+/** 从大纲数据提取的预定章节标题。
+ *  - plannedChapterTitles：按大纲条目顺序的数组（保留兼容）。
+ *  - plannedTitleByChapter：按真实章节号索引的映射，用于章节同步时精确匹配，
+ *    避免"数组索引 == 章节号-1"假设在写超规划/章节号不连续时错位。 */
 let plannedChapterTitles: string[] = []
+let plannedTitleByChapter = new Map<number, string>()
+
+/** 按章节号查预定标题：优先用真实章节号映射（避免数组索引与章节号错位），
+ *  降级用旧的顺序数组（num-1 索引）以兼容。 */
+function lookupPlannedTitle(num: number): string {
+  if (num > 0) {
+    const byChapter = plannedTitleByChapter.get(num)
+    if (byChapter) return byChapter
+    if (num <= plannedChapterTitles.length) return plannedChapterTitles[num - 1]
+  }
+  return ''
+}
+
+/** 首行是否更像正文而非标题：以中文句末标点结尾，或含句中标点且较长。 */
+function firstLineLooksLikeContent(s: string): boolean {
+  if (!s) return false
+  if (/[。！？]$/.test(s)) return true
+  return s.length > 14 && /[，。！？、；：]/.test(s)
+}
 
 function startRuntimeSync() {
   if (runtimeSyncActive) return
@@ -881,6 +903,10 @@ function doRuntimeSync() {
   const db = getDB()
   const bookId = getActiveWritingBookId()
 
+  // 先同步规划数据，确保章节同步前已建立"章节号 → 标题"映射，
+  // 否则首轮扫描会用到空的映射、回退到错误的标题来源。
+  try { syncPlanningData(bookDir, db, bookId) } catch (e: any) { log.error('runtime-sync:planning', e) }
+
   // 自动导入新章节（带目录 mtime 缓存，避免每次全扫）
   const chDir = join(bookDir, 'chapters')
   if (existsSync(chDir)) {
@@ -894,9 +920,11 @@ function doRuntimeSync() {
           const num = parseInt(file.replace('.md', ''), 10)
           if (!isNaN(num)) {
             const content = readFileSync(join(chDir, file), 'utf8')
-            const planned = num > 0 && num <= plannedChapterTitles.length ? plannedChapterTitles[num - 1] : ''
+            const planned = lookupPlannedTitle(num)
             const fromContent = content.split('\n')[0]?.replace(/^#\s*/, '').trim() || ''
-            const title = planned || fromContent || `第${num}章`
+            // 优先用预定标题；预定缺失时，仅当首行"像标题"（非正文句子）才采用，
+            // 否则降级为"第N章"，避免重写后正文首句被当成章节名显示。
+            const title = planned || (fromContent && !firstLineLooksLikeContent(fromContent) ? fromContent : `第${num}章`)
             db.saveChapter(bookId, num, content, title)
             if (planned && planned !== fromContent) {
               log.debug('runtime-sync:chapters 使用预定标题', { num, planned, fromContent })
@@ -998,9 +1026,6 @@ function doRuntimeSync() {
     } catch (e: any) { log.error('runtime-sync:progress', e) }
   }
 
-  // 同步规划数据 → SQLite（大纲/角色/时间线/世界观/用户规则等）
-  syncPlanningData(bookDir, db, bookId)
-
   // 推送最新快照到渲染进程
   try {
     if (bookId && state.mainWindow && !state.mainWindow.isDestroyed()) {
@@ -1018,6 +1043,7 @@ function stopRuntimeSync() {
   // 清空文件缓存，确保下次启动时重新同步
   planFileCache = {}
   plannedChapterTitles = []
+  plannedTitleByChapter.clear()
 }
 
 /**
@@ -1067,6 +1093,12 @@ function syncPlanningData(bookDir: string, db: any, bookId: string) {
           if (allArcChapters.length) db.saveArcChapters(bookId, allArcChapters)
           // 按卷/弧顺序提取预定章节标题，供写入章节时使用
           plannedChapterTitles = allArcChapters.map((ac: any) => ac.title || '')
+          // 同时建立"章节号 → 标题"映射，供章节同步时按真实章节号精确匹配
+          plannedTitleByChapter = new Map(
+            allArcChapters
+              .filter((ac: any) => (ac.chapter || 0) > 0)
+              .map((ac: any) => [ac.chapter as number, (ac.title || '') as string])
+          )
           log.info('runtime-sync:plan 已提取预定章节标题', { count: plannedChapterTitles.length })
         }
       },

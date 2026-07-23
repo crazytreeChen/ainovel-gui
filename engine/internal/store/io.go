@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/voocel/ainovel-cli/internal/utils"
 )
 
 // IO 封装文件系统读写操作，提供加锁和原子写入。
@@ -30,10 +32,19 @@ func (io *IO) ReadFile(rel string) ([]byte, error) {
 }
 
 func (io *IO) ReadFileUnlocked(rel string) ([]byte, error) {
-	return os.ReadFile(io.path(rel))
+	data, err := os.ReadFile(io.path(rel))
+	if err != nil {
+		return nil, err
+	}
+	// 兜底清洗：章节/草稿/大纲等文本文件可能含非法 UTF-8（模型输出偶发、
+	// 或外部导入文件），读回上下文前必须保证合法，否则 provider SDK 会在
+	// 上下文压缩（compaction）时拒绝请求导致整轮创作终止。
+	return utils.SanitizeUTF8(data), nil
 }
 
 func (io *IO) WriteFileUnlocked(rel string, data []byte) error {
+	// 落盘前清洗，避免非法 UTF-8 字节写入文件后被反复读回、污染 transcript。
+	data = utils.SanitizeUTF8(data)
 	p := io.path(rel)
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
